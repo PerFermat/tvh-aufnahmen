@@ -267,15 +267,63 @@ def do_move(tvh, moves):
     return {'moved': done, 'skipped': len(moves) - done}
 
 
-def do_edit(tvh, req):
-    # Beschreibung, Start und Ende lassen sich bei fertigen Aufnahmen in 4.3 nicht ändern
-    # (Ende ändern macht den Eintrag sogar ungültig) – daher nur Titel und Untertitel.
-    title = (req.get('title') or '').strip()
+# Felder, die beim Neuanlegen eines Eintrags (Beschreibung ändern) übernommen werden
+COPY_FIELDS = ('channel', 'channelname', 'start', 'stop', 'start_extra', 'stop_extra', 'comment',
+               'config_name', 'owner', 'creator', 'pri', 'retention', 'removal', 'summary',
+               'genre', 'image', 'fanart_image', 'copyright_year', 'age_rating', 'category',
+               'keyword', 'credits', 'first_aired', 'content_type', 'playcount', 'playposition')
+
+
+def do_edit(tvh, lang, req):
+    norm = lambda s: (s or '').replace('\r\n', '\n').strip()  # Browser senden \r\n
+    title = norm(req.get('title'))
+    subtitle = norm(req.get('subtitle'))
     if not title:
         raise ValueError('Titel fehlt')
-    tvh.call('idnode/save', node=json.dumps({'uuid': req['uuid'], 'disp_title': title,
-                                             'disp_subtitle': (req.get('subtitle') or '').strip()}))
-    return {}
+    info = entry_info(tvh, req['uuid'])
+    desc = req.get('description')
+    if desc is None or norm(desc) == norm(info.get('disp_description')):
+        tvh.call('idnode/save', node=json.dumps({'uuid': req['uuid'], 'disp_title': title,
+                                                 'disp_subtitle': subtitle}))
+        return {'uuid': req['uuid']}
+    return recreate_entry(tvh, req['uuid'], info, lang, title, subtitle, norm(desc))
+
+
+def recreate_entry(tvh, uuid, info, lang, title, subtitle, desc):
+    """Die Beschreibung fertiger Aufnahmen ist in TVHeadend 4.3 schreibgeschützt.
+    Deshalb wird der Eintrag mit neuer Beschreibung neu angelegt. Den alten Eintrag
+    zu löschen würde die Videodatei mitlöschen – daher zeigt er vorher auf einen
+    leeren Platzhalter, und nur der wird mitgelöscht."""
+    fn = info.get('filename')
+    if not file_exists(fn):
+        raise ValueError('Videodatei fehlt, Beschreibung kann nicht geändert werden')
+    conf = {k: info[k] for k in COPY_FIELDS if info.get(k) not in (None, '', [], {})}
+    conf.update(enabled=True, title={lang: title}, files=[{'filename': fn}])
+    if subtitle:
+        conf['subtitle'] = {lang: subtitle}
+    if desc:
+        conf['description'] = {lang: desc}
+    if not conf.get('channel') and not conf.get('channelname'):
+        conf['channelname'] = UNKNOWN_CHANNEL
+    placeholder = fn + '.alter-eintrag'
+    open(placeholder, 'wb').close()
+    new = None
+    try:
+        file_moved(tvh, fn, placeholder)
+        if entry_info(tvh, uuid).get('filename') != placeholder:
+            raise ValueError('TVHeadend hat den alten Eintrag nicht umgestellt; nichts geändert')
+        new = tvh.call('dvr/entry/create', conf=json.dumps(conf)).get('uuid')
+        if not new:
+            raise ValueError('TVHeadend hat den neuen Eintrag nicht angelegt; nichts geändert')
+        tvh.call('idnode/delete', uuid=json.dumps([uuid]))
+    except Exception:
+        if not new:
+            file_moved(tvh, placeholder, fn)  # alten Eintrag zurück auf die Videodatei
+        raise
+    finally:
+        if os.path.exists(placeholder):
+            os.remove(placeholder)
+    return {'uuid': new}
 
 
 def do_remove(tvh, uuids):
@@ -471,7 +519,7 @@ def make_handler(app):
                 return
             req = json.loads(self.rfile.read(length) or b'{}')
             if self.path == '/api/edit':
-                self.run(lambda: do_edit(app.tvh, req))
+                self.run(lambda: do_edit(app.tvh, app.cfg.get('lang') or 'ger', req))
             elif self.path == '/api/remove':
                 self.run(lambda: do_remove(app.tvh, req['uuids']))
             elif self.path == '/api/import':
@@ -562,22 +610,25 @@ function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolea
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>
- <button class="b sec" onclick="editRec('${r.uuid}')">Bearbeiten</button></td></tr>
+ <button class="b sec" id="eb-${r.uuid}" onclick="editRec('${r.uuid}')">Bearbeiten</button></td></tr>
  <tr id="er-${r.uuid}" hidden><td colspan="5"></td></tr>`).join('')}
-function editRec(u){const row=$('#er-'+u);if(!row.hidden){row.hidden=true;return}
- const r=R(u);row.hidden=false;
+function closeRec(u){$('#er-'+u).hidden=true;$('#eb-'+u).textContent='Bearbeiten';$('#eb-'+u).scrollIntoView({block:'nearest'})}
+function editRec(u){const row=$('#er-'+u);if(!row.hidden)return closeRec(u);
+ const r=R(u);row.hidden=false;$('#eb-'+u).textContent='Schließen';
  row.firstElementChild.innerHTML=`<form class="ed" onsubmit="event.preventDefault();saveRec('${u}',this)">
  <label class="wide">Titel<input name="title" required value="${esc(r.title)}"></label>
- <label class="wide">Untertitel / Episode<input name="subtitle" value="${esc(r.subtitle)}"></label>
- ${r.description?`<div class="wide muted">${esc(r.description)}</div>`:''}
+ <label class="wide">Untertitel / Episode<textarea name="subtitle" rows="2" style="min-height:0">${esc(r.subtitle)}</textarea></label>
+ <label class="wide">Beschreibung<textarea name="description" rows="6">${esc(r.description)}</textarea></label>
  <div class="wide muted">Datei: ${esc(r.rel)}</div>
- <div class="wide"><button class="b">Titel speichern</button></div>
+ <div class="wide" style="display:flex;gap:10px"><button class="b">Speichern</button>
+  <button type="button" class="b sec" onclick="closeRec('${u}')">Schließen</button></div>
  <label class="wide">Datei ersetzen (z. B. nach dem Schneiden)<input type="file" accept="video/*,.ts,.mkv,.mp4,.m2ts,.mpg,.mpeg,.avi,.mov" id="up-${u}"></label>
  <div class="wide" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
   <button type="button" class="b sec" onclick="upload('${u}')">Hochladen und ersetzen</button><span id="pr-${u}" class="muted"></span>
   <button type="button" class="b bad" style="margin-left:auto" onclick="removeRec(['${u}'])">Aufnahme löschen</button></div></form>`}
 async function saveRec(u,form){const f=Object.fromEntries(new FormData(form));
- try{await api('/api/edit',{uuid:u,title:f.title,subtitle:f.subtitle});msg('Gespeichert: '+f.title,true);await load()}catch(e){msg(e.message)}}
+ const btn=form.querySelector('button');btn.disabled=true;
+ try{await api('/api/edit',{uuid:u,title:f.title,subtitle:f.subtitle,description:f.description});msg('Gespeichert: '+f.title,true);await load()}catch(e){msg(e.message);btn.disabled=false}}
 async function removeRec(uuids){if(!uuids.length)return msg('Nichts ausgewählt');
  const names=uuids.map(u=>R(u).title).slice(0,5).join(', ')+(uuids.length>5?' …':'');
  if(!confirm(`${uuids.length} Aufnahme(n) samt Videodatei endgültig löschen?\n\n${names}`))return;
@@ -623,7 +674,8 @@ function edit(i){const row=$('#ed'+i);if(!row.hidden){row.hidden=true;return}
  <label>Ende<input type="datetime-local" name="stop" required value="${dtl(s.stop)}"></label>
  <label class="wide">Beschreibung<textarea name="description"></textarea></label>
  <label class="wide">Kommentar<input name="comment" value="nachträglich importiert"></label>
- <div class="wide"><button class="b">In TVHeadend eintragen</button></div></form>`}
+ <div class="wide" style="display:flex;gap:10px"><button class="b">In TVHeadend eintragen</button>
+  <button type="button" class="b sec" onclick="$('#ed${i}').hidden=true">Schließen</button></div></form>`}
 function payload(u,f){const ch=S.channels.find(c=>c.name===f.channelname);
  return {path:u.path,title:f.title,subtitle:f.subtitle,description:f.description,comment:f.comment,
   channelname:f.channelname,channel:ch?ch.uuid:'',start:Math.floor(new Date(f.start).getTime()/1000),stop:Math.floor(new Date(f.stop).getTime()/1000)}}
