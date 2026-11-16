@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""tvh-aufnahmen: Web-Oberfläche, um Videodateien wieder als TVHeadend-Aufnahmen
-einzutragen und Einträge zu bereinigen, deren Datei nicht mehr existiert.
+"""tvh-aufnahmen: Web-Oberfläche, um TVHeadend-Aufnahmen zu verwalten – anzeigen,
+suchen, herunterladen, Datei ersetzen und löschen –, Videodateien wieder als
+Aufnahmen einzutragen und Einträge zu bereinigen, deren Datei nicht mehr existiert.
 
 Läuft direkt auf dem OSMC-Gerät (Python 3, nur Standardbibliothek).
 Getestet gegen die API von TVHeadend 4.3.
@@ -178,8 +179,38 @@ def build_state(tvh, recdir):
                         'candidate': cands[0] if len(cands) == 1 else None})
     missing.sort(key=lambda m: m['start'], reverse=True)
 
-    return {'recdir': recdir, 'unknown': unknown, 'missing': missing,
+    recordings = []
+    for e in entries:
+        fn = e.get('filename') or ''
+        if e.get('sched_status') in ('scheduled', 'recording') or not file_exists(fn):
+            continue
+        rel = os.path.relpath(fn, recdir) if fn.startswith(recdir + os.sep) else fn
+        recordings.append({'uuid': e['uuid'], 'title': e.get('disp_title') or '',
+                           'subtitle': e.get('disp_subtitle') or '',
+                           'description': e.get('disp_description') or '',
+                           'channel': e.get('channelname') or '', 'start': e.get('start', 0),
+                           'stop': e.get('stop', 0), 'status': e.get('status') or '',
+                           'rel': rel, 'size': os.path.getsize(fn)})
+    recordings.sort(key=lambda r: r['start'], reverse=True)
+
+    return {'recdir': recdir, 'recordings': recordings, 'unknown': unknown, 'missing': missing,
             'channels': tvh.channels(), 'known_count': len(entries)}
+
+
+def entry_info(tvh, uuid):
+    res = tvh.call('idnode/load', uuid=uuid)
+    if not res.get('entries'):
+        raise ValueError('Aufnahme nicht gefunden')
+    return {p['id']: p.get('value') for p in res['entries'][0]['params']}
+
+
+def file_moved(tvh, src, dst):
+    # TVHeadend 4.3 übernimmt den neuen Pfad, antwortet aber trotzdem mit 404.
+    try:
+        tvh.call('dvr/entry/filemoved', src=src, dst=dst)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
 
 
 def do_import(tvh, recdir, lang, req):
@@ -231,9 +262,64 @@ def do_move(tvh, moves):
     for m in moves:
         if file_exists(m['src']) or not file_exists(m['dst']):
             continue
-        tvh.call('dvr/entry/filemoved', src=m['src'], dst=m['dst'])
+        file_moved(tvh, m['src'], m['dst'])
         done += 1
     return {'moved': done, 'skipped': len(moves) - done}
+
+
+def do_edit(tvh, req):
+    # Beschreibung, Start und Ende lassen sich bei fertigen Aufnahmen in 4.3 nicht ändern
+    # (Ende ändern macht den Eintrag sogar ungültig) – daher nur Titel und Untertitel.
+    title = (req.get('title') or '').strip()
+    if not title:
+        raise ValueError('Titel fehlt')
+    tvh.call('idnode/save', node=json.dumps({'uuid': req['uuid'], 'disp_title': title,
+                                             'disp_subtitle': (req.get('subtitle') or '').strip()}))
+    return {}
+
+
+def do_remove(tvh, uuids):
+    """Löscht Aufnahmen samt Datei über TVHeadend."""
+    if uuids:
+        tvh.call('dvr/entry/remove', uuid=json.dumps(uuids))
+    return {'removed': len(uuids)}
+
+
+def replace_file(tvh, uuid, name, length, body):
+    """Ersetzt die Datei einer Aufnahme durch den hochgeladenen Inhalt."""
+    old = entry_info(tvh, uuid).get('filename')
+    if not file_exists(old):
+        raise ValueError('Die bisherige Datei fehlt, Ersetzen nicht möglich')
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in VIDEO_EXT:
+        raise ValueError('Keine Videodatei: ' + name)
+    if length <= 0:
+        raise ValueError('Leere Datei')
+    if length > shutil.disk_usage(os.path.dirname(old)).free - 100 * 1024 * 1024:
+        raise ValueError('Nicht genug freier Speicher für die neue Datei')
+    new = os.path.splitext(old)[0] + ext
+    if new != old and os.path.exists(new):
+        raise ValueError('Datei existiert bereits: ' + new)
+    tmp = new + '.upload'  # keine Video-Endung: taucht nicht als „nicht eingetragen“ auf
+    try:
+        with open(tmp, 'wb') as f:
+            left = length
+            while left:
+                chunk = body.read(min(left, 1024 * 1024))
+                if not chunk:
+                    raise ValueError('Upload abgebrochen')
+                f.write(chunk)
+                left -= len(chunk)
+        os.replace(tmp, new)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    if new != old:
+        file_moved(tvh, old, new)
+        if entry_info(tvh, uuid).get('filename') != new:
+            raise ValueError('TVHeadend hat den neuen Pfad nicht übernommen; alte Datei bleibt erhalten')
+        os.remove(old)
+    return {'filename': new, 'size': length}
 
 
 class App:
@@ -308,28 +394,87 @@ def make_handler(app):
 
         def run(self, fn):
             try:
-                self.send(200, fn())
+                result = fn()
+                if result is not None:
+                    self.send(200, result)
             except urllib.error.HTTPError as e:
                 self.send(502, {'error': 'TVHeadend antwortet mit HTTP %d (%s)' % (e.code, e.reason)})
             except urllib.error.URLError as e:
                 self.send(502, {'error': 'TVHeadend nicht erreichbar: %s' % e.reason})
-            except (ValueError, KeyError) as e:
+            except (ValueError, KeyError, OSError) as e:
+                self.close_connection = True  # evtl. ungelesener Upload
                 self.send(400, {'error': str(e)})
 
+        def download(self, uuid):
+            fn = entry_info(app.tvh, uuid).get('filename')
+            if not file_exists(fn):
+                raise ValueError('Datei nicht gefunden')
+            size = os.path.getsize(fn)
+            start, end = 0, size - 1
+            rng = re.match(r'bytes=(\d*)-(\d*)$', self.headers.get('Range') or '')
+            if rng and (rng.group(1) or rng.group(2)):
+                if rng.group(1):
+                    start = int(rng.group(1))
+                    end = min(int(rng.group(2)), end) if rng.group(2) else end
+                else:
+                    start = max(0, size - int(rng.group(2)))
+                if start > end:
+                    self.send_response(416)
+                    self.send_header('Content-Range', 'bytes */%d' % size)
+                    self.end_headers()
+                    return
+                self.send_response(206)
+                self.send_header('Content-Range', 'bytes %d-%d/%d' % (start, end, size))
+            else:
+                self.send_response(200)
+            name = os.path.basename(fn)
+            ascii_name = name.encode('ascii', 'replace').decode().replace('"', '')
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Disposition', 'attachment; filename="%s"; filename*=UTF-8\'\'%s'
+                             % (ascii_name, urllib.parse.quote(name)))
+            self.send_header('Accept-Ranges', 'bytes')
+            self.send_header('Content-Length', str(end - start + 1))
+            self.end_headers()
+            try:
+                with open(fn, 'rb') as f:
+                    f.seek(start)
+                    left = end - start + 1
+                    while left:
+                        chunk = f.read(min(left, 1024 * 1024))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        left -= len(chunk)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # Download im Browser abgebrochen
+
         def do_GET(self):
-            if self.path in ('/', '/index.html'):
+            url = urllib.parse.urlsplit(self.path)
+            q = dict(urllib.parse.parse_qsl(url.query))
+            if url.path in ('/', '/index.html'):
                 self.send(200, PAGE.encode(), 'text/html; charset=utf-8')
-            elif self.path == '/api/state':
+            elif url.path == '/api/state':
                 self.run(lambda: build_state(app.tvh, app.recdir))
-            elif self.path == '/api/config':
+            elif url.path == '/api/config':
                 self.run(app.public)
+            elif url.path == '/api/download':
+                self.run(lambda: self.download(q['uuid']))
             else:
                 self.send(404, {'error': 'nicht gefunden'})
 
         def do_POST(self):
             length = int(self.headers.get('Content-Length') or 0)
+            url = urllib.parse.urlsplit(self.path)
+            if url.path == '/api/upload':  # Rohdaten der Datei, kein JSON
+                q = dict(urllib.parse.parse_qsl(url.query))
+                self.run(lambda: replace_file(app.tvh, q['uuid'], q.get('name', ''), length, self.rfile))
+                return
             req = json.loads(self.rfile.read(length) or b'{}')
-            if self.path == '/api/import':
+            if self.path == '/api/edit':
+                self.run(lambda: do_edit(app.tvh, req))
+            elif self.path == '/api/remove':
+                self.run(lambda: do_remove(app.tvh, req['uuids']))
+            elif self.path == '/api/import':
                 self.run(lambda: do_import(app.tvh, app.recdir, app.cfg.get('lang') or 'ger', req))
             elif self.path == '/api/delete':
                 self.run(lambda: do_delete(app.tvh, req['uuids']))
@@ -359,9 +504,9 @@ main{background:var(--card);margin:0 20px 20px;border:1px solid var(--line);bord
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase}
 td.f{word-break:break-all;font-size:13px}.muted{color:var(--muted)}
-button.b{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
-button.b.sec{background:transparent;color:var(--acc);border:1px solid var(--acc)}
-button.b.bad{background:var(--bad)}button.b:disabled{opacity:.5;cursor:default}
+.b{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+.b.sec{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+.b.bad{background:var(--bad)}.b:disabled{opacity:.5;cursor:default}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 form.ed{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:12px;background:var(--bg);border-radius:8px}
 form.ed label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
@@ -375,13 +520,14 @@ textarea{min-height:70px;resize:vertical}
 </style></head><body>
 <header><h1>TVHeadend Aufnahmen</h1><div class="sub" id="info">Lade …</div></header>
 <div id="msg"></div>
-<nav><button id="t1" class="on" onclick="tab(1)">Nicht eingetragene Dateien</button>
+<nav><button id="t0" class="on" onclick="tab(0)">Aufnahmen</button>
+<button id="t1" onclick="tab(1)">Nicht eingetragene Dateien</button>
 <button id="t2" onclick="tab(2)">Einträge ohne Datei</button>
 <button id="t3" onclick="tab(3)">Einstellungen</button></nav>
 <main id="main">Lade …</main>
 <datalist id="chans"></datalist>
 <script>
-let S=null,cur=1;
+let S=null,cur=0,Q='';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -392,11 +538,60 @@ function msg(t,ok){const m=$('#msg');m.textContent=t;m.className=ok?'ok':'err';i
 async function api(p,body){const r=await fetch(p,body?{method:'POST',body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
 async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').textContent='Fehler: '+e.message;tab(3);msg(e.message);return}
  $('#info').textContent=`${S.recdir} · ${S.known_count} Einträge in TVHeadend`;
+ $('#t0').textContent=`Aufnahmen (${S.recordings.length})`;
  $('#t1').textContent=`Nicht eingetragene Dateien (${S.unknown.length})`;
  $('#t2').textContent=`Einträge ohne Datei (${S.missing.length})`;
  $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');render()}
-function tab(n){cur=n;[1,2,3].forEach(k=>$('#t'+k).className=n==k?'on':'');render()}
-function render(){if(cur==3)return renderConfig();if(!S){$('#main').innerHTML='<p class="muted">Keine Daten – bitte Einstellungen prüfen.</p>';return}cur==1?renderUnknown():renderMissing()}
+function tab(n){cur=n;[0,1,2,3].forEach(k=>$('#t'+k).className=n==k?'on':'');render()}
+function render(){if(cur==3)return renderConfig();if(!S){$('#main').innerHTML='<p class="muted">Keine Daten – bitte Einstellungen prüfen.</p>';return}
+ [renderRecordings,renderUnknown,renderMissing][cur]()}
+const mins=r=>Math.round((r.stop-r.start)/60)+' min';
+const R=u=>S.recordings.find(r=>r.uuid===u);
+function renderRecordings(){
+ $('#main').innerHTML=`<div class="bar"><input id="q" type="search" placeholder="Suchen: Titel, Untertitel, Sender, Datei …" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
+ <button class="b bad" onclick="removeSel()">Ausgewählte löschen</button>
+ <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked)"> alle sichtbaren</label></div>
+ <p class="muted" id="rcount"></p>
+ <table><thead><tr><th></th><th>Titel</th><th>Sender / Datum</th><th>Dauer / Größe</th><th></th></tr></thead><tbody id="rbody"></tbody></table>`;
+ fillRecordings()}
+function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolean);
+ const list=S.recordings.filter(r=>{const t=(r.title+' '+r.subtitle+' '+r.channel+' '+r.rel).toLowerCase();return words.every(w=>t.includes(w))});
+ $('#rcount').textContent=list.length+' von '+S.recordings.length+' Aufnahmen';$('#allr').checked=false;
+ $('#rbody').innerHTML=list.map(r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
+ <td>${esc(r.title)}${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
+ <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
+ <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
+ <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>
+ <button class="b sec" onclick="editRec('${r.uuid}')">Bearbeiten</button></td></tr>
+ <tr id="er-${r.uuid}" hidden><td colspan="5"></td></tr>`).join('')}
+function editRec(u){const row=$('#er-'+u);if(!row.hidden){row.hidden=true;return}
+ const r=R(u);row.hidden=false;
+ row.firstElementChild.innerHTML=`<form class="ed" onsubmit="event.preventDefault();saveRec('${u}',this)">
+ <label class="wide">Titel<input name="title" required value="${esc(r.title)}"></label>
+ <label class="wide">Untertitel / Episode<input name="subtitle" value="${esc(r.subtitle)}"></label>
+ ${r.description?`<div class="wide muted">${esc(r.description)}</div>`:''}
+ <div class="wide muted">Datei: ${esc(r.rel)}</div>
+ <div class="wide"><button class="b">Titel speichern</button></div>
+ <label class="wide">Datei ersetzen (z. B. nach dem Schneiden)<input type="file" accept="video/*,.ts,.mkv,.mp4,.m2ts,.mpg,.mpeg,.avi,.mov" id="up-${u}"></label>
+ <div class="wide" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <button type="button" class="b sec" onclick="upload('${u}')">Hochladen und ersetzen</button><span id="pr-${u}" class="muted"></span>
+  <button type="button" class="b bad" style="margin-left:auto" onclick="removeRec(['${u}'])">Aufnahme löschen</button></div></form>`}
+async function saveRec(u,form){const f=Object.fromEntries(new FormData(form));
+ try{await api('/api/edit',{uuid:u,title:f.title,subtitle:f.subtitle});msg('Gespeichert: '+f.title,true);await load()}catch(e){msg(e.message)}}
+async function removeRec(uuids){if(!uuids.length)return msg('Nichts ausgewählt');
+ const names=uuids.map(u=>R(u).title).slice(0,5).join(', ')+(uuids.length>5?' …':'');
+ if(!confirm(`${uuids.length} Aufnahme(n) samt Videodatei endgültig löschen?\n\n${names}`))return;
+ try{const r=await api('/api/remove',{uuids});msg(r.removed+' Aufnahme(n) gelöscht',true);await load()}catch(e){msg(e.message)}}
+function removeSel(){removeRec([...document.querySelectorAll('.cr:checked')].map(c=>c.value))}
+function upload(u){const f=$('#up-'+u).files[0];if(!f)return msg('Bitte zuerst eine Datei auswählen');
+ if(!confirm(`Die Videodatei von „${R(u).title}“ durch „${f.name}“ (${gb(f.size)}) ersetzen?\nDie bisherige Datei wird überschrieben.`))return;
+ const pr=$('#pr-'+u),x=new XMLHttpRequest();
+ x.open('POST','/api/upload?uuid='+u+'&name='+encodeURIComponent(f.name));
+ x.upload.onprogress=e=>{if(e.lengthComputable)pr.textContent='Hochladen … '+Math.round(e.loaded/e.total*100)+' %'};
+ x.onload=()=>{let j={};try{j=JSON.parse(x.responseText)}catch(e){}
+  if(x.status==200){pr.textContent='';msg('Datei ersetzt: '+f.name,true);load()}else{pr.textContent='';msg(j.error||'Fehler '+x.status)}};
+ x.onerror=()=>{pr.textContent='';msg('Upload abgebrochen')};
+ x.send(f)}
 async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#main').textContent=e.message;return}
  $('#main').innerHTML=`<form class="ed" onsubmit="event.preventDefault();saveConfig(this)">
  <label class="wide">Aufnahmeverzeichnis (auf dem OSMC)<input name="recdir" required value="${esc(c.recdir)}" placeholder="/media/HDD/recordings"></label>
@@ -408,7 +603,7 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  <div class="wide muted">Gespeichert in ${esc(c.config_file)}</div>
  <div class="wide"><button class="b">Verbindung prüfen und speichern</button></div></form>`}
 async function saveConfig(form){const f=Object.fromEntries(new FormData(form));f.clear_password=!!f.clear_password;
- try{await api('/api/config',f);msg('Einstellungen gespeichert',true);await load();if(S)tab(1)}catch(e){msg(e.message)}}
+ try{await api('/api/config',f);msg('Einstellungen gespeichert',true);await load();if(S)tab(0)}catch(e){msg(e.message)}}
 function renderUnknown(){
  if(!S.unknown.length){$('#main').innerHTML='<p class="muted">Alle Dateien im Aufnahmeverzeichnis sind in TVHeadend eingetragen.</p>';return}
  let h=`<div class="bar"><button class="b sec" onclick="bulk()">Ausgewählte mit Vorschlägen importieren</button>

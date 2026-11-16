@@ -2,6 +2,7 @@
 
 Web-Oberfläche für TVHeadend 4.3, um
 
+- **Aufnahmen** anzuzeigen und zu durchsuchen, herunterzuladen, Titel und Untertitel zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen,
 - Videodateien aus dem Aufnahmeordner, die TVHeadend nicht (mehr) kennt, wieder als Aufnahme einzutragen – mit Titel, Untertitel, Sender, Zeit und Beschreibung,
 - alte Einträge, deren Datei nur in einen anderen Ordner gewandert ist, auf den neuen Pfad umzustellen,
 - Einträge zu löschen, deren Datei nicht mehr existiert. Videodateien werden dabei nie gelöscht.
@@ -60,4 +61,6 @@ sudo systemctl enable --now tvh-aufnahmen
 - Start- und Endzeit werden aus dem Dateinamen (z. B. `Tatort-2023-05-14-20-15.ts`) und der Änderungszeit geraten. Ist `ffprobe` installiert (`sudo apt install ffmpeg`), wird die echte Laufzeit verwendet.
 - Ohne Sender legt TVHeadend keinen Eintrag an. Das Tool schlägt den Sender anderer Aufnahmen im selben Ordner vor, sonst „Unbekannt“.
 - Das Ende einer Aufnahme muss in der Vergangenheit liegen, sonst würde TVHeadend einen Aufnahme-Timer anlegen. Das Tool verhindert das.
+- Datei ersetzen: Die hochgeladene Datei überschreibt die bisherige. Hat sie eine andere Endung (z. B. `.mkv` statt `.ts`), wird die Aufnahme auf die neue Datei umgestellt und die alte gelöscht. Start, Ende und Beschreibung lassen sich bei fertigen Aufnahmen in TVHeadend 4.3 nicht ändern.
+- Downloads unterstützen HTTP-Range, Player können also spulen.
 - Vor dem ersten großen Import am besten den Ordner `~/.hts/tvheadend/dvr/log` sichern.
