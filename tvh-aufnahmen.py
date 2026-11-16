@@ -1,0 +1,505 @@
+#!/usr/bin/env python3
+"""tvh-aufnahmen: Web-Oberfläche, um Videodateien wieder als TVHeadend-Aufnahmen
+einzutragen und Einträge zu bereinigen, deren Datei nicht mehr existiert.
+
+Läuft direkt auf dem OSMC-Gerät (Python 3, nur Standardbibliothek).
+Getestet gegen die API von TVHeadend 4.3.
+"""
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+VIDEO_EXT = {'.ts', '.mkv', '.mp4', '.m2ts', '.mpg', '.mpeg', '.avi', '.mov'}
+DEFAULT_DURATION = 90 * 60
+DATE_RE = re.compile(r'(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})(?:[ T_.-]{0,1}(\d{2})[-_.:h]?(\d{2}))?(?:-\d{1,2}(?!\d))?')
+UNKNOWN_CHANNEL = 'Unbekannt'
+
+
+class Utf8DigestAuthHandler(urllib.request.HTTPDigestAuthHandler):
+    """Wie HTTPDigestAuthHandler, aber mit UTF-8 statt ASCII – sonst scheitern
+    Benutzer oder Passwörter mit Umlauten."""
+    ALGOS = {'MD5': hashlib.md5, 'SHA': hashlib.sha1, 'SHA-256': hashlib.sha256}
+
+    def get_algorithm_impls(self, algorithm):
+        algo = self.ALGOS.get(algorithm.upper())
+        if algo is None:
+            raise ValueError('Nicht unterstütztes Digest-Verfahren: %r' % algorithm)
+        H = lambda x: algo(x.encode('utf-8')).hexdigest()
+        KD = lambda s, d: H('%s:%s' % (s, d))
+        return H, KD
+
+
+class Tvh:
+    def __init__(self, url, user, password):
+        self.url = url.rstrip('/')
+        handlers = []
+        if user:
+            mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+            mgr.add_password(None, self.url, user, password or '')
+            handlers += [Utf8DigestAuthHandler(mgr),
+                         urllib.request.HTTPBasicAuthHandler(mgr)]
+        self.opener = urllib.request.build_opener(*handlers)
+
+    def call(self, path, **params):
+        data = urllib.parse.urlencode(params).encode()
+        with self.opener.open(self.url + '/api/' + path, data=data, timeout=60) as r:
+            body = r.read().decode('utf-8', 'replace')
+        return json.loads(body) if body.strip() else {}
+
+    def entries(self):
+        seen = {}
+        for grid in ('grid', 'grid_finished', 'grid_failed', 'grid_removed'):
+            try:
+                res = self.call('dvr/entry/' + grid, limit=100000)
+            except urllib.error.HTTPError:
+                continue
+            for e in res.get('entries', []):
+                seen[e['uuid']] = e
+        return list(seen.values())
+
+    def channels(self):
+        res = self.call('channel/grid', limit=100000)
+        chans = [{'uuid': c['uuid'], 'name': c.get('name', '')} for c in res.get('entries', [])]
+        return sorted(chans, key=lambda c: c['name'].lower())
+
+
+_duration_cache = {}
+
+
+def probe_duration(path, mtime):
+    """Laufzeit per ffprobe, falls installiert; sonst None."""
+    key = (path, mtime)
+    if key in _duration_cache:
+        return _duration_cache[key]
+    dur = None
+    if shutil.which('ffprobe'):
+        try:
+            out = subprocess.run(
+                ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                 '-of', 'default=nw=1:nk=1', path],
+                capture_output=True, text=True, timeout=20).stdout.strip()
+            dur = int(float(out)) if out else None
+        except (subprocess.SubprocessError, ValueError):
+            pass
+    _duration_cache[key] = dur
+    return dur
+
+
+def suggest(path, st):
+    """Titel, Start und Ende aus Dateiname, Änderungszeit und Laufzeit raten."""
+    name = os.path.splitext(os.path.basename(path))[0]
+    duration = probe_duration(path, st.st_mtime)
+    start = None
+    m = DATE_RE.search(name)
+    if m:
+        y, mo, d, h, mi = m.groups()
+        try:
+            start = datetime(int(y), int(mo), int(d), int(h or 0), int(mi or 0)).timestamp()
+            name = name[:m.start()] + ' ' + name[m.end():]
+        except ValueError:
+            start = None
+    title = re.sub(r'[_]+', ' ', name)
+    title = re.sub(r'\s+', ' ', title).strip(' -._')
+    mtime = st.st_mtime
+    if start is None:
+        stop = mtime
+        start = stop - (duration or DEFAULT_DURATION)
+    elif duration:
+        stop = start + duration
+    elif start < mtime < start + 6 * 3600:
+        stop = mtime
+    else:
+        stop = start + DEFAULT_DURATION
+    return {'title': title or os.path.basename(path), 'start': int(start), 'stop': int(stop),
+            'duration_known': duration is not None}
+
+
+def scan(recdir):
+    for root, _dirs, files in os.walk(recdir):
+        for f in files:
+            if os.path.splitext(f)[1].lower() in VIDEO_EXT:
+                yield os.path.join(root, f)
+
+
+def file_exists(fn):
+    return bool(fn) and os.path.isfile(fn)
+
+
+def build_state(tvh, recdir):
+    now = time.time()
+    entries = tvh.entries()
+    known = {os.path.realpath(e['filename']) for e in entries if e.get('filename')}
+
+    # Sender-Vorschlag: der häufigste Sender anderer Aufnahmen im selben Ordner
+    dir_channels = {}
+    for e in entries:
+        if e.get('filename') and e.get('channelname'):
+            counts = dir_channels.setdefault(os.path.dirname(e['filename']), {})
+            counts[e['channelname']] = counts.get(e['channelname'], 0) + 1
+
+    unknown = []
+    for path in sorted(scan(recdir)):
+        if os.path.realpath(path) in known:
+            continue
+        st = os.stat(path)
+        sug = suggest(path, st)
+        counts = dir_channels.get(os.path.dirname(path))
+        sug['channelname'] = max(counts, key=counts.get) if counts else ''
+        unknown.append({'path': path, 'rel': os.path.relpath(path, recdir), 'size': st.st_size,
+                        'mtime': int(st.st_mtime), 'suggest': sug})
+
+    by_name = {}
+    for u in unknown:
+        by_name.setdefault(os.path.basename(u['path']), []).append(u['path'])
+
+    missing = []
+    for e in entries:
+        # Geplante und laufende Aufnahmen haben noch keine Datei – nicht anfassen.
+        if e.get('stop', 0) > now or e.get('sched_status') in ('scheduled', 'recording'):
+            continue
+        fn = e.get('filename') or ''
+        if file_exists(fn):
+            continue
+        cands = by_name.get(os.path.basename(fn), []) if fn else []
+        missing.append({'uuid': e['uuid'], 'title': e.get('disp_title') or '',
+                        'subtitle': e.get('disp_subtitle') or '',
+                        'channel': e.get('channelname') or '', 'start': e.get('start', 0),
+                        'status': e.get('status') or '', 'filename': fn,
+                        'candidate': cands[0] if len(cands) == 1 else None})
+    missing.sort(key=lambda m: m['start'], reverse=True)
+
+    return {'recdir': recdir, 'unknown': unknown, 'missing': missing,
+            'channels': tvh.channels(), 'known_count': len(entries)}
+
+
+def do_import(tvh, recdir, lang, req):
+    path = req['path']
+    real = os.path.realpath(path)
+    if not real.startswith(os.path.realpath(recdir) + os.sep) or not os.path.isfile(real):
+        raise ValueError('Datei nicht gefunden oder außerhalb des Aufnahmeverzeichnisses')
+    start, stop = int(req['start']), int(req['stop'])
+    if stop <= start:
+        raise ValueError('Ende muss nach dem Start liegen')
+    if stop >= time.time():
+        raise ValueError('Ende muss in der Vergangenheit liegen, sonst entsteht ein Aufnahme-Timer')
+    title = (req.get('title') or '').strip()
+    if not title:
+        raise ValueError('Titel fehlt')
+    conf = {'enabled': True, 'start': start, 'stop': stop, 'title': {lang: title},
+            'comment': (req.get('comment') or 'nachträglich importiert').strip(),
+            'files': [{'filename': path}]}
+    for key in ('subtitle', 'description'):
+        val = (req.get(key) or '').strip()
+        if val:
+            conf[key] = {lang: val}
+    if req.get('channel'):
+        conf['channel'] = req['channel']
+    # Ohne Sender legt TVHeadend stillschweigend nichts an (Antwort 200 mit leerem {}).
+    conf['channelname'] = (req.get('channelname') or '').strip() or UNKNOWN_CHANNEL
+    res = tvh.call('dvr/entry/create', conf=json.dumps(conf))
+    if not res.get('uuid'):
+        raise ValueError('TVHeadend hat den Eintrag nicht angelegt: ' + os.path.basename(path))
+    return res
+
+
+def do_delete(tvh, uuids):
+    entries = {e['uuid']: e for e in tvh.entries()}
+    now = time.time()
+    safe = []
+    for u in uuids:
+        e = entries.get(u)
+        # Nur löschen, wenn die Datei wirklich fehlt – sonst würde TVHeadend sie mitlöschen.
+        if e and e.get('stop', 0) < now and not file_exists(e.get('filename')):
+            safe.append(u)
+    if safe:
+        tvh.call('idnode/delete', uuid=json.dumps(safe))
+    return {'deleted': len(safe), 'skipped': len(uuids) - len(safe)}
+
+
+def do_move(tvh, moves):
+    done = 0
+    for m in moves:
+        if file_exists(m['src']) or not file_exists(m['dst']):
+            continue
+        tvh.call('dvr/entry/filemoved', src=m['src'], dst=m['dst'])
+        done += 1
+    return {'moved': done, 'skipped': len(moves) - done}
+
+
+class App:
+    """Hält die Einstellungen und speichert sie in einer JSON-Datei."""
+    KEYS = ('recdir', 'tvh', 'user', 'password', 'lang')
+
+    def __init__(self, path, cfg):
+        self.path = path
+        self.cfg = cfg
+        self.tvh = Tvh(cfg['tvh'], cfg.get('user'), cfg.get('password'))
+
+    def public(self):
+        c = {k: self.cfg.get(k) or '' for k in self.KEYS if k != 'password'}
+        c['has_password'] = bool(self.cfg.get('password'))
+        c['config_file'] = self.path
+        return c
+
+    def update(self, req):
+        new = dict(self.cfg)
+        for k in self.KEYS:
+            if k in req and (k != 'password' or req[k]):
+                new[k] = (req[k] or '').strip()
+        if req.get('clear_password'):
+            new['password'] = ''
+        new['recdir'] = os.path.abspath(new['recdir']) if new.get('recdir') else ''
+        if not new['recdir'] or not os.path.isdir(new['recdir']):
+            raise ValueError('Aufnahmeverzeichnis nicht gefunden: ' + (new['recdir'] or '(leer)'))
+        if not re.match(r'https?://', new.get('tvh') or ''):
+            raise ValueError('Server-Adresse muss mit http:// oder https:// beginnen')
+        new['lang'] = new.get('lang') or 'ger'
+        tvh = Tvh(new['tvh'], new.get('user'), new.get('password'))
+        tvh.call('serverinfo')  # Verbindung und Login prüfen, bevor gespeichert wird
+        self.cfg, self.tvh = new, tvh
+        save_config(self.path, new)
+        return self.public()
+
+    @property
+    def recdir(self):
+        if not self.cfg.get('recdir'):
+            raise ValueError('Bitte zuerst unter „Einstellungen“ das Aufnahmeverzeichnis eintragen')
+        return self.cfg['recdir']
+
+
+def load_config(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def save_config(path, cfg):
+    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+    tmp = path + '.tmp'
+    with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
+        json.dump(cfg, f, indent=2)
+    os.replace(tmp, path)
+
+
+def make_handler(app):
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            pass
+
+        def send(self, code, body, ctype='application/json; charset=utf-8'):
+            data = body if isinstance(body, bytes) else json.dumps(body).encode()
+            self.send_response(code)
+            self.send_header('Content-Type', ctype)
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def run(self, fn):
+            try:
+                self.send(200, fn())
+            except urllib.error.HTTPError as e:
+                self.send(502, {'error': 'TVHeadend antwortet mit HTTP %d (%s)' % (e.code, e.reason)})
+            except urllib.error.URLError as e:
+                self.send(502, {'error': 'TVHeadend nicht erreichbar: %s' % e.reason})
+            except (ValueError, KeyError) as e:
+                self.send(400, {'error': str(e)})
+
+        def do_GET(self):
+            if self.path in ('/', '/index.html'):
+                self.send(200, PAGE.encode(), 'text/html; charset=utf-8')
+            elif self.path == '/api/state':
+                self.run(lambda: build_state(app.tvh, app.recdir))
+            elif self.path == '/api/config':
+                self.run(app.public)
+            else:
+                self.send(404, {'error': 'nicht gefunden'})
+
+        def do_POST(self):
+            length = int(self.headers.get('Content-Length') or 0)
+            req = json.loads(self.rfile.read(length) or b'{}')
+            if self.path == '/api/import':
+                self.run(lambda: do_import(app.tvh, app.recdir, app.cfg.get('lang') or 'ger', req))
+            elif self.path == '/api/delete':
+                self.run(lambda: do_delete(app.tvh, req['uuids']))
+            elif self.path == '/api/move':
+                self.run(lambda: do_move(app.tvh, req['moves']))
+            elif self.path == '/api/config':
+                self.run(lambda: app.update(req))
+            else:
+                self.send(404, {'error': 'nicht gefunden'})
+    return Handler
+
+
+PAGE = r'''<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TVHeadend Aufnahmen</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1c2330;--muted:#6b7380;--line:#dfe3e8;--acc:#2563eb;--bad:#c0392b;--ok:#1e8a4c}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d2128;--fg:#e6e9ee;--muted:#9aa3ad;--line:#2f353e;--acc:#5b8cff;--bad:#ff6b5b;--ok:#4cc27e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}
+header{padding:16px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+h1{margin:0;font-size:19px}.sub{color:var(--muted);font-size:13px}
+nav{display:flex;gap:4px;padding:12px 20px 0}
+nav button{border:1px solid var(--line);border-bottom:none;background:transparent;color:var(--fg);padding:8px 14px;border-radius:8px 8px 0 0;cursor:pointer}
+nav button.on{background:var(--card);font-weight:600}
+main{background:var(--card);margin:0 20px 20px;border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:16px;overflow-x:auto}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase}
+td.f{word-break:break-all;font-size:13px}.muted{color:var(--muted)}
+button.b{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+button.b.sec{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+button.b.bad{background:var(--bad)}button.b:disabled{opacity:.5;cursor:default}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+form.ed{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:12px;background:var(--bg);border-radius:8px}
+form.ed label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+form.ed .wide{grid-column:1/-1}
+input,textarea,select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
+textarea{min-height:70px;resize:vertical}
+#msg{margin:12px 20px 0;padding:10px 14px;border-radius:8px;display:none}
+#msg.ok{display:block;background:color-mix(in srgb,var(--ok) 15%,transparent)}
+#msg.err{display:block;background:color-mix(in srgb,var(--bad) 15%,transparent)}
+.tag{font-size:12px;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--muted)}
+</style></head><body>
+<header><h1>TVHeadend Aufnahmen</h1><div class="sub" id="info">Lade …</div></header>
+<div id="msg"></div>
+<nav><button id="t1" class="on" onclick="tab(1)">Nicht eingetragene Dateien</button>
+<button id="t2" onclick="tab(2)">Einträge ohne Datei</button>
+<button id="t3" onclick="tab(3)">Einstellungen</button></nav>
+<main id="main">Lade …</main>
+<datalist id="chans"></datalist>
+<script>
+let S=null,cur=1;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const dtl=t=>{const d=new Date(t*1000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())};
+const fmt=t=>t?new Date(t*1000).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'–';
+const gb=b=>(b/1073741824).toFixed(2)+' GB';
+function msg(t,ok){const m=$('#msg');m.textContent=t;m.className=ok?'ok':'err';if(ok)setTimeout(()=>m.className='',5000)}
+async function api(p,body){const r=await fetch(p,body?{method:'POST',body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
+async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').textContent='Fehler: '+e.message;tab(3);msg(e.message);return}
+ $('#info').textContent=`${S.recdir} · ${S.known_count} Einträge in TVHeadend`;
+ $('#t1').textContent=`Nicht eingetragene Dateien (${S.unknown.length})`;
+ $('#t2').textContent=`Einträge ohne Datei (${S.missing.length})`;
+ $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');render()}
+function tab(n){cur=n;[1,2,3].forEach(k=>$('#t'+k).className=n==k?'on':'');render()}
+function render(){if(cur==3)return renderConfig();if(!S){$('#main').innerHTML='<p class="muted">Keine Daten – bitte Einstellungen prüfen.</p>';return}cur==1?renderUnknown():renderMissing()}
+async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#main').textContent=e.message;return}
+ $('#main').innerHTML=`<form class="ed" onsubmit="event.preventDefault();saveConfig(this)">
+ <label class="wide">Aufnahmeverzeichnis (auf dem OSMC)<input name="recdir" required value="${esc(c.recdir)}" placeholder="/media/HDD/recordings"></label>
+ <label class="wide">TVHeadend-Server<input name="tvh" required value="${esc(c.tvh)}" placeholder="http://localhost:9981"></label>
+ <label>Benutzer<input name="user" value="${esc(c.user)}" autocomplete="off"></label>
+ <label>Passwort<input type="password" name="password" autocomplete="new-password" placeholder="${c.has_password?'gespeichert – leer lassen = unverändert':''}"></label>
+ <label>Sprachcode<input name="lang" value="${esc(c.lang)}" placeholder="ger"></label>
+ ${c.has_password?'<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="clear_password"> Passwort entfernen</label>':''}
+ <div class="wide muted">Gespeichert in ${esc(c.config_file)}</div>
+ <div class="wide"><button class="b">Verbindung prüfen und speichern</button></div></form>`}
+async function saveConfig(form){const f=Object.fromEntries(new FormData(form));f.clear_password=!!f.clear_password;
+ try{await api('/api/config',f);msg('Einstellungen gespeichert',true);await load();if(S)tab(1)}catch(e){msg(e.message)}}
+function renderUnknown(){
+ if(!S.unknown.length){$('#main').innerHTML='<p class="muted">Alle Dateien im Aufnahmeverzeichnis sind in TVHeadend eingetragen.</p>';return}
+ let h=`<div class="bar"><button class="b sec" onclick="bulk()">Ausgewählte mit Vorschlägen importieren</button>
+ <label><input type="checkbox" onchange="document.querySelectorAll('.cu').forEach(c=>c.checked=this.checked)"> alle auswählen</label></div>
+ <table><tr><th></th><th>Datei</th><th>Vorschlag</th><th>Größe</th><th></th></tr>`;
+ S.unknown.forEach((u,i)=>{h+=`<tr><td><input type="checkbox" class="cu" data-i="${i}"></td><td class="f">${esc(u.rel)}</td>
+ <td>${esc(u.suggest.title)}<br><span class="muted">${esc(u.suggest.channelname||'Sender unbekannt')} · ${fmt(u.suggest.start)}${u.suggest.duration_known?'':' · Dauer geschätzt'}</span></td>
+ <td>${gb(u.size)}</td><td><button class="b" onclick="edit(${i})">Bearbeiten</button></td></tr><tr id="ed${i}" hidden><td colspan="5"></td></tr>`});
+ $('#main').innerHTML=h+'</table>'}
+function edit(i){const row=$('#ed'+i);if(!row.hidden){row.hidden=true;return}
+ const u=S.unknown[i],s=u.suggest;row.hidden=false;
+ row.firstElementChild.innerHTML=`<form class="ed" onsubmit="event.preventDefault();save(${i},this)">
+ <label class="wide">Titel<input name="title" required value="${esc(s.title)}"></label>
+ <label class="wide">Untertitel / Episode<input name="subtitle"></label>
+ <label>Sender<input name="channelname" list="chans" value="${esc(s.channelname)}" placeholder="Unbekannt"></label>
+ <label>Start<input type="datetime-local" name="start" required value="${dtl(s.start)}"></label>
+ <label>Ende<input type="datetime-local" name="stop" required value="${dtl(s.stop)}"></label>
+ <label class="wide">Beschreibung<textarea name="description"></textarea></label>
+ <label class="wide">Kommentar<input name="comment" value="nachträglich importiert"></label>
+ <div class="wide"><button class="b">In TVHeadend eintragen</button></div></form>`}
+function payload(u,f){const ch=S.channels.find(c=>c.name===f.channelname);
+ return {path:u.path,title:f.title,subtitle:f.subtitle,description:f.description,comment:f.comment,
+  channelname:f.channelname,channel:ch?ch.uuid:'',start:Math.floor(new Date(f.start).getTime()/1000),stop:Math.floor(new Date(f.stop).getTime()/1000)}}
+async function save(i,form){const f=Object.fromEntries(new FormData(form));
+ try{await api('/api/import',payload(S.unknown[i],f));msg('Eingetragen: '+f.title,true);await load()}catch(e){msg(e.message)}}
+async function bulk(){const sel=[...document.querySelectorAll('.cu:checked')].map(c=>S.unknown[c.dataset.i]);
+ if(!sel.length)return msg('Nichts ausgewählt');
+ if(!confirm(sel.length+' Dateien mit den vorgeschlagenen Titeln und Zeiten eintragen?'))return;
+ let ok=0,err=[];for(const u of sel){const s=u.suggest;
+  try{await api('/api/import',{path:u.path,title:s.title,channelname:s.channelname,start:s.start,stop:s.stop,comment:'nachträglich importiert'});ok++}catch(e){err.push(u.rel+': '+e.message)}}
+ msg(ok+' eingetragen'+(err.length?'. Fehler: '+err.join('; '):''),!err.length);await load()}
+function renderMissing(){
+ if(!S.missing.length){$('#main').innerHTML='<p class="muted">Keine Einträge mit fehlender Datei.</p>';return}
+ const rep=S.missing.filter(m=>m.candidate).length;
+ let h=`<div class="bar">${rep?`<button class="b" onclick="repairAll()">${rep} Pfade reparieren</button>`:''}
+ <button class="b bad" onclick="del()">Ausgewählte Einträge löschen</button>
+ <label><input type="checkbox" onchange="document.querySelectorAll('.cm').forEach(c=>c.checked=this.checked)"> alle auswählen</label></div>
+ <p class="muted">Gelöscht werden nur Einträge, deren Datei wirklich fehlt. Videodateien werden dabei nicht angefasst.</p>
+ <table><tr><th></th><th>Titel</th><th>Sender / Datum</th><th>Erwartete Datei</th><th></th></tr>`;
+ S.missing.forEach((m,i)=>{h+=`<tr><td><input type="checkbox" class="cm" data-i="${i}"></td>
+ <td>${esc(m.title)}${m.subtitle?'<br><span class="muted">'+esc(m.subtitle)+'</span>':''}<br><span class="tag">${esc(m.status)}</span></td>
+ <td>${esc(m.channel)}<br><span class="muted">${fmt(m.start)}</span></td>
+ <td class="f">${m.filename?esc(m.filename):'<span class="muted">keine Datei</span>'}${m.candidate?'<br>→ gefunden: '+esc(m.candidate):''}</td>
+ <td>${m.candidate?`<button class="b" onclick="repair([${i}])">Pfad reparieren</button>`:''}</td></tr>`});
+ $('#main').innerHTML=h+'</table>'}
+async function repair(idx){const moves=idx.map(i=>({src:S.missing[i].filename,dst:S.missing[i].candidate}));
+ try{const r=await api('/api/move',{moves});msg(r.moved+' Pfade repariert'+(r.skipped?', '+r.skipped+' übersprungen':''),true);await load()}catch(e){msg(e.message)}}
+function repairAll(){repair(S.missing.map((m,i)=>m.candidate?i:-1).filter(i=>i>=0))}
+async function del(){const uuids=[...document.querySelectorAll('.cm:checked')].map(c=>S.missing[c.dataset.i].uuid);
+ if(!uuids.length)return msg('Nichts ausgewählt');
+ if(!confirm(uuids.length+' Einträge endgültig aus TVHeadend löschen?'))return;
+ try{const r=await api('/api/delete',{uuids});msg(r.deleted+' gelöscht'+(r.skipped?', '+r.skipped+' übersprungen (Datei vorhanden)':''),true);await load()}catch(e){msg(e.message)}}
+load();
+</script></body></html>'''
+
+
+def main():
+    p = argparse.ArgumentParser(
+        description='Web-Oberfläche zum Re-Import und Bereinigen von TVHeadend-Aufnahmen. '
+                    'Ordner und Server lassen sich auch in der Oberfläche unter „Einstellungen“ ändern.')
+    p.add_argument('--config', default=os.path.expanduser('~/.config/tvh-aufnahmen.json'),
+                   help='Konfigurationsdatei (Standard: %(default)s)')
+    p.add_argument('--recdir', help='Aufnahmeverzeichnis, z. B. /media/HDD/recordings')
+    p.add_argument('--tvh', help='TVHeadend-URL, z. B. http://localhost:9981')
+    p.add_argument('--user', default=os.environ.get('TVH_USER'), help='TVHeadend-Benutzer (oder TVH_USER)')
+    p.add_argument('--password', default=os.environ.get('TVH_PASS'), help='Passwort (oder TVH_PASS)')
+    p.add_argument('--lang', help='Sprachcode für Titel/Beschreibung (Standard: ger)')
+    p.add_argument('--port', type=int, default=8099, help='Port der Oberfläche (Standard: %(default)s)')
+    p.add_argument('--bind', default='0.0.0.0', help='Adresse (Standard: %(default)s)')
+    a = p.parse_args()
+
+    default_dir = os.path.expanduser('~/Tvheadend/Extern/Aufnahmen')
+    cfg = {'tvh': 'http://localhost:9981', 'lang': 'ger', 'user': '', 'password': '',
+           'recdir': default_dir if os.path.isdir(default_dir) else ''}
+    cfg.update(load_config(a.config))
+    for k in App.KEYS:  # Startparameter haben Vorrang vor der Datei
+        if getattr(a, k):
+            cfg[k] = getattr(a, k)
+    if cfg['recdir']:
+        cfg['recdir'] = os.path.abspath(cfg['recdir'])
+        if not os.path.isdir(cfg['recdir']):
+            print('Warnung: Aufnahmeverzeichnis nicht gefunden: ' + cfg['recdir'])
+
+    app = App(a.config, cfg)
+    srv = ThreadingHTTPServer((a.bind, a.port), make_handler(app))
+    print('Oberfläche läuft auf http://%s:%d/ (Strg+C beendet)' % (a.bind, a.port))
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == '__main__':
+    main()
