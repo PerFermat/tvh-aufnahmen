@@ -2,7 +2,7 @@
 
 Web-Oberfläche für TVHeadend 4.3, um
 
-- **Aufnahmen** als Liste oder nach Ordnern gruppiert anzuzeigen, nach Name, Sender, Datum, Dauer oder Größe zu sortieren, zu durchsuchen, herunterzuladen, Titel, Untertitel und Beschreibung zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen,
+- **Aufnahmen** als Liste oder nach Ordnern gruppiert anzuzeigen, nach Name, Sender, Datum, Dauer oder Größe zu sortieren, zu durchsuchen, herunterzuladen, in VLC als Stream abzuspielen, Titel, Untertitel und Beschreibung zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen,
 - Videodateien aus dem Aufnahmeordner, die TVHeadend nicht (mehr) kennt, wieder als Aufnahme einzutragen – mit Titel, Untertitel, Sender, Zeit und Beschreibung,
 - alte Einträge, deren Datei nur in einen anderen Ordner gewandert ist, auf den neuen Pfad umzustellen,
 - Einträge zu löschen, deren Datei nicht mehr existiert. Videodateien werden dabei nie gelöscht.
@@ -61,6 +61,7 @@ sudo systemctl enable --now tvh-aufnahmen
 - Start- und Endzeit werden aus dem Dateinamen (z. B. `Tatort-2023-05-14-20-15.ts`) und der Änderungszeit geraten. Ist `ffprobe` installiert (`sudo apt install ffmpeg`), wird die echte Laufzeit verwendet.
 - Ohne Sender legt TVHeadend keinen Eintrag an. Das Tool schlägt den Sender anderer Aufnahmen im selben Ordner vor, sonst „Unbekannt“.
 - Das Ende einer Aufnahme muss in der Vergangenheit liegen, sonst würde TVHeadend einen Aufnahme-Timer anlegen. Das Tool verhindert das.
+- Abspielen: Der Knopf lädt eine kleine `.m3u`-Datei. Mit VLC (oder einem anderen Player) geöffnet, streamt sie die Aufnahme vom Tool; Vor- und Zurückspulen funktioniert. Im Browser selbst lassen sich `.ts`-Aufnahmen nicht abspielen.
 - Datei ersetzen: Die hochgeladene Datei überschreibt die bisherige. Hat sie eine andere Endung (z. B. `.mkv` statt `.ts`), wird die Aufnahme auf die neue Datei umgestellt und die alte gelöscht. Start und Ende lassen sich bei fertigen Aufnahmen in TVHeadend 4.3 nicht ändern.
 - Beschreibung ändern: TVHeadend 4.3 erlaubt das bei fertigen Aufnahmen nicht direkt. Das Tool legt den Eintrag deshalb mit der neuen Beschreibung neu an; die Videodatei bleibt unverändert, der Eintrag bekommt aber eine neue ID.
 - Downloads unterstützen HTTP-Range, Player können also spulen.

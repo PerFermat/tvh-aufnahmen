@@ -496,6 +496,26 @@ def make_handler(app):
             except (BrokenPipeError, ConnectionResetError):
                 pass  # Download im Browser abgebrochen
 
+        def playlist(self, uuid):
+            """M3U-Datei, mit der VLC die Aufnahme über /api/download streamt."""
+            info = entry_info(app.tvh, uuid)
+            if not file_exists(info.get('filename')):
+                raise ValueError('Datei nicht gefunden')
+            title = ' '.join((info.get('disp_title') or 'Aufnahme').split())
+            dur = max(0, (info.get('stop') or 0) - (info.get('start') or 0))
+            host = self.headers.get('Host') or '%s:%d' % self.server.server_address[:2]
+            body = ('#EXTM3U\n#EXTINF:%d,%s\nhttp://%s/api/download?uuid=%s\n'
+                    % (dur, title, host, urllib.parse.quote(uuid))).encode()
+            name = re.sub(r'[\\/:*?"<>|]', '_', title) + '.m3u'
+            ascii_name = name.encode('ascii', 'replace').decode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'audio/x-mpegurl; charset=utf-8')
+            self.send_header('Content-Disposition', 'attachment; filename="%s"; filename*=UTF-8\'\'%s'
+                             % (ascii_name, urllib.parse.quote(name)))
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self):
             url = urllib.parse.urlsplit(self.path)
             q = dict(urllib.parse.parse_qsl(url.query))
@@ -507,6 +527,8 @@ def make_handler(app):
                 self.run(app.public)
             elif url.path == '/api/download':
                 self.run(lambda: self.download(q['uuid']))
+            elif url.path == '/api/playlist':
+                self.run(lambda: self.playlist(q['uuid']))
             else:
                 self.send(404, {'error': 'nicht gefunden'})
 
@@ -636,6 +658,7 @@ const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></t
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>
+ <a class="b sec" style="text-decoration:none;display:inline-block" href="/api/playlist?uuid=${r.uuid}" title="Öffnet die Aufnahme als Stream in VLC">Abspielen</a>
  <button class="b sec" id="eb-${r.uuid}" onclick="editRec('${r.uuid}')">Bearbeiten</button></td></tr>
  <tr id="er-${r.uuid}" hidden><td colspan="5"></td></tr>`;
 function closeRec(u){$('#er-'+u).hidden=true;$('#eb-'+u).textContent='Bearbeiten';$('#eb-'+u).scrollIntoView({block:'nearest'})}
