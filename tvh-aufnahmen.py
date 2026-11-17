@@ -564,6 +564,9 @@ textarea{min-height:70px;resize:vertical}
 #msg{margin:12px 20px 0;padding:10px 14px;border-radius:8px;display:none}
 #msg.ok{display:block;background:color-mix(in srgb,var(--ok) 15%,transparent)}
 #msg.err{display:block;background:color-mix(in srgb,var(--bad) 15%,transparent)}
+th a{cursor:pointer;color:inherit;text-decoration:none}th a:hover{color:var(--acc)}th a.on{color:var(--fg)}
+tr.fold td{background:var(--bg);cursor:pointer;font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}.seg button{border:0;background:transparent;color:var(--fg);padding:6px 12px;cursor:pointer;font:inherit}.seg button.on{background:var(--acc);color:#fff}
 .tag{font-size:12px;padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--muted)}
 </style></head><body>
 <header><h1>TVHeadend Aufnahmen</h1><div class="sub" id="info">Lade …</div></header>
@@ -576,6 +579,8 @@ textarea{min-height:70px;resize:vertical}
 <datalist id="chans"></datalist>
 <script>
 let S=null,cur=0,Q='';
+const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+let VIEW=store('view')||'list',SORT=store('sort')||'date',DESC=(store('desc')??'1')=='1';const OPEN=new Set();
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -597,21 +602,42 @@ const mins=r=>Math.round((r.stop-r.start)/60)+' min';
 const R=u=>S.recordings.find(r=>r.uuid===u);
 function renderRecordings(){
  $('#main').innerHTML=`<div class="bar"><input id="q" type="search" placeholder="Suchen: Titel, Untertitel, Sender, Datei …" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
+ <span class="seg"><button id="v-list" onclick="setView('list')">Liste</button><button id="v-dir" onclick="setView('dir')">Ordner</button></span>
  <button class="b bad" onclick="removeSel()">Ausgewählte löschen</button>
  <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked)"> alle sichtbaren</label></div>
  <p class="muted" id="rcount"></p>
- <table><thead><tr><th></th><th>Titel</th><th>Sender / Datum</th><th>Dauer / Größe</th><th></th></tr></thead><tbody id="rbody"></tbody></table>`;
+ <table><thead><tr><th></th><th>${sh('title','Name')}</th><th>${sh('channel','Sender')} / ${sh('date','Datum')}</th><th>${sh('dur','Dauer')} / ${sh('size','Größe')}</th><th></th></tr></thead><tbody id="rbody"></tbody></table>`;
  fillRecordings()}
+const sh=(k,t)=>`<a class="${SORT==k?'on':''}" onclick="sortBy('${k}')">${t}${SORT==k?(DESC?' ▼':' ▲'):''}</a>`;
+function sortBy(k){if(SORT==k)DESC=!DESC;else{SORT=k;DESC=k=='date'||k=='size'||k=='dur'}store('sort',SORT);store('desc',DESC?'1':'0');renderRecordings()}
+function setView(v){VIEW=v;store('view',v);fillRecordings()}
+const folder=r=>{const i=r.rel.lastIndexOf('/');return i<0?'':r.rel.slice(0,i)};
+const coll=new Intl.Collator('de',{numeric:true,sensitivity:'base'});
+const KEYS={title:r=>r.title+' '+r.subtitle,channel:r=>r.channel,date:r=>r.start,dur:r=>r.stop-r.start,size:r=>r.size};
+function cmp(a,b){const k=KEYS[SORT],x=k(a),y=k(b);
+ const c=typeof x=='number'?x-y:coll.compare(x,y);return (DESC?-c:c)||b.start-a.start}
+function toggleFolder(f){OPEN.has(f)?OPEN.delete(f):OPEN.add(f);fillRecordings()}
 function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolean);
+ $('#v-list').className=VIEW=='list'?'on':'';$('#v-dir').className=VIEW=='dir'?'on':'';
  const list=S.recordings.filter(r=>{const t=(r.title+' '+r.subtitle+' '+r.channel+' '+r.rel).toLowerCase();return words.every(w=>t.includes(w))});
+ list.sort(cmp);
  $('#rcount').textContent=list.length+' von '+S.recordings.length+' Aufnahmen';$('#allr').checked=false;
- $('#rbody').innerHTML=list.map(r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
+ if(VIEW=='list'){$('#rbody').innerHTML=list.map(recRow).join('');return}
+ const groups=new Map();list.forEach(r=>{const f=folder(r);if(!groups.has(f))groups.set(f,[]);groups.get(f).push(r)});
+ let gs=[...groups];const total=g=>g[1].reduce((n,r)=>n+r.size,0);
+ if(SORT=='title')gs.sort((a,b)=>coll.compare(a[0],b[0])*(DESC?-1:1));
+ if(SORT=='size')gs.sort((a,b)=>(total(a)-total(b))*(DESC?-1:1));
+ const root=gs.filter(g=>!g[0]);gs=gs.filter(g=>g[0]);
+ $('#rbody').innerHTML=gs.map(g=>{const open=OPEN.has(g[0])||words.length>0;
+  return `<tr class="fold" onclick="toggleFolder(this.dataset.f)" data-f="${esc(g[0])}"><td>${open?'▾':'▸'}</td><td colspan="2">📁 ${esc(g[0])} <span class="muted">(${g[1].length})</span></td><td colspan="2"><span class="muted">${gb(total(g))}</span></td></tr>`+(open?g[1].map(recRow).join(''):'')}).join('')
+  +root.flatMap(g=>g[1]).map(recRow).join('')}
+const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
  <td>${esc(r.title)}${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>
  <button class="b sec" id="eb-${r.uuid}" onclick="editRec('${r.uuid}')">Bearbeiten</button></td></tr>
- <tr id="er-${r.uuid}" hidden><td colspan="5"></td></tr>`).join('')}
+ <tr id="er-${r.uuid}" hidden><td colspan="5"></td></tr>`;
 function closeRec(u){$('#er-'+u).hidden=true;$('#eb-'+u).textContent='Bearbeiten';$('#eb-'+u).scrollIntoView({block:'nearest'})}
 function editRec(u){const row=$('#er-'+u);if(!row.hidden)return closeRec(u);
  const r=R(u);row.hidden=false;$('#eb-'+u).textContent='Schließen';
