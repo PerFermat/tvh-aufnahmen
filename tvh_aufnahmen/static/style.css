@@ -160,6 +160,11 @@ td.logo{width:72px}td.logo img{width:60px;height:38px;object-fit:contain;display
 .prog{height:5px;background:var(--line);border-radius:3px;margin:6px 0 8px;max-width:360px;overflow:hidden}
 .prog div{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px}
 .nxt{font-size:12.5px;line-height:1.6}
+/* „Danach“ als eigene Spalte, wenn das Fenster breit genug ist */
+td.nxt-col{display:none}
+.nxt2{font-size:13px;line-height:1.35;margin-bottom:7px}.nxt2:last-child{margin-bottom:0}
+.nxt2 .st{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34ch}
+@media (min-width:980px){td.nxt-col{display:table-cell;width:32%;border-left:1px dashed var(--line);padding-left:16px}.nxt-in{display:none}}
 
 /* ---------- Programmzeitschrift ---------- */
 main.tight{padding:10px;margin-bottom:8px}
@@ -222,6 +227,7 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
  main table:not(.epg) tr{display:block;position:relative;padding:12px 4px;border-bottom:1px solid var(--line)}
  main table:not(.epg) td{display:block;border:0;padding:2px 0;width:auto!important}
  main table:not(.epg) td:empty{display:none}
+ main table:not(.epg) td.nxt-col{display:none}
  main table:not(.epg) td:first-child:has(> input[type=checkbox]){position:absolute;right:4px;top:12px}
  main table:not(.epg) tr:has(> td:first-child > input[type=checkbox]){padding-right:30px}
  main table:not(.epg) td.logo{float:left;width:auto;margin:2px 12px 4px 0}
