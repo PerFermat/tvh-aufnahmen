@@ -10,7 +10,14 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  ${c.has_password?'<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="clear_password"> Passwort entfernen</label>':''}
  <div class="wide muted">Gespeichert in ${esc(c.config_file)}</div>
  <div class="wide"><button class="b">Verbindung prüfen und speichern</button></div></form>
- <div id="notifycfg"></div>`;renderNotify()}
+ <div id="qualitycfg"></div>
+ <div id="notifycfg"></div>`;renderQuality();renderNotify()}
+// Qualität beim Abspielen – gilt nur für dieses Gerät (Handy z. B. „Mobil“, PC „Home“)
+async function renderQuality(){const q=await qualities();if(cur!='config'||!$('#qualitycfg'))return;
+ if(q.length<2){$('#qualitycfg').innerHTML='';return}
+ $('#qualitycfg').innerHTML=`<h3>Qualität beim Abspielen (dieses Gerät)</h3>
+ <p class="muted">Gilt für „Abspielen“ in Live-TV und im Programm. Jedes Gerät merkt sich seine eigene Einstellung. Die kleineren Stufen rechnet der Raspberry um – das schafft er nur für einen Stream gleichzeitig.</p>
+ <div class="ed">${q.map(x=>`<label class="chk wide"><input type="radio" name="quality" value="${esc(x.profile)}" ${x.profile==quality()?'checked':''} onchange="store('quality',this.value);msg('Qualität auf diesem Gerät: ${esc(x.name)}',true)"> <b>${esc(x.name)}</b>&nbsp;<span class="muted">– ${esc(x.info)}</span></label>`).join('')}</div>`}
 // Benachrichtigungen aufs Handy über ntfy (App „ntfy“, kostenlos, ohne Konto)
 async function renderNotify(){let j;try{j=await api('/api/jobs')}catch(e){return}if(cur!='config'||!$('#notifycfg'))return;const n=j.notify;
  $('#notifycfg').innerHTML=`<h3>Benachrichtigungen aufs Handy</h3>
