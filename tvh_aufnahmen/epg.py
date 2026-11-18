@@ -61,12 +61,12 @@ def event_detail(tvh, posters, event_id):
     res = tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or []
     if not res:
         raise ValueError('Sendung nicht mehr im Programm')
-    attach(posters, res)
+    attach(posters, res, min_duration=0, urgent=True)  # beim Öffnen für jede Sendung, sofort
     return res[0]
 
 
-def poster_status(posters, titles):
-    return {t: posters.get(t) for t in titles[:500] if isinstance(t, str)}
+def poster_status(posters, keys, urgent=False):
+    return {k: posters.get(k, urgent) for k in keys[:500] if isinstance(k, str)}
 
 
 def record_event(tvh, event_id, config_uuid=''):

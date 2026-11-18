@@ -31,10 +31,10 @@ async function renderEpg(start,jump){
  if(EPG.posters_pending)setTimeout(()=>epgPosters(EPG),4000)}
 // Bilder werden auf dem Server im Hintergrund gesucht – hier nachfragen und eintragen, sobald sie da sind
 async function epgPosters(day,tries=0){if(day!==EPG||cur!='epg'||tries>60)return;
- const open=EPG.events.filter(e=>e.poster_pending),titles=[...new Set(open.map(e=>e.title))];if(!titles.length)return;
- let res;try{res=await api('/api/posters',{titles})}catch(e){return}
+ const open=EPG.events.filter(e=>e.poster_pending),keys=[...new Set(open.map(e=>e.poster_key))];if(!keys.length)return;
+ let res;try{res=await api('/api/posters',{keys})}catch(e){return}
  if(day!==EPG)return;let found=false;
- open.forEach(e=>{const p=res[e.title];if(p==='pending')return;delete e.poster_pending;if(p){e.poster=p;found=true}});
+ open.forEach(e=>{const p=res[e.poster_key];if(p==='pending')return;delete e.poster_pending;if(p){e.poster=p;found=true}});
  if(found&&cur=='epg'){const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x;epgMark()}
  if(EPG.events.some(e=>e.poster_pending))setTimeout(()=>epgPosters(day,tries+1),5000)}
 function epgDay(v){if(!v)return;const [y,m,d]=v.split('-').map(Number);renderEpg(new Date(y,m-1,d,12).getTime()/1000,0)}
@@ -76,10 +76,10 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
  const flags=['hd','widescreen','subtitled','audiodesc','deafsigned','new','repeat'].filter(k=>e[k]).map(k=>({hd:'HD',widescreen:'16:9',subtitled:'Untertitel',audiodesc:'Audiodeskription',deafsigned:'Gebärdensprache',new:'Neu',repeat:'Wiederholung'})[k]);
  const extra=[['Folge',e.episodeOnscreen],['Staffel/Folge',e.seasonNumber?`S${e.seasonNumber} E${e.episodeNumber||'?'}`:''],['Jahr',e.copyright_year],['Altersfreigabe',e.ageRating],['Bewertung',e.starRating],['Kategorie',(e.category||[]).join(', ')],['Stichwörter',(e.keyword||[]).join(', ')],['Erstausstrahlung',e.first_aired?fmt(e.first_aired):'']].filter(x=>x[1]);
  const wdv=(new Date(e.start*1000).getDay()+6)%7+1;
- EVENT=e;dialog(`<h2 style="margin:0 40px 4px 0">${esc(e.title)}</h2>${e.subtitle?`<div class="muted">${esc(e.subtitle)}</div>`:''}
+ EVENT=e;if(e.poster_pending)setTimeout(()=>eventPoster(e),1500);dialog(`<h2 style="margin:0 40px 4px 0">${esc(e.title)}</h2>${e.subtitle?`<div class="muted">${esc(e.subtitle)}</div>`:''}
  <p><b>${esc(e.channelName)}</b> · ${esc(wday(e.start))}, ${hm(e.start)}–${hm(e.stop)} (${Math.round((e.stop-e.start)/60)} min)${flags.length?' · '+flags.join(' · '):''}</p>
  ${e.image?`<img src="${esc(e.image)}" alt="" style="max-width:100%;max-height:220px;border-radius:6px">`:''}
- ${e.poster?`<figure class="wp"><a href="${esc(e.poster.page)}" target="_blank" rel="noopener"><img src="${esc(e.poster.image)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">Bild: <a href="${esc(e.poster.page)}" target="_blank" rel="noopener">${esc(e.poster.caption)}</a> (Wikipedia)</figcaption></figure>`:''}
+ <div id="evposter">${e.poster?posterFig(e.poster):e.poster_pending?'<figure class="wp muted" style="font-size:12px">Bild wird gesucht …</figure>':''}</div>
  ${e.summary&&e.summary!=e.description?`<p><i>${esc(e.summary)}</i></p>`:''}<p style="white-space:pre-line">${esc(e.description||'Keine Beschreibung.')}</p>
  ${extra.length?`<table>${extra.map(x=>`<tr><td class="muted">${x[0]}</td><td>${esc(x[1])}</td></tr>`).join('')}</table>`:''}
  ${e.dvrUuid?`<p class="tag">Aufnahme ist geplant</p>`:''}
@@ -90,6 +90,13 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
   ${idnodeForm(schema,{name:e.title,title:'^'+e.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$',channel:e.channelUuid,weekdays:[wdv]})}
   <div class="bar" style="margin-top:12px"><button class="b">Serienaufnahme anlegen</button></div></form>`)}
 let EVENT=null;
+const posterFig=p=>`<figure class="wp"><a href="${esc(p.page)}" target="_blank" rel="noopener"><img src="${esc(p.thumb)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">Bild: <a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.caption)}</a> (Wikipedia)</figcaption></figure>`;
+// Bild für die geöffnete Sendung: Der Server sucht es vorrangig, hier nachfragen, bis es da ist (max. 1 Minute)
+async function eventPoster(e,tries=0){if(EVENT!==e||!$('#dlg').open)return;
+ let res;try{res=await api('/api/posters',{keys:[e.poster_key],urgent:true})}catch(err){return}
+ const p=res[e.poster_key],box=$('#evposter');if(EVENT!==e||!box)return;
+ if(p==='pending'){if(tries<30)setTimeout(()=>eventPoster(e,tries+1),2000);else box.innerHTML='';return}
+ box.innerHTML=p?posterFig(p):''}
 async function recordEvent(id){try{await api('/api/record',{event:id,config:$('#evcfg').value});$('#dlg').close();msg('Aufnahme geplant: '+EVENT.title,true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
 async function saveSeries(form){const schema=await formSchema('dvrautorec'),conf=readIdnodeForm(form,schema);
  try{await api('/api/autorec-save',conf);$('#dlg').close();msg('Serienaufnahme angelegt: '+(conf.name||conf.title),true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}

@@ -222,7 +222,7 @@ def make_handler(app):
             elif self.path == '/api/config':
                 self.run(lambda: app.update(req))
             elif self.path == '/api/posters':
-                self.run(lambda: poster_status(app.posters, req.get('titles') or []))
+                self.run(lambda: poster_status(app.posters, req.get('keys') or [], bool(req.get('urgent'))))
             elif self.path == '/api/record':
                 self.run(lambda: record_event(app.tvh, req['event'], req.get('config')))
             elif self.path == '/api/autorec-save':

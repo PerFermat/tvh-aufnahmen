@@ -1,5 +1,7 @@
-"""Bilder zu langen Sendungen (vor allem Filmen) aus der deutschen Wikipedia.
-Das EPG liefert keine Bilder. Gesucht wird im Hintergrund – höchstens eine Anfrage pro
+"""Bilder zu Sendungen (vor allem Filmen) aus der Wikipedia.
+Das EPG liefert keine Bilder. Gesucht wird der passende Artikel in der deutschen Wikipedia;
+hat er kein Bild – Filmplakate sind dort aus Urheberrechtsgründen nicht erlaubt –, wird über
+den Sprachlink das Bild des englischen Artikels genommen, dort gibt es meist das Plakat. Gesucht wird im Hintergrund – höchstens eine Anfrage pro
 Sekunde, weil Wikipedia sonst mit HTTP 429 abblockt – und das Ergebnis dauerhaft
 zwischengespeichert, auch „kein Bild gefunden“."""
 import json
@@ -11,11 +13,19 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-MIN_DURATION = 80 * 60  # nur lange Sendungen
-API = 'https://de.wikipedia.org/w/api.php'
-USER_AGENT = 'tvh-aufnahmen/1.0 (TVHeadend-Weboberflaeche im Heimnetz)'
-# Art der Sendung in der Kurzbeschreibung – „Fernsehsender“ o. Ä. zählt nicht
-KINDS = re.compile(r'\b(\w*film|\w*serie|\w*sendung|\w*magazin|\w*reihe|\w*show|dokumentation|\w*doku)\b', re.I)
+MIN_DURATION = 80 * 60  # in der Programmübersicht nur für lange Sendungen
+DE, EN = 'de.wikipedia.org', 'en.wikipedia.org'
+CACHE_VERSION = 3  # 2: Plakat aus der englischen Wikipedia, 3: Wikidata, Jahr, breitere Prüfung
+USER_AGENT = 'tvh-aufnahmen/1.0 (https://github.com/PerFermat/tvh-aufnahmen)'  # Wikimedia verlangt Kontakt
+# Art der Sendung in der Kurzbeschreibung des Artikels („Filmdrama von …“, „deutsche Kochsendung“).
+# „Fernsehsender“ zählt nicht, Personen („Filmschauspieler“, „Regisseur“), Spiele, Bücher, Musik o. Ä. auch nicht.
+KINDS = re.compile(r'film|serie|sendung|magazin|reihe|show|doku|drama|thriller|krimi|komödie|western|musical'
+                   r'|zeichentrick|animation|sitcom|soap|telenovela|fernsehspiel', re.I)
+NOT_PROGRAMME = re.compile(r'schauspieler|regisseur|produzent|moderator|sänger|musiker|autor|unternehmer|journalist'
+                           r'|begriffsklärung|computerspiel|videospiel|brettspiel|kartenspiel|roman|buch|comic|album|lied|song|band\b|zeitschrift|zeitung'
+                           r'|software|unternehmen|marke', re.I)
+# Jahr aus der EPG-Zeile „Genre, Land Jahr“, z. B. „Drama, USA 2005“ oder „Action, USA/GB 2013“
+EPG_YEAR = re.compile(r'^[^\n,]{2,40}, [^\n,]{1,30} ((?:19|20)\d\d)\s*$', re.M)
 RETRY_NONE = 30 * 86400  # „nichts gefunden“ nach 30 Tagen erneut versuchen
 
 
@@ -25,22 +35,68 @@ def norm(title):
     return re.sub(r'\s+', ' ', re.sub(r'[^\w ]+', ' ', title.lower())).strip()
 
 
-def wiki_lookup(title):
-    """Bester passender Artikel mit Bild oder None. Nur Treffer, deren Titel genau passt und
-    die laut Kurzbeschreibung ein Film, eine Serie o. Ä. sind – sonst lieber kein Bild."""
-    q = urllib.parse.urlencode({'action': 'query', 'generator': 'search', 'gsrsearch': title, 'gsrlimit': 5,
-                                'prop': 'pageimages|description', 'piprop': 'thumbnail|original',
-                                'pithumbsize': 400, 'format': 'json'})
-    req = urllib.request.Request(API + '?' + q, headers={'User-Agent': USER_AGENT})
+def wiki_query(host, **params):
+    params.update(action='query', format='json')
+    req = urllib.request.Request('https://%s/w/api.php?%s' % (host, urllib.parse.urlencode(params)),
+                                 headers={'User-Agent': USER_AGENT})
     with urllib.request.urlopen(req, timeout=15) as r:
-        pages = sorted((json.load(r).get('query') or {}).get('pages', {}).values(), key=lambda p: p.get('index', 0))
+        pages = (json.load(r).get('query') or {}).get('pages', {}).values()
+    return sorted(pages, key=lambda p: p.get('index', 0))
+
+
+def is_programme(desc):
+    return bool(desc and KINDS.search(desc) and not NOT_PROGRAMME.search(desc))
+
+
+def wikidata_image(item):
+    """Plakat, Bild oder Logo aus Wikidata (P3383 Filmplakat, P18 Bild, P154 Logo) als Commons-Datei."""
+    req = urllib.request.Request('https://www.wikidata.org/w/api.php?' + urllib.parse.urlencode(
+        {'action': 'wbgetclaims', 'entity': item, 'format': 'json'}), headers={'User-Agent': USER_AGENT})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        claims = json.load(r).get('claims', {})
+    for prop in ('P3383', 'P18', 'P154'):
+        for c in claims.get(prop, []):
+            name = ((c.get('mainsnak') or {}).get('datavalue') or {}).get('value')
+            if isinstance(name, str):
+                url = 'https://commons.wikimedia.org/wiki/Special:FilePath/' + urllib.parse.quote(name.replace(' ', '_'))
+                return {'thumbnail': {'source': url + '?width=400'}, 'original': {'source': url}}
+    return {}
+
+
+def wiki_lookup(title, year=None):
+    """Bester passender Artikel mit Bild oder None. Nur Treffer, deren Titel genau passt und
+    die laut Kurzbeschreibung ein Film, eine Serie o. Ä. sind – sonst lieber kein Bild.
+    Das Bild kommt aus dem deutschen Artikel, sonst aus dem englischen (dort gibt es
+    Filmplakate), sonst aus Wikidata (oft das Logo einer Sendung)."""
+    pages = wiki_query(DE, generator='search', gsrsearch=title, gsrlimit=8,
+                       prop='pageimages|description|langlinks|pageprops', piprop='thumbnail|original',
+                       pithumbsize=400, lllang='en', ppprop='wikibase_item')
     want = norm(title)
-    for p in pages:
-        if norm(p['title']) == want and KINDS.search(p.get('description') or '') and p.get('thumbnail'):
-            return {'thumb': p['thumbnail']['source'], 'image': (p.get('original') or p['thumbnail'])['source'],
-                    'page': 'https://de.wikipedia.org/wiki/' + urllib.parse.quote(p['title'].replace(' ', '_')),
-                    'caption': p['title'] + (' – ' + p['description'] if p.get('description') else '')}
-    return None
+    cands = [p for p in pages if norm(p['title']) == want and is_programme(p.get('description'))]
+    if year:  # gleichnamige Artikel (Film und Serie): den mit passendem Jahr zuerst
+        cands.sort(key=lambda p: year not in (p.get('description') or '') + p['title'])
+    if not cands:
+        return None
+    page = img = cands[0]
+    if not img.get('thumbnail') and page.get('langlinks'):
+        time.sleep(1)  # Wikipedia nicht zu schnell befragen
+        en = wiki_query(EN, titles=page['langlinks'][0]['*'], prop='pageimages', piprop='thumbnail|original',
+                        pithumbsize=400, pilicense='any')
+        img = en[0] if en else {}
+    if not img.get('thumbnail') and (page.get('pageprops') or {}).get('wikibase_item'):
+        time.sleep(1)
+        img = wikidata_image(page['pageprops']['wikibase_item'])
+    if not img.get('thumbnail'):
+        return None
+    return {'thumb': img['thumbnail']['source'], 'image': (img.get('original') or img['thumbnail'])['source'],
+            'page': 'https://de.wikipedia.org/wiki/' + urllib.parse.quote(page['title'].replace(' ', '_')),
+            'caption': page['title'] + (' – ' + page['description'] if page.get('description') else '')}
+
+
+def still_valid(entry):
+    if entry.get('poster'):
+        return is_programme(entry['poster'].get('caption', '').split(' – ', 1)[-1])
+    return entry.get('v', 1) >= CACHE_VERSION
 
 
 class Posters:
@@ -54,19 +110,24 @@ class Posters:
                 self.cache = json.load(f)
         except (OSError, ValueError):
             self.cache = {}
-        # Treffer, die die (evtl. verschärfte) Prüfung nicht mehr bestehen, neu suchen
-        self.cache = {t: v for t, v in self.cache.items()
-                      if not v.get('poster') or KINDS.search(v['poster'].get('caption', '').split(' – ', 1)[-1])}
+        # Neu suchen: Treffer, die die (evtl. verschärfte) Prüfung nicht mehr bestehen, und
+        # „nichts gefunden“ aus einer älteren Suche (vor dem Plakat aus der englischen Wikipedia)
+        self.cache = {t: v for t, v in self.cache.items() if still_valid(v)}
         threading.Thread(target=self.worker, daemon=True).start()
 
-    def get(self, title):
-        """Bild-Angaben, None (keins gefunden) oder 'pending' (wird gesucht)."""
+    def get(self, key, urgent=False):
+        """Bild-Angaben, None (keins gefunden) oder 'pending' (wird gesucht).
+        key: Titel oder „Titel|Jahr“ (siehe poster_key).
+        urgent: gerade im Detailfenster geöffnet – vor allen anderen suchen."""
+        title = key
         with self.lock:
             hit = self.cache.get(title)
             if hit and (hit.get('poster') or time.time() - hit.get('ts', 0) < RETRY_NONE):
                 return hit.get('poster')
+            if urgent and title in self.queue:
+                self.queue.remove(title)
             if title not in self.queue:
-                self.queue.append(title)
+                self.queue.insert(0, title) if urgent else self.queue.append(title)
                 self.wake.set()
         return 'pending'
 
@@ -80,7 +141,8 @@ class Posters:
             if title is None:
                 continue
             try:
-                poster = wiki_lookup(title)
+                name, _, year = title.partition('|')
+                poster = wiki_lookup(name, year or None)
             except urllib.error.HTTPError as e:
                 with self.lock:
                     self.queue.append(title)  # später noch einmal
@@ -91,7 +153,7 @@ class Posters:
                 time.sleep(10)  # kein Internet o. Ä. – Titel bleibt ungeklärt und wird beim nächsten Abruf neu angefragt
                 continue
             with self.lock:
-                self.cache[title] = {'poster': poster, 'ts': int(time.time())}
+                self.cache[title] = {'poster': poster, 'ts': int(time.time()), 'v': CACHE_VERSION}
                 self.save()
             time.sleep(1)
 
@@ -103,12 +165,19 @@ class Posters:
         os.replace(tmp, self.path)
 
 
-def attach(posters, events):
-    """Hängt an lange Sendungen das Bild an; gibt die Zahl der noch gesuchten zurück."""
+def poster_key(e):
+    """Schlüssel für die Bildsuche: Titel, bei Filmen mit Jahr aus „Genre, Land Jahr“ im EPG."""
+    m = EPG_YEAR.search((e.get('subtitle') or '') + '\n' + (e.get('description') or ''))
+    return e['title'] + ('|' + m.group(1) if m else '')
+
+
+def attach(posters, events, min_duration=MIN_DURATION, urgent=False):
+    """Hängt an Sendungen ab min_duration das Bild an; gibt die Zahl der noch gesuchten zurück."""
     pending = 0
     for e in events:
-        if e.get('stop', 0) - e.get('start', 0) >= MIN_DURATION and e.get('title'):
-            p = posters.get(e['title'])
+        if e.get('stop', 0) - e.get('start', 0) >= min_duration and e.get('title'):
+            e['poster_key'] = poster_key(e)
+            p = posters.get(e['poster_key'], urgent)
             if p == 'pending':
                 e['poster_pending'] = True
                 pending += 1
