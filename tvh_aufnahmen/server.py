@@ -8,7 +8,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
 from .backup import check_password, restore, write_backup
-from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_block,
+from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day,
                   event_detail, record_event, upcoming, upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels
@@ -183,7 +183,7 @@ def make_handler(app):
             elif url.path == '/api/export':
                 self.run(self.export)
             elif url.path == '/api/epg':
-                self.run(lambda: epg_block(app.tvh, q.get('start')))
+                self.run(lambda: epg_day(app.tvh, q.get('start')))
             elif url.path == '/api/epg/event':
                 self.run(lambda: event_detail(app.tvh, q['id']))
             elif url.path == '/api/form':

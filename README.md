@@ -2,7 +2,7 @@
 
 Web-Oberfläche für TVHeadend 4.3, um
 
-- das **Programm** wie eine Fernsehzeitschrift zu zeigen – Sender als Spalten, Startzeiten als Zeilen, in Blöcken zu 4 Stunden – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
+- das **Programm** wie eine Fernsehzeitschrift zu zeigen – ein ganzer Tag, Sender als Spalten, sechs Zeilen zu je 4 Stunden mit allen Sendungen, die darin beginnen; die Schnellauswahl springt zum Block – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
 - **Serienaufnahmen** zu verwalten (anlegen, bearbeiten, aktivieren/deaktivieren, löschen) und alle **geplanten Aufnahmen** einzeln zu sehen und zu löschen,
 - **Live-TV**: alle Sender mit Logo, der laufenden Sendung (mit Fortschrittsbalken) und den nächsten drei Sendungen anzuzeigen und einen Sender per Knopf in VLC abzuspielen,
 - **Aufnahmen** als Liste oder nach Ordnern gruppiert anzuzeigen, nach Name, Sender, Datum, Dauer oder Größe zu sortieren, zu durchsuchen, herunterzuladen, in VLC als Stream abzuspielen, Titel, Untertitel und Beschreibung zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen,

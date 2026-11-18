@@ -4,36 +4,37 @@ import re
 import time
 from datetime import datetime
 
-BLOCK_HOURS = 4
 EVENT_FIELDS = ('eventId', 'channelUuid', 'title', 'subtitle', 'description', 'start', 'stop',
                 'hd', 'subtitled', 'widescreen', 'audiodesc')
+GRID_TEXT = 400  # Zeichen Beschreibung in der Übersicht; vollständig im Detailfenster
 
 
-def block_start(ts):
-    """Anfang des 4-Stunden-Blocks (0, 4, 8 … Uhr Ortszeit), in dem ts liegt."""
-    d = datetime.fromtimestamp(ts)
-    return int(d.replace(hour=d.hour - d.hour % BLOCK_HOURS, minute=0, second=0, microsecond=0).timestamp())
+def day_start(ts):
+    """Mitternacht (Ortszeit) des Tages, in dem ts liegt."""
+    return int(datetime.fromtimestamp(ts).replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
 
 
-def block_end(start):
-    """Ende des Blocks; über die Uhrzeit gerechnet, damit Sommer-/Winterzeit stimmt."""
-    d = datetime.fromtimestamp(start + (BLOCK_HOURS + 1) * 3600)
-    return block_start(d.timestamp())
+def day_end(start):
+    """Nächste Mitternacht; über das Datum gerechnet, damit Sommer-/Winterzeit stimmt."""
+    return day_start(start + 26 * 3600)
 
 
 def upcoming_entries(tvh):
     return tvh.call('dvr/entry/grid_upcoming', limit=100000).get('entries', [])
 
 
-def epg_block(tvh, start=None):
-    start = block_start(int(start) if start else time.time())
-    end = block_end(start)
+def epg_day(tvh, start=None):
+    start = day_start(int(start) if start else time.time())
+    end = day_end(start)
     # Zwei Bedingungen auf dasselbe Feld wertet TVHeadend nicht zuverlässig aus.
     flt = [{'field': 'stop', 'type': 'numeric', 'value': start, 'comparison': 'gt'},
            {'field': 'start', 'type': 'numeric', 'value': end, 'comparison': 'lt'}]
     events = [{k: e.get(k) for k in EVENT_FIELDS}
               for e in tvh.call('epg/events/grid', filter=json.dumps(flt), limit=100000).get('entries', [])
               if start <= e.get('start', 0) < end]
+    for e in events:
+        if len(e.get('description') or '') > GRID_TEXT:
+            e['description'] = e['description'][:GRID_TEXT].rsplit(' ', 1)[0] + ' …'
     planned = upcoming_entries(tvh)
     by_event = {e.get('broadcast') for e in planned if e.get('broadcast')}
     by_time = {(e.get('channel'), e.get('start')) for e in planned}
@@ -50,7 +51,7 @@ def epg_block(tvh, start=None):
                          'epg': c['uuid'] in with_epg})
     channels.sort(key=lambda c: (c['number'] or 1 << 30, c['name'].lower()))
     events.sort(key=lambda e: e['start'])
-    return {'start': start, 'end': end, 'prev': block_start(start - 1), 'next': end,
+    return {'start': start, 'end': end, 'prev': day_start(start - 1), 'next': end,
             'channels': channels, 'events': events}
 
 
