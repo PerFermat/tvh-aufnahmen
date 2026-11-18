@@ -26,7 +26,7 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;render()}
 const TABS={live:()=>renderLive(),epg:()=>renderEpg(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup(),scan:()=>renderScan(),status:()=>renderStatus()};
 function tab(n){if(!TABS[n])n='live';cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');
- $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);$('main').classList.toggle('tight',n=='epg');render();toolsState()}
+ $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);$('main').classList.toggle('tight',n=='epg');if(n!='epg')$('#hdrslot').innerHTML='';render();toolsState()}
 // Suche und Filter (Elemente mit class="tools") über 🔍 im Kopf ein-/ausblenden; gilt für alle Reiter und wird gemerkt
 const TOOLTABS=['live','epg','rec','upcoming'];
 const activeQuery=()=>({live:()=>LQ,epg:()=>EPGQ||EPGT,rec:()=>Q,upcoming:()=>UPQ}[cur]||(()=>''))();

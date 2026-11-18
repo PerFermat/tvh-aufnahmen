@@ -16,7 +16,8 @@ async function renderEpg(start,jump){
  if(seq!==EPGSEQ||cur!='epg')return;  // inzwischen neuer angefordert oder Reiter gewechselt – verwerfen
  EPG=day;EPGS=EPG.start;const target=EPGPT;EPGPT=null;
  const tags=[...new Set(EPG.channels.flatMap(c=>c.tags))].sort();
- // Zeile 1 immer sichtbar und kompakt; Zeile 2 (Filter, Suche) über 🔍 im Kopf aufklappbar
+ // Zeile 1 immer sichtbar und kompakt (bei genug Breite oben im Kopf); Zeile 2 (Filter, Suche) über 🔍 aufklappbar
+ $('#hdrslot').innerHTML='';
  $('#epgbar').innerHTML=`<div class="epgnav"><button class="b sec sq" onclick="renderEpg(EPG.prev,0)" title="Voriger Tag">‹</button>
  <input type="date" value="${dkey(EPG.start)}" onchange="epgDay(this.value)" title="${esc(wday(EPG.start))}">
  <button class="b sec sq" onclick="renderEpg(EPG.next,0)" title="Nächster Tag">›</button>
@@ -27,7 +28,7 @@ async function renderEpg(start,jump){
  <button class="b sec" onclick="epgSearch()" title="Im ganzen Programm (alle Tage) suchen">Alle Tage durchsuchen</button>
  <label class="chk"><input type="checkbox" ${EPGE?'checked':''} onchange="EPGE=this.checked;fillEpg()"> Sender ohne Programm</label></div>`;
  const keep=$('#epgwrap').scrollTop,keepX=$('#epgwrap').scrollLeft;fillEpg();
- sizeEpg();toolsState();
+ placeEpgNav();toolsState();
  if(target!==null)epgJump(target);else{$('#epgwrap').scrollTop=keep;epgMark()}
  $('#epgwrap').scrollLeft=keepX;
  if(EPG.posters_pending)setTimeout(()=>epgPosters(EPG),4000)}
@@ -42,11 +43,17 @@ async function epgPosters(day,tries=0){if(day!==EPG||cur!='epg'||tries>60)return
 // Die Zeitschrift bekommt die ganze restliche Bildschirmhöhe (eigener Scrollbereich mit festem Kopf)
 function sizeEpg(){const w=$('#epgwrap');if(!w||cur!='epg')return;
  w.style.maxHeight=Math.max(260,innerHeight-(w.getBoundingClientRect().top+scrollY)-14)+'px'}
-addEventListener('resize',()=>sizeEpg());
+// Tag, Blöcke und „Jetzt“ in den Kopf, wenn das Fenster breit genug ist – spart eine Zeile
+const WIDE=matchMedia('(min-width:980px)');
+function placeEpgNav(){const nav=document.querySelector('.epgnav'),slot=$('#hdrslot');if(!nav||!slot)return;
+ if(cur=='epg'&&WIDE.matches){if(nav.parentNode!==slot)slot.appendChild(nav)}
+ else if(nav.parentNode===slot)$('#epgbar')?.prepend(nav);
+ sizeEpg()}
+addEventListener('resize',()=>placeEpgNav());
 function epgDay(v){if(!v)return;const [y,m,d]=v.split('-').map(Number);renderEpg(new Date(y,m-1,d,12).getTime()/1000,0)}
 function epgJump(h){const w=$('#epgwrap'),r=$('#blk'+h);if(!r)return;
  w.scrollTop=r.offsetTop-w.querySelector('thead').offsetHeight;w.scrollIntoView({block:'nearest'});epgMark()}
-function epgMark(){const w=$('#epgwrap'),th=w.querySelector('thead');if(!th)return;  // sichtbaren Block in der Schnellauswahl markieren
+function epgMark(){const w=$('#epgwrap'),th=w&&w.querySelector('thead');if(!th)return;  // sichtbaren Block in der Schnellauswahl markieren
  const top=w.scrollTop+th.offsetHeight+5,h=BLOCKS.filter(b=>$('#blk'+b).offsetTop<=top).pop()??0;
  BLOCKS.forEach(b=>$('#jb'+b)&&($('#jb'+b).className=b==h?'on':''))}
 function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x}
