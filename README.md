@@ -6,6 +6,7 @@ Web-Oberfläche für TVHeadend 4.3, um
 - im Programm **über alle Tage zu suchen** (Titel, auf Wunsch auch Beschreibungen); laufende Sendungen sind markiert, vorbeigelaufene grau,
 - den **Status** zu sehen: Tuner mit Signal und Fehlern, laufende Aufnahmen und Streams, Temperatur, Last und Speicher des Raspberry,
 - **Konflikte** zu erkennen, wenn mehr Aufnahmen gleichzeitig auf verschiedenen Transpondern geplant sind, als es Tuner gibt,
+- **doppelte Aufnahmen** zu finden (Ansicht „Doppelte“ bei Aufnahmen: gleicher Titel und Untertitel, ohne Untertitel gleiche Beschreibung) – behalten wird die HD- bzw. längste Fassung, die übrigen sind zum Löschen vorausgewählt,
 - Aufnahmen **von Hand** zu planen (Sender, Titel, Datum, Beginn, Ende, Vor-/Nachlauf) – Knopf „＋ Neue Aufnahme“ im Kopf bei „Aufnahmen“ und „Geplante Aufnahmen“,
 - **Serienaufnahmen** zu verwalten (anlegen, bearbeiten, aktivieren/deaktivieren, löschen) und alle **geplanten Aufnahmen** einzeln zu sehen und zu löschen,
 - **Live-TV**: alle Sender mit Logo, der laufenden Sendung (mit Fortschrittsbalken) und den nächsten drei Sendungen anzuzeigen und einen Sender per Knopf in VLC abzuspielen,

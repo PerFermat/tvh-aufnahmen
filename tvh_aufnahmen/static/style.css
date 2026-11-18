@@ -145,6 +145,9 @@ img.thumb:hover{transform:scale(1.06);box-shadow:var(--shadow)}
 .bigthumb{position:relative;min-height:120px;display:grid;place-items:center;background:#000;border-radius:12px;overflow:hidden}
 .bigthumb img{width:100%;display:block;position:relative;z-index:1}.bigthumb p{position:absolute;margin:0}
 
+tr.fold.dup td{cursor:default}
+.tag.keep{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+
 /* ---------- Live-TV ---------- */
 td.logo{width:72px}td.logo img{width:60px;height:38px;object-fit:contain;display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
 .prog{height:5px;background:var(--line);border-radius:3px;margin:6px 0 8px;max-width:360px;overflow:hidden}

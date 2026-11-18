@@ -4,7 +4,7 @@ const mins=r=>Math.round((r.stop-r.start)/60)+' min';
 const R=u=>S.recordings.find(r=>r.uuid===u);
 function renderRecordings(){
  $('#main').innerHTML=`<div class="bar"><input id="q" class="tools" type="search" placeholder="Suchen: Titel, Untertitel, Sender, Datei …" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
- <span class="seg"><button id="v-list" onclick="setView('list')">Liste</button><button id="v-dir" onclick="setView('dir')">Ordner</button></span>
+ <span class="seg"><button id="v-list" onclick="setView('list')">Liste</button><button id="v-dir" onclick="setView('dir')">Ordner</button><button id="v-dup" onclick="setView('dup')" title="Doppelt aufgenommene Sendungen finden">Doppelte</button></span>
  <button class="b bad" onclick="removeSel()">Ausgewählte löschen</button>
  <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked)"> alle sichtbaren</label></div>
  <p class="muted" id="rcount"></p>
@@ -20,11 +20,12 @@ function cmp(a,b){const k=KEYS[SORT],x=k(a),y=k(b);
  const c=typeof x=='number'?x-y:coll.compare(x,y);return (DESC?-c:c)||b.start-a.start}
 function toggleFolder(f){OPEN.has(f)?OPEN.delete(f):OPEN.add(f);fillRecordings()}
 function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolean);
- $('#v-list').className=VIEW=='list'?'on':'';$('#v-dir').className=VIEW=='dir'?'on':'';
+ ['list','dir','dup'].forEach(v=>$('#v-'+v).className=VIEW==v?'on':'');
  const list=S.recordings.filter(r=>{const t=(r.title+' '+r.subtitle+' '+r.channel+' '+r.rel).toLowerCase();return words.every(w=>t.includes(w))});
  list.sort(cmp);
  $('#rcount').textContent=list.length+' von '+S.recordings.length+' Aufnahmen';$('#allr').checked=false;
  if(VIEW=='list'){$('#rbody').innerHTML=list.map(recRow).join('');return}
+ if(VIEW=='dup')return fillDuplicates(list);
  const groups=new Map();list.forEach(r=>{const f=folder(r);if(!groups.has(f))groups.set(f,[]);groups.get(f).push(r)});
  let gs=[...groups];const total=g=>g[1].reduce((n,r)=>n+r.size,0);
  if(SORT=='title')gs.sort((a,b)=>coll.compare(a[0],b[0])*(DESC?-1:1));
@@ -76,3 +77,34 @@ function upload(u){const f=$('#up-'+u).files[0];if(!f)return msg('Bitte zuerst e
 function showThumb(u){const r=R(u);dialog(`<h3 style="margin:0 90px 10px 0">${esc(r.title)}</h3>${r.subtitle?`<div class="muted" style="margin:-6px 0 10px">${esc(r.subtitle.split('\n')[0])}</div>`:''}
  <div class="bigthumb"><img src="/api/thumb?uuid=${u}&size=large" alt="" onerror="this.parentNode.innerHTML='<p class=muted>Kein Bild verfügbar.</p>'"><p class="muted">Bild wird erzeugt …</p></div>
  <p class="muted small">${esc(r.channel)} · ${fmt(r.start)} · ${mins(r)} · ${gb(r.size)}</p>`)}
+
+// ---------- Doppelte Aufnahmen ----------
+// Gleich sind Aufnahmen mit gleichem Titel und Untertitel (Episode) – ohne Untertitel mit gleicher Beschreibung.
+// Nutzt ein Sender immer denselben Untertitel („Moderation: …“), trennen unterschiedliche Beschreibungen die Folgen.
+const dnorm=s=>(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+// ganze Beschreibung vergleichen – die ersten Sätze sind oft eine allgemeine Einleitung, erst danach kommen z. B. die Gäste
+const ddesc=r=>dnorm(r.description);
+const perMin=r=>r.size/Math.max(60,r.stop-r.start)*60;
+const isHD=r=>/\bhd\b/i.test(r.channel)||perMin(r)>45e6;  // HD-Sender oder > ~6 Mbit/s
+// beste Fassung zuerst: HD, dann längste, dann größte, dann älteste
+const dupScore=(a,b)=>(isHD(b)-isHD(a))||((b.stop-b.start)-(a.stop-a.start))||(b.size-a.size)||(a.start-b.start);
+function duplicateGroups(list){
+ const byEpisode=new Map();
+ for(const r of list){const t=dnorm(r.title),sub=dnorm(r.subtitle.split('\n')[0]),d=ddesc(r);
+  const key=sub&&sub!=t?t+'|'+sub:d?t+'||'+d:null;if(!key||!t)continue;
+  (byEpisode.get(key)||byEpisode.set(key,[]).get(key)).push(r)}
+ const groups=[];
+ for(const [key,rs] of byEpisode){if(rs.length<2)continue;
+  // gleicher Untertitel, aber verschiedene Beschreibungen: allgemeiner Untertitel → nach Beschreibung trennen
+  const descs=new Set(rs.map(ddesc).filter(Boolean));
+  if(!key.includes('||')&&descs.size>1){const by=new Map();rs.forEach(r=>{const d=ddesc(r)||'';(by.get(d)||by.set(d,[]).get(d)).push(r)});
+   const empty=by.get('')||[];by.delete('');const parts=[...by.values()];
+   if(parts.length==1)parts[0].push(...empty);parts.filter(p=>p.length>1).forEach(p=>groups.push(p))}
+  else groups.push(rs)}
+ groups.forEach(g=>g.sort(dupScore));
+ return groups.sort((a,b)=>coll.compare(a[0].title,b[0].title)||(a[0].start-b[0].start))}
+function fillDuplicates(list){const groups=duplicateGroups(list);
+ const extra=groups.reduce((n,g)=>n+g.length-1,0),space=groups.reduce((n,g)=>n+g.slice(1).reduce((m,r)=>m+r.size,0),0);
+ $('#rcount').textContent=groups.length?`${groups.length} Sendungen doppelt aufgenommen · ${extra} Kopien vorausgewählt (${gb(space)}) – „Ausgewählte löschen“ entfernt sie`:'Keine doppelten Aufnahmen gefunden.';
+ $('#rbody').innerHTML=groups.map(g=>`<tr class="fold dup"><td></td><td colspan="4">${g.length}× <b>${esc(g[0].title)}</b>${g[0].subtitle&&g[0].subtitle!=g[0].title?' – '+esc(g[0].subtitle.split('\n')[0]):' <span class="muted">(gleiche Beschreibung)</span>'}</td></tr>`
+  +g.map((r,i)=>recRow(r).replace('class="cr"',`class="cr"${i?' checked':''}`).replace('<td><img',`<td>${i?'':'<span class="tag keep">behalten</span><br>'}<span class="tag">${isHD(r)?'HD':'SD'}</span> <img`)).join('')).join('')}
