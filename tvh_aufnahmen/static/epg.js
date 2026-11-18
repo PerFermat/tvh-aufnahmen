@@ -1,6 +1,6 @@
 // Reiter „Programm“: Fernsehzeitschrift für einen ganzen Tag – Sender als Spalten, sechs Zeilen zu je 4 Stunden.
 // In einer Zeile stehen alle Sendungen, die in diesem Zeitraum beginnen; die Schnellauswahl springt nur dorthin.
-let EPG=null,EPGS=0,EPGQ='',EPGT=store('epgtag')||'',EPGE=false,EPGJ=null;
+let EPG=null,EPGS=0,EPGQ='',EPGT=store('epgtag')||'',EPGE=false,EPGSEQ=0,EPGPT=null;  // EPGPT: Sprungziel, das noch aussteht
 const BLOCKS=[0,4,8,12,16,20],CELLMAX=10,EPGX=new Set();  // EPGX: aufgeklappte Zellen
 const dkey=t=>{const d=new Date(t*1000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 const wday=t=>new Date(t*1000).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
@@ -9,10 +9,12 @@ async function renderEpg(start,jump){
  if(start!==undefined)EPGS=start;
  const now=Date.now()/1000,fresh=!$('#epgwrap');
  // Sprungziel: angegeben; „Jetzt“ → aktueller Block; Reiter neu geöffnet → aktueller Block (heute) bzw. Tagesanfang
- EPGJ=jump??(start!==undefined?(start?0:blockOf(now)):fresh?(EPGS&&dkey(EPGS)!=dkey(now)?0:blockOf(now)):null);
+ EPGPT=jump??(start!==undefined?(start?0:blockOf(now)):fresh?(EPGS&&dkey(EPGS)!=dkey(now)?0:blockOf(now)):EPGPT);
+ const seq=++EPGSEQ;let day;
  if(fresh)$('#main').innerHTML=`<div class="bar" id="epgbar"></div><div id="epgwrap" class="epgwrap"><p class="muted">Lade Programm …</p></div>`;
- try{EPG=await api('/api/epg'+(EPGS?'?start='+EPGS:''))}catch(e){$('#epgwrap').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
- if(cur!='epg')return;EPGS=EPG.start;
+ try{day=await api('/api/epg'+(EPGS?'?start='+EPGS:''))}catch(e){if(seq===EPGSEQ)$('#epgwrap').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
+ if(seq!==EPGSEQ||cur!='epg')return;  // inzwischen neuer angefordert oder Reiter gewechselt – verwerfen
+ EPG=day;EPGS=EPG.start;const target=EPGPT;EPGPT=null;
  const tags=[...new Set(EPG.channels.flatMap(c=>c.tags))].sort();
  $('#epgbar').innerHTML=`<button class="b sec" onclick="renderEpg(EPG.prev,0)" title="Voriger Tag">‹</button>
  <input type="date" value="${dkey(EPG.start)}" onchange="epgDay(this.value)">
@@ -24,8 +26,17 @@ async function renderEpg(start,jump){
  <label class="chk"><input type="checkbox" ${EPGE?'checked':''} onchange="EPGE=this.checked;fillEpg()"> Sender ohne Programm</label>
  <span class="muted">${esc(wday(EPG.start))}</span>`;
  const keep=$('#epgwrap').scrollTop,keepX=$('#epgwrap').scrollLeft;fillEpg();
- if(EPGJ!==null)epgJump(EPGJ);else{$('#epgwrap').scrollTop=keep;epgMark()}
- $('#epgwrap').scrollLeft=keepX;EPGJ=null}
+ if(target!==null)epgJump(target);else{$('#epgwrap').scrollTop=keep;epgMark()}
+ $('#epgwrap').scrollLeft=keepX;
+ if(EPG.posters_pending)setTimeout(()=>epgPosters(EPG),4000)}
+// Bilder werden auf dem Server im Hintergrund gesucht – hier nachfragen und eintragen, sobald sie da sind
+async function epgPosters(day,tries=0){if(day!==EPG||cur!='epg'||tries>60)return;
+ const open=EPG.events.filter(e=>e.poster_pending),titles=[...new Set(open.map(e=>e.title))];if(!titles.length)return;
+ let res;try{res=await api('/api/posters',{titles})}catch(e){return}
+ if(day!==EPG)return;let found=false;
+ open.forEach(e=>{const p=res[e.title];if(p==='pending')return;delete e.poster_pending;if(p){e.poster=p;found=true}});
+ if(found&&cur=='epg'){const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x;epgMark()}
+ if(EPG.events.some(e=>e.poster_pending))setTimeout(()=>epgPosters(day,tries+1),5000)}
 function epgDay(v){if(!v)return;const [y,m,d]=v.split('-').map(Number);renderEpg(new Date(y,m-1,d,12).getTime()/1000,0)}
 function epgJump(h){const w=$('#epgwrap'),r=$('#blk'+h);if(!r)return;
  w.scrollTop=r.offsetTop-w.querySelector('thead').offsetHeight;w.scrollIntoView({block:'nearest'});epgMark()}
@@ -33,14 +44,33 @@ function epgMark(){const w=$('#epgwrap'),th=w.querySelector('thead');if(!th)retu
  const top=w.scrollTop+th.offsetHeight+5,h=BLOCKS.filter(b=>$('#blk'+b).offsetTop<=top).pop()??0;
  BLOCKS.forEach(b=>$('#jb'+b)&&($('#jb'+b).className=b==h?'on':''))}
 function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x}
+// Zellen gleichmäßig füllen: Erst ohne Beschreibung zeichnen und messen. Die vollste Zelle der Zeile
+// (mindestens ROW_MIN px) bestimmt die Höhe; den übrigen Platz jeder Zelle bekommen ihre Beschreibungen –
+// bei vielen Sendungen bleibt keiner, bei wenigen werden sie lang, bei viel Platz kommt ein Bild dazu.
+const ROW_MIN=300,LINE_PX=16,IMG_PX=110,MIN_DESC=2,MAX_DESC=40;
+function evHtml(e){
+ return `<div class="ev${e.planned?' pl':''}" onclick="showEvent(${e.eventId})">
+  ${e.poster?`<img class="poster" src="${esc(e.poster.thumb)}" alt="" loading="lazy" hidden onerror="this.remove()">`:''}
+  <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)}${e.hd?' · HD':''}</div>
+  ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}${e.description?`<div class="ds" hidden>${esc(e.description)}</div>`:''}</div>`}
+function layoutEpg(){
+ for(const tr of document.querySelectorAll('table.epg tbody tr')){
+  const cells=[...tr.querySelectorAll('td > .cell')],base=cells.map(c=>c.offsetHeight);
+  const H=Math.max(ROW_MIN,...base);
+  cells.forEach((c,i)=>{const ds=[...c.querySelectorAll('.ds')];if(!ds.length)return;
+   let lines=Math.min(MAX_DESC,Math.floor((H-base[i])/LINE_PX/ds.length));
+   ds.forEach(d=>{let n=lines;const img=d.parentNode.querySelector('.poster');
+    if(img&&n*LINE_PX>=IMG_PX+4*LINE_PX){img.hidden=false;n-=Math.ceil(IMG_PX/LINE_PX)}
+    if(n>=MIN_DESC){d.hidden=false;d.style.webkitLineClamp=n}})})}}
 function fillEpg(){const words=EPGQ.toLowerCase().split(/\s+/).filter(Boolean),match=e=>words.every(w=>(e.title+' '+(e.subtitle||'')+' '+(e.description||'')).toLowerCase().includes(w));
  const chans=EPG.channels.filter(c=>(EPGE||c.epg)&&(!EPGT||c.tags.includes(EPGT)));
  const evs=EPG.events.filter(match),cell={};evs.forEach(e=>{(cell[blockOf(e.start)+'|'+e.channelUuid]??=[]).push(e)});
  if(!chans.length||!evs.length){$('#epgwrap').innerHTML='<p class="muted">Keine Sendungen an diesem Tag.</p>';return}
- $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th>${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}<div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>
- ${BLOCKS.map(h=>`<tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[],list=EPGX.has(k)?all:all.slice(0,CELLMAX);return `<td>${list.map(e=>`<div class="ev${e.planned?' pl':''}" onclick="showEvent(${e.eventId})">
-  <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)}${e.hd?' · HD':''}</div>${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}<div class="ds">${esc(e.description||'')}</div></div>`).join('')}${all.length>list.length?`<button class="b sec more" onclick="epgMore('${k}')">+ ${all.length-list.length} weitere</button>`:''}</td>`}).join('')}</tr>`).join('')}</tbody></table>`;
- $('#epgwrap').onscroll=epgMark}
+ const rows=BLOCKS.map(h=>{
+  const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];return {k,all,list:EPGX.has(k)?all:all.slice(0,CELLMAX)}});
+  return `<tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${cells.map(x=>`<td><div class="cell">${x.list.map(evHtml).join('')}${x.all.length>x.list.length?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${x.all.length-x.list.length} weitere</button>`:''}</div></td>`).join('')}</tr>`});
+ $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th>${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}<div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+ layoutEpg();$('#epgwrap').onscroll=epgMark}
 async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catch(err){return msg(err.message)}
  const schema=await formSchema('dvrautorec'),cfg=(schema.props.find(p=>p.id=='config_name')||{enum:[]}).enum;
  const flags=['hd','widescreen','subtitled','audiodesc','deafsigned','new','repeat'].filter(k=>e[k]).map(k=>({hd:'HD',widescreen:'16:9',subtitled:'Untertitel',audiodesc:'Audiodeskription',deafsigned:'Gebärdensprache',new:'Neu',repeat:'Wiederholung'})[k]);
@@ -49,6 +79,7 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
  EVENT=e;dialog(`<h2 style="margin:0 40px 4px 0">${esc(e.title)}</h2>${e.subtitle?`<div class="muted">${esc(e.subtitle)}</div>`:''}
  <p><b>${esc(e.channelName)}</b> · ${esc(wday(e.start))}, ${hm(e.start)}–${hm(e.stop)} (${Math.round((e.stop-e.start)/60)} min)${flags.length?' · '+flags.join(' · '):''}</p>
  ${e.image?`<img src="${esc(e.image)}" alt="" style="max-width:100%;max-height:220px;border-radius:6px">`:''}
+ ${e.poster?`<figure class="wp"><a href="${esc(e.poster.page)}" target="_blank" rel="noopener"><img src="${esc(e.poster.image)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">Bild: <a href="${esc(e.poster.page)}" target="_blank" rel="noopener">${esc(e.poster.caption)}</a> (Wikipedia)</figcaption></figure>`:''}
  ${e.summary&&e.summary!=e.description?`<p><i>${esc(e.summary)}</i></p>`:''}<p style="white-space:pre-line">${esc(e.description||'Keine Beschreibung.')}</p>
  ${extra.length?`<table>${extra.map(x=>`<tr><td class="muted">${x[0]}</td><td>${esc(x[1])}</td></tr>`).join('')}</table>`:''}
  ${e.dvrUuid?`<p class="tag">Aufnahme ist geplant</p>`:''}

@@ -4,9 +4,11 @@ import re
 import time
 from datetime import datetime
 
+from .posters import attach
+
 EVENT_FIELDS = ('eventId', 'channelUuid', 'title', 'subtitle', 'description', 'start', 'stop',
                 'hd', 'subtitled', 'widescreen', 'audiodesc')
-GRID_TEXT = 400  # Zeichen Beschreibung in der Übersicht; vollständig im Detailfenster
+GRID_TEXT = 1500  # Zeichen Beschreibung in der Übersicht (reicht für ~40 Zeilen); vollständig im Detailfenster
 
 
 def day_start(ts):
@@ -23,7 +25,7 @@ def upcoming_entries(tvh):
     return tvh.call('dvr/entry/grid_upcoming', limit=100000).get('entries', [])
 
 
-def epg_day(tvh, start=None):
+def epg_day(tvh, posters, start=None):
     start = day_start(int(start) if start else time.time())
     end = day_end(start)
     # Zwei Bedingungen auf dasselbe Feld wertet TVHeadend nicht zuverlässig aus.
@@ -52,14 +54,19 @@ def epg_day(tvh, start=None):
     channels.sort(key=lambda c: (c['number'] or 1 << 30, c['name'].lower()))
     events.sort(key=lambda e: e['start'])
     return {'start': start, 'end': end, 'prev': day_start(start - 1), 'next': end,
-            'channels': channels, 'events': events}
+            'channels': channels, 'events': events, 'posters_pending': attach(posters, events)}
 
 
-def event_detail(tvh, event_id):
+def event_detail(tvh, posters, event_id):
     res = tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or []
     if not res:
         raise ValueError('Sendung nicht mehr im Programm')
+    attach(posters, res)
     return res[0]
+
+
+def poster_status(posters, titles):
+    return {t: posters.get(t) for t in titles[:500] if isinstance(t, str)}
 
 
 def record_event(tvh, event_id, config_uuid=''):

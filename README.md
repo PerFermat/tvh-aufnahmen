@@ -87,6 +87,7 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/files.py` | Videodateien finden, Titel und Zeiten aus dem Dateinamen raten |
 | `tvh_aufnahmen/live.py` | Live-TV: Sender mit Programmdaten, Stream-Playlist, Senderlogos |
 | `tvh_aufnahmen/epg.py` | Programmzeitschrift, Aufnahmen planen, Serienaufnahmen, geplante Aufnahmen, Formulare aus den TVHeadend-Klassen |
+| `tvh_aufnahmen/posters.py` | Bilder zu langen Sendungen aus der Wikipedia, im Hintergrund gesucht und zwischengespeichert |
 | `tvh_aufnahmen/state.py` | Abgleich Einträge ↔ Dateien: Aufnahmen, nicht eingetragene Dateien, Einträge ohne Datei |
 | `tvh_aufnahmen/recordings.py` | Ändern: importieren, bearbeiten, Datei ersetzen, löschen, Pfade reparieren |
 | `tvh_aufnahmen/backup.py` | Komplettsicherung des TVHeadend-Ordners und Wiederherstellung |
@@ -107,5 +108,6 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 - Beschreibung ändern: TVHeadend 4.3 erlaubt das bei fertigen Aufnahmen nicht direkt. Das Tool legt den Eintrag deshalb mit der neuen Beschreibung neu an; die Videodatei bleibt unverändert, der Eintrag bekommt aber eine neue ID.
 - Live-TV abspielen: Die `.m3u`-Datei kommt von TVHeadend und enthält statt des Passworts ein Einmal-Ticket, das nur kurz gültig ist – die Datei also gleich öffnen. Gestreamt wird direkt von TVHeadend (Port 9981), unverändert wie empfangen. Wer die Oberfläche erreicht, kann damit auch Sender abspielen.
 - Das Formular für Serienaufnahmen wird aus der Klassenbeschreibung von TVHeadend (`api/idnode/class`) erzeugt und zeigt deshalb alle Optionen der installierten Version; selten gebrauchte stehen unter „Weitere Optionen“.
+- Programm: Die Zellen einer Zeile werden gleichmäßig gefüllt – laufen bei einem Sender viele Sendungen, fällt die Beschreibung weg, bei wenigen wird sie länger. Für Sendungen ab 80 Minuten sucht der Server im Hintergrund ein Bild in der deutschen Wikipedia (höchstens eine Anfrage pro Sekunde, nur bei genau passendem Titel und Kurzbeschreibung als Film, Serie, Sendung o. Ä.). Die Ergebnisse liegen in `~/.cache/tvh-aufnahmen/posters.json`; die Bilder lädt der Browser direkt von Wikimedia.
 - Downloads unterstützen HTTP-Range, Player können also spulen.
 - Vor dem ersten großen Import am besten den Ordner `~/.hts/tvheadend/dvr/log` sichern.

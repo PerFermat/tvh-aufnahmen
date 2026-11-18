@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler
 
 from .backup import check_password, restore, write_backup
 from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day,
-                  event_detail, record_event, upcoming, upcoming_cancel)
+                  event_detail, poster_status, record_event, upcoming, upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
@@ -183,9 +183,9 @@ def make_handler(app):
             elif url.path == '/api/export':
                 self.run(self.export)
             elif url.path == '/api/epg':
-                self.run(lambda: epg_day(app.tvh, q.get('start')))
+                self.run(lambda: epg_day(app.tvh, app.posters, q.get('start')))
             elif url.path == '/api/epg/event':
-                self.run(lambda: event_detail(app.tvh, q['id']))
+                self.run(lambda: event_detail(app.tvh, app.posters, q['id']))
             elif url.path == '/api/form':
                 self.run(lambda: class_form(app.tvh, q['class']))
             elif url.path == '/api/autorecs':
@@ -221,6 +221,8 @@ def make_handler(app):
                 self.run(lambda: do_move(app.tvh, req['moves']))
             elif self.path == '/api/config':
                 self.run(lambda: app.update(req))
+            elif self.path == '/api/posters':
+                self.run(lambda: poster_status(app.posters, req.get('titles') or []))
             elif self.path == '/api/record':
                 self.run(lambda: record_event(app.tvh, req['event'], req.get('config')))
             elif self.path == '/api/autorec-save':
