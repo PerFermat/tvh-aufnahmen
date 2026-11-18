@@ -15,7 +15,7 @@ def live_channels(tvh, upcoming=3):
     for e in tvh.call('epg/events/grid', filter=json.dumps(flt), limit=100000).get('entries', []):
         if e.get('stop', 0) > now and e.get('channelUuid'):
             events.setdefault(e['channelUuid'], []).append(
-                {'title': e.get('title') or '', 'subtitle': e.get('subtitle') or '',
+                {'eventId': e.get('eventId'), 'title': e.get('title') or '', 'subtitle': e.get('subtitle') or '',
                  'start': e.get('start', 0), 'stop': e.get('stop', 0)})
     chans = []
     for c in tvh.call('channel/grid', limit=100000).get('entries', []):

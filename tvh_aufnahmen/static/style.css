@@ -160,10 +160,10 @@ td.logo{width:72px}td.logo img{width:60px;height:38px;object-fit:contain;display
 .prog{height:5px;background:var(--line);border-radius:3px;margin:6px 0 8px;max-width:360px;overflow:hidden}
 .prog div{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px}
 .nxt{font-size:12.5px;line-height:1.6}
+a.evl{cursor:pointer;color:inherit;text-decoration:none}a.evl:hover{color:var(--acc);text-decoration:underline}
+td.nxt-col .nxt{font-size:13.5px;line-height:1.7}
 /* „Danach“ als eigene Spalte, wenn das Fenster breit genug ist */
 td.nxt-col{display:none}
-.nxt2{font-size:13px;line-height:1.35;margin-bottom:7px}.nxt2:last-child{margin-bottom:0}
-.nxt2 .st{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34ch}
 @media (min-width:980px){td.nxt-col{display:table-cell;width:32%;border-left:1px dashed var(--line);padding-left:16px}.nxt-in{display:none}}
 
 /* ---------- Programmzeitschrift ---------- */
