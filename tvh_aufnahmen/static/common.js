@@ -54,4 +54,11 @@ function readIdnodeForm(form,schema){const out={},num=p=>NUMTYPES.includes(p.typ
  return out}
 function dialog(html){const d=$('#dlg');d.innerHTML=`<button class="b sec x" onclick="$('#dlg').close()">Schließen</button>`+html;if(!d.open)d.showModal();d.scrollTop=0;return d}
 const WD=['','Mo','Di','Mi','Do','Fr','Sa','So'];
+// Qualität beim Abspielen (je Gerät gemerkt): Home = Original, sonst ein Transcode-Profil von TVHeadend
+let QUALS=null;
+async function qualities(){return QUALS||(QUALS=(await api('/api/qualities').catch(()=>({qualities:[]}))).qualities)}
+const quality=()=>store('quality')||'pass';
+const playHref=uuid=>`/api/channel-playlist?uuid=${uuid}`+(quality()!='pass'?'&profile='+encodeURIComponent(quality()):'');
+async function qualitySelect(){const q=await qualities();if(q.length<2)return '';
+ return `<label class="chk" title="Qualität beim Abspielen – wird auf diesem Gerät gemerkt">Qualität <select onchange="store('quality',this.value);document.querySelectorAll('a[data-play]').forEach(a=>a.href=playHref(a.dataset.play))">${q.map(x=>`<option value="${esc(x.profile)}" ${x.profile==quality()?'selected':''}>${esc(x.name)} – ${esc(x.info)}</option>`).join('')}</select></label>`}
 const days=w=>!w||!w.length||w.length==7?'täglich':w.map(d=>WD[d]).join(', ');

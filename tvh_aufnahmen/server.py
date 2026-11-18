@@ -11,7 +11,7 @@ from .backup import check_password, restore, write_backup
 from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day, epg_search,
                   event_detail, poster_status, record_event, upcoming, upcoming_cancel)
 from .files import file_exists
-from .live import channel_icon, channel_playlist, live_channels
+from .live import channel_icon, channel_playlist, live_channels, qualities
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
 from .status import status
 from .scan import scan_add, scan_delete, scan_result, scan_start, scan_status
@@ -115,8 +115,8 @@ def make_handler(app):
                     % (dur, title, host, urllib.parse.quote(uuid))).encode()
             self.send_m3u(title, body)
 
-        def channel_playlist(self, uuid):
-            self.send_m3u(*channel_playlist(app.tvh, uuid, self.headers.get('Host')))
+        def channel_playlist(self, uuid, profile=None):
+            self.send_m3u(*channel_playlist(app.tvh, uuid, self.headers.get('Host'), profile))
 
         def thumb(self, uuid):
             path = thumbnail(entry_info(app.tvh, uuid).get('filename'))
@@ -194,7 +194,9 @@ def make_handler(app):
             elif url.path == '/api/live':
                 self.run(lambda: live_channels(app.tvh))
             elif url.path == '/api/channel-playlist':
-                self.run(lambda: self.channel_playlist(q['uuid']))
+                self.run(lambda: self.channel_playlist(q['uuid'], q.get('profile')))
+            elif url.path == '/api/qualities':
+                self.run(lambda: qualities(app.tvh))
             elif url.path == '/api/thumb':
                 self.run(lambda: self.thumb(q['uuid']))
             elif url.path == '/api/icon':
