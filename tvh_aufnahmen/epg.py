@@ -103,6 +103,40 @@ def event_detail(tvh, posters, archive, event_id):
     return res[0]
 
 
+def _norm(s):
+    return re.sub(r'\s+', ' ', re.sub(r'[^\w ]+', ' ', (s or '').lower())).strip()
+
+
+def repeats(tvh, archive, event_id):
+    """Weitere Ausstrahlungen einer Sendung in den kommenden Tagen. Hat sie einen eigenen
+    Untertitel (Episode), müssen Titel und Untertitel passen, sonst genügt der gleiche Titel."""
+    res = tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or []
+    ev = res[0] if res else archive.find(event_id)
+    if not ev:
+        raise ValueError('Sendung nicht gefunden')
+    title, sub = _norm(ev.get('title')), _norm((ev.get('subtitle') or '').split('\n')[0])
+    first = (ev.get('subtitle') or '').split('\n')[0]
+    # „Komödie, USA 1962“ ist kein Episodenname, sondern Genre/Land/Jahr – dann zählt nur der Titel
+    genre_line = re.match(r'^[^,]{2,40}, [^,]{1,30} (19|20)\d\d\b', first)
+    episode = sub if sub and sub != title and not genre_line else ''
+    now = time.time()
+    planned = upcoming_entries(tvh)
+    by_event = {e.get('broadcast') for e in planned if e.get('broadcast')}
+    by_time = {(e.get('channel'), e.get('start')) for e in planned}
+    hits = []
+    for e in tvh.call('epg/events/grid', title=ev.get('title') or '', limit=500).get('entries', []):
+        if e.get('eventId') == ev.get('eventId') or e.get('start', 0) <= now or _norm(e.get('title')) != title:
+            continue
+        if episode and _norm((e.get('subtitle') or '').split('\n')[0]) != episode:
+            continue
+        hits.append({'eventId': e['eventId'], 'title': e.get('title'), 'subtitle': e.get('subtitle') or '',
+                     'channelName': e.get('channelName'), 'channelUuid': e.get('channelUuid'),
+                     'start': e['start'], 'stop': e['stop'], 'hd': e.get('hd'),
+                     'planned': e['eventId'] in by_event or (e.get('channelUuid'), e.get('start')) in by_time})
+    hits.sort(key=lambda e: e['start'])
+    return {'title': ev.get('title'), 'episode': bool(episode), 'repeats': hits}
+
+
 def poster_status(posters, keys, urgent=False):
     return {k: posters.get(k, urgent) for k in keys[:500] if isinstance(k, str)}
 

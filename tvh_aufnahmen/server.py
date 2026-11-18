@@ -9,7 +9,8 @@ from http.server import BaseHTTPRequestHandler
 
 from .backup import check_password, restore, write_backup
 from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day, epg_search,
-                  event_detail, poster_status, record_event, record_manual, upcoming, upcoming_cancel)
+                  event_detail, poster_status, record_event, record_manual, repeats, upcoming,
+                  upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels, qualities
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
@@ -207,6 +208,8 @@ def make_handler(app):
                 self.run(lambda: epg_day(app.tvh, app.posters, app.archive, q.get('start')))
             elif url.path == '/api/epg-search':
                 self.run(lambda: epg_search(app.tvh, q.get('q'), q.get('full') == '1'))
+            elif url.path == '/api/repeats':
+                self.run(lambda: repeats(app.tvh, app.archive, q['id']))
             elif url.path == '/api/epg/event':
                 self.run(lambda: event_detail(app.tvh, app.posters, app.archive, q['id']))
             elif url.path == '/api/form':

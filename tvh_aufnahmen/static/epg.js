@@ -106,6 +106,7 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
   ${e.start<=Date.now()/1000&&e.channelUuid?`<a class="b" style="text-decoration:none" href="${playHref(e.channelUuid)}" data-play="${e.channelUuid}" title="Öffnet den Sender als Stream in VLC">▶ Abspielen</a>`:''}
   <button class="b" onclick="recordEvent(${e.eventId})">Aufnehmen</button>
   <button class="b sec" onclick="$('#serform').hidden=!$('#serform').hidden">Serienaufnahme …</button></div>`}
+ ${e.start<=Date.now()/1000?`<div class="bar" style="margin-top:10px"><button class="b sec" onclick="findRepeats(${e.eventId},this)">🔁 Wiederholungen suchen</button></div><div id="reps"></div>`:''}
  <form id="serform" hidden onsubmit="event.preventDefault();saveSeries(this)"><h3>Serienaufnahme</h3>
   ${idnodeForm(schema,{name:e.title,title:'^'+e.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$',channel:e.channelUuid,weekdays:[wdv]})}
   <div class="bar" style="margin-top:12px"><button class="b">Serienaufnahme anlegen</button></div></form>`)}
@@ -135,3 +136,17 @@ async function epgSearch(full){const q=($('#epgq')?.value||EPGQ).trim();if(q.len
    <td style="white-space:nowrap;width:110px"><b>${hm(e.start)}</b>–${hm(e.stop)}</td><td style="width:180px">${esc(e.channelName||'')}</td>
    <td><b>${e.planned?'<span class="dot"></span>':''}${esc(e.title)}</b>${e.subtitle&&e.subtitle!=e.title?`<div class="muted">${esc(e.subtitle.split('\n')[0])}</div>`:''}${e.description?`<div class="muted ds2">${esc(e.description)}</div>`:''}</td></tr>`).join('')}</table>`).join(''):'<p class="muted">Nichts gefunden.</p>'}</div>`}
 let EPGR=null;
+
+// Wiederholungen einer laufenden oder vergangenen Sendung in den kommenden Tagen
+async function findRepeats(id,btn){btn.disabled=true;$('#reps').innerHTML='<p class="muted">Suche …</p>';
+ let r;try{r=await api('/api/repeats?id='+id)}catch(e){$('#reps').innerHTML='';btn.disabled=false;return msg(e.message)}
+ btn.disabled=false;
+ $('#reps').innerHTML=r.repeats.length?`<p class="muted" style="margin:6px 0">${r.repeats.length} weitere Ausstrahlung(en)${r.episode?' dieser Folge':''}:</p>
+ <table class="reps">${r.repeats.map(e=>`<tr><td style="white-space:nowrap"><b>${esc(wday(e.start))}</b><br><span class="muted">${hm(e.start)}–${hm(e.stop)}</span></td>
+  <td>${esc(e.channelName||'')}${e.hd?' <span class="tag">HD</span>':''}<br><a class="evl" onclick="showEvent(${e.eventId})">${esc(e.title)}</a>${e.subtitle&&e.subtitle!=e.title?' <span class="muted">– '+esc(e.subtitle.split('\n')[0])+'</span>':''}</td>
+  <td style="white-space:nowrap">${e.planned?'<span class="tag keep">geplant</span>':`<button class="b" onclick="recordRepeat(${e.eventId},this)">Aufnehmen</button>`}</td></tr>`).join('')}</table>`
+  :`<p class="muted">Keine weitere Ausstrahlung${r.episode?' dieser Folge':''} in den Programmdaten gefunden (reichen etwa 4 Wochen voraus).</p>`}
+async function recordRepeat(id,btn){btn.disabled=true;
+ try{const r=await api('/api/record',{event:id,config:''});btn.outerHTML='<span class="tag keep">geplant</span>';
+  if(r.conflict)msg(`Aufnahme geplant – aber ⚠ Konflikt: zu der Zeit sind schon ${r.conflict.titles.length-1} andere Aufnahme(n) auf anderen Transpondern geplant, es gibt nur ${r.tuners} Tuner:\n${r.conflict.titles.join(', ')}`);
+  else msg('Aufnahme geplant',true)}catch(e){btn.disabled=false;msg(e.message)}}

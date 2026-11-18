@@ -258,3 +258,4 @@ code{font-size:12.5px;padding:1px 6px;border-radius:6px;background:var(--line)}
 .meter div{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
 .warn-t{margin:8px 0 0;color:#d97706;font-weight:600}
 dialog:has(.cmp){max-width:1180px}
+table.reps td{padding:7px 8px;vertical-align:middle}
