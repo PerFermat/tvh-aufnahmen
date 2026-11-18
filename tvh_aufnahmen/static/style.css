@@ -148,6 +148,13 @@ img.thumb:hover{transform:scale(1.06);box-shadow:var(--shadow)}
 tr.fold.dup td{cursor:default}
 .tag.keep{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
 
+a.rtitle{cursor:pointer;color:var(--fg);font-weight:600;text-decoration:none}a.rtitle:hover{color:var(--acc);text-decoration:underline}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rcard{border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}.rcard.keep{border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.rcard h3{margin:8px 0 2px}.rcard-h{margin-bottom:8px}
+.rthumb{width:100%;max-height:200px;object-fit:cover;border-radius:10px;cursor:zoom-in;background:var(--line)}
+table.kvt td{padding:3px 8px 3px 0;border:0;font-size:13.5px}table.kvt td:first-child{color:var(--muted);white-space:nowrap}
+
 /* ---------- Live-TV ---------- */
 td.logo{width:72px}td.logo img{width:60px;height:38px;object-fit:contain;display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
 .prog{height:5px;background:var(--line);border-radius:3px;margin:6px 0 8px;max-width:360px;overflow:hidden}
@@ -222,6 +229,7 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
  main table:not(.epg) tr[hidden]{display:none}
  tr.fold td{padding:8px!important;border-radius:8px}
  .ed{grid-template-columns:1fr;padding:12px}
+ .cmp{grid-template-columns:1fr}
  .seg.blocks .to{display:none}
  .epgnav{flex-wrap:wrap;overflow:visible}.epgnav>*{flex:none}
  .seg.blocks{order:9;flex:1 1 100%;display:flex}.seg.blocks button{flex:1;padding:6px 0}
@@ -234,3 +242,4 @@ code{font-size:12.5px;padding:1px 6px;border-radius:6px;background:var(--line)}
 .meter{height:10px;border-radius:999px;background:var(--line);overflow:hidden}.meter.sm{height:6px;margin-top:7px}
 .meter div{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
 .warn-t{margin:8px 0 0;color:#d97706;font-weight:600}
+dialog:has(.cmp){max-width:1180px}
