@@ -49,7 +49,7 @@ function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLe
 // bei vielen Sendungen bleibt keiner, bei wenigen werden sie lang, bei viel Platz kommt ein Bild dazu.
 const ROW_MIN=300,LINE_PX=16,IMG_PX=110,MIN_DESC=2,MAX_DESC=40;
 function evHtml(e){
- return `<div class="ev${e.planned?' pl':''}" onclick="showEvent(${e.eventId})">
+ return `<div class="ev${e.planned?' pl':''}" data-s="${e.start}" data-e="${e.stop}" onclick="showEvent(${e.eventId})">
   ${e.poster?`<img class="poster" src="${esc(e.poster.thumb)}" alt="" loading="lazy" hidden onerror="this.remove()">`:''}
   <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)}${e.hd?' · HD':''}</div>
   ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}${e.description?`<div class="ds" hidden>${esc(e.description)}</div>`:''}</div>`}
@@ -70,7 +70,13 @@ function fillEpg(){const words=EPGQ.toLowerCase().split(/\s+/).filter(Boolean),m
   const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];return {k,all,list:EPGX.has(k)?all:all.slice(0,CELLMAX)}});
   return `<tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${cells.map(x=>`<td><div class="cell">${x.list.map(evHtml).join('')}${x.all.length>x.list.length?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${x.all.length-x.list.length} weitere</button>`:''}</div></td>`).join('')}</tr>`});
  $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th>${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}<div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
- layoutEpg();$('#epgwrap').onscroll=epgMark}
+ epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
+// Laufende Sendung je Sender hervorheben, mit Fortschritt; jede Minute aktualisiert.
+// Nur Rahmen, Hintergrund und eine eingeblendete Leiste – die Zellenhöhen bleiben dadurch gleich.
+function epgNow(){const now=Date.now()/1000;
+ document.querySelectorAll('table.epg .ev').forEach(el=>{const s=+el.dataset.s,e=+el.dataset.e,on=s<=now&&now<e;
+  el.classList.toggle('now',on);if(on)el.style.setProperty('--p',((now-s)/(e-s)*100).toFixed(1)+'%');else el.style.removeProperty('--p')})}
+setInterval(()=>{if(cur=='epg'&&$('table.epg'))epgNow()},60000);
 async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catch(err){return msg(err.message)}
  const schema=await formSchema('dvrautorec'),cfg=(schema.props.find(p=>p.id=='config_name')||{enum:[]}).enum;
  const flags=['hd','widescreen','subtitled','audiodesc','deafsigned','new','repeat'].filter(k=>e[k]).map(k=>({hd:'HD',widescreen:'16:9',subtitled:'Untertitel',audiodesc:'Audiodeskription',deafsigned:'Gebärdensprache',new:'Neu',repeat:'Wiederholung'})[k]);
