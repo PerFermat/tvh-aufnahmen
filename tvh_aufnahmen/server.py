@@ -8,6 +8,8 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
 from .backup import check_password, restore, write_backup
+from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_block,
+                  event_detail, record_event, upcoming, upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
@@ -180,6 +182,18 @@ def make_handler(app):
                 self.run(lambda: self.icon(q['id']))
             elif url.path == '/api/export':
                 self.run(self.export)
+            elif url.path == '/api/epg':
+                self.run(lambda: epg_block(app.tvh, q.get('start')))
+            elif url.path == '/api/epg/event':
+                self.run(lambda: event_detail(app.tvh, q['id']))
+            elif url.path == '/api/form':
+                self.run(lambda: class_form(app.tvh, q['class']))
+            elif url.path == '/api/autorecs':
+                self.run(lambda: autorecs(app.tvh))
+            elif url.path == '/api/autorec':
+                self.run(lambda: autorec_load(app.tvh, q['uuid']))
+            elif url.path == '/api/upcoming':
+                self.run(lambda: upcoming(app.tvh))
             else:
                 self.send(404, {'error': 'nicht gefunden'})
 
@@ -207,6 +221,14 @@ def make_handler(app):
                 self.run(lambda: do_move(app.tvh, req['moves']))
             elif self.path == '/api/config':
                 self.run(lambda: app.update(req))
+            elif self.path == '/api/record':
+                self.run(lambda: record_event(app.tvh, req['event'], req.get('config')))
+            elif self.path == '/api/autorec-save':
+                self.run(lambda: autorec_save(app.tvh, req))
+            elif self.path == '/api/autorec-delete':
+                self.run(lambda: autorec_delete(app.tvh, req['uuid']))
+            elif self.path == '/api/upcoming-cancel':
+                self.run(lambda: upcoming_cancel(app.tvh, req['uuid']))
             elif self.path == '/api/backup':
                 self.run(lambda: self.backup(req))
             elif self.path in ('/api/import-preview', '/api/import-apply'):

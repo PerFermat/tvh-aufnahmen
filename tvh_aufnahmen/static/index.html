@@ -7,6 +7,9 @@
 <header><h1>TVHeadend Aufnahmen</h1><div class="sub" id="info">Lade …</div></header>
 <div id="msg"></div>
 <nav><button id="t-live" onclick="tab('live')">Live-TV</button>
+<button id="t-epg" onclick="tab('epg')">Programm</button>
+<button id="t-autorec" onclick="tab('autorec')">Serienaufnahmen</button>
+<button id="t-upcoming" onclick="tab('upcoming')">Geplante Aufnahmen</button>
 <button id="t-rec" onclick="tab('rec')">Aufnahmen</button>
 <button id="t-unknown" onclick="tab('unknown')">Nicht eingetragene Dateien</button>
 <button id="t-missing" onclick="tab('missing')">Einträge ohne Datei</button>
@@ -14,8 +17,12 @@
 <button id="t-backup" onclick="tab('backup')">Sicherung</button></nav>
 <main id="main">Lade …</main>
 <datalist id="chans"></datalist>
+<dialog id="dlg"></dialog>
 <script src="/static/common.js"></script>
 <script src="/static/live.js"></script>
+<script src="/static/epg.js"></script>
+<script src="/static/autorecs.js"></script>
+<script src="/static/upcoming.js"></script>
 <script src="/static/recordings.js"></script>
 <script src="/static/unknown.js"></script>
 <script src="/static/missing.js"></script>

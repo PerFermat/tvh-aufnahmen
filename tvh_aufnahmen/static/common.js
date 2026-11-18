@@ -7,6 +7,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const pad=n=>String(n).padStart(2,'0');
 const dtl=t=>{const d=new Date(t*1000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())};
 const fmt=t=>t?new Date(t*1000).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'–';
+const hm=t=>{const d=new Date(t*1000);return pad(d.getHours())+':'+pad(d.getMinutes())};
 const gb=b=>(b/1073741824).toFixed(2)+' GB';
 function msg(t,ok){const m=$('#msg');m.textContent=t;m.className=ok?'ok':'err';if(ok)setTimeout(()=>m.className='',5000)}
 async function api(p,body){const r=await fetch(p,body?{method:'POST',body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
@@ -16,7 +17,29 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#t-unknown').textContent=`Nicht eingetragene Dateien (${S.unknown.length})`;
  $('#t-missing').textContent=`Einträge ohne Datei (${S.missing.length})`;
  $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');render()}
-const TABS={live:()=>renderLive(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup()};
+const TABS={live:()=>renderLive(),epg:()=>renderEpg(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup()};
 function tab(n){if(!TABS[n])n='live';cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');render()}
-function render(){if(['live','config','backup'].includes(cur))return TABS[cur]();if(!S){$('#main').innerHTML='<p class="muted">Keine Daten – bitte Einstellungen prüfen.</p>';return}
+function render(){if(['live','epg','autorec','upcoming','config','backup'].includes(cur))return TABS[cur]();if(!S){$('#main').innerHTML='<p class="muted">Keine Daten – bitte Einstellungen prüfen.</p>';return}
  TABS[cur]()}
+// Formulare aus der Klassenbeschreibung von TVHeadend (/api/form) – zeigt alle Optionen einer Klasse
+const FORMS={};
+async function formSchema(cls){return FORMS[cls]||(FORMS[cls]=await api('/api/form?class='+cls))}
+const NUMTYPES=['int','u32','u16','s64','s32','dbl','time'];
+function idnodeField(p,v){if(v===undefined||v===null)v=p.default;const t=p.description?` title="${esc(p.description)}"`:'',n=`name="${p.id}"`;
+ if(p.type=='bool')return `<label class="chk"${t}><input type="checkbox" ${n} ${v?'checked':''}> ${esc(p.caption)}</label>`;
+ if(p.list&&p.enum)return `<fieldset class="wide"${t}><legend>${esc(p.caption)}</legend>${p.enum.map(o=>`<label class="chk"><input type="checkbox" ${n} value="${esc(o.key)}" ${(v||[]).map(String).includes(String(o.key))?'checked':''}> ${esc(o.val)}</label>`).join('')}</fieldset>`;
+ if(p.enum)return `<label${t}>${esc(p.caption)}<select ${n}>${p.enum.some(o=>String(o.key)==String(v??''))?'':`<option value="${esc(v??'')}">${esc(v??'')}</option>`}${p.enum.map(o=>`<option value="${esc(o.key)}" ${String(o.key)==String(v??'')?'selected':''}>${esc(o.val===''?'–':o.val)}</option>`).join('')}</select></label>`;
+ if(NUMTYPES.includes(p.type))return `<label${t}>${esc(p.caption)}<input type="number" ${n} value="${esc(v??'')}"></label>`;
+ return `<label${t}>${esc(p.caption)}<input ${n} value="${esc(v??'')}"></label>`}
+function idnodeForm(schema,values){const main=schema.props.filter(p=>!p.advanced&&!p.expert&&!p.hidden),more=schema.props.filter(p=>!main.includes(p));
+ return `<div class="ed" style="padding:0;background:none">${main.map(p=>idnodeField(p,values[p.id])).join('')}</div>
+ <details style="margin-top:10px"><summary class="muted">Weitere Optionen (${more.length})</summary><div class="ed" style="padding:10px 0 0;background:none">${more.map(p=>idnodeField(p,values[p.id])).join('')}</div></details>`}
+function readIdnodeForm(form,schema){const out={},num=p=>NUMTYPES.includes(p.type);
+ for(const p of schema.props){const els=[...form.querySelectorAll(`[name="${p.id}"]`)];if(!els.length)continue;
+  if(p.type=='bool')out[p.id]=els[0].checked;
+  else if(p.list)out[p.id]=els.filter(e=>e.checked).map(e=>num(p)?Number(e.value):e.value);
+  else out[p.id]=num(p)?Number(els[0].value||0):els[0].value}
+ return out}
+function dialog(html){const d=$('#dlg');d.innerHTML=`<button class="b sec x" onclick="$('#dlg').close()">Schließen</button>`+html;if(!d.open)d.showModal();d.scrollTop=0;return d}
+const WD=['','Mo','Di','Mi','Do','Fr','Sa','So'];
+const days=w=>!w||!w.length||w.length==7?'täglich':w.map(d=>WD[d]).join(', ');
