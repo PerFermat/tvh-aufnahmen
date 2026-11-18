@@ -1,5 +1,6 @@
 """Abgleich zwischen TVHeadend-Einträgen und Dateien auf der Platte."""
 import os
+import shutil
 import time
 
 from .files import file_exists, scan, suggest
@@ -63,4 +64,14 @@ def build_state(tvh, recdir):
     recordings.sort(key=lambda r: r['start'], reverse=True)
 
     return {'recdir': recdir, 'recordings': recordings, 'unknown': unknown, 'missing': missing,
-            'channels': tvh.channels(), 'known_count': len(entries)}
+            'channels': tvh.channels(), 'known_count': len(entries), 'disk': disk_info(recdir, entries)}
+
+
+def disk_info(recdir, entries=()):
+    """Belegung der Platte mit dem Aufnahmeordner und die Zahl der Aufnahmen der letzten 30 Tage,
+    die TVHeadend wegen vollem Speicher nicht machen konnte."""
+    du = shutil.disk_usage(recdir)
+    since = time.time() - 30 * 86400
+    full = sum(1 for e in entries if (e.get('start') or 0) > since
+               and (e.get('errorcode') == 403 or 'disk space' in (e.get('status') or '').lower()))
+    return {'total': du.total, 'used': du.used, 'free': du.free, 'failed_full': full}

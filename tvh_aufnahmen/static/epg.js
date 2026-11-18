@@ -22,7 +22,8 @@ async function renderEpg(start,jump){
  <span class="seg">${BLOCKS.map(h=>`<button id="jb${h}" onclick="epgJump(${h})">${h}–${h+4}</button>`).join('')}</span>
  <button class="b sec" onclick="renderEpg(0)">Jetzt</button>
  <select onchange="EPGT=this.value;store('epgtag',EPGT);fillEpg()"><option value="">Alle Sender</option>${tags.map(t=>`<option ${t==EPGT?'selected':''}>${esc(t)}</option>`).join('')}</select>
- <input type="search" placeholder="Suchen an diesem Tag …" value="${esc(EPGQ)}" oninput="EPGQ=this.value;fillEpg()" style="flex:1;min-width:160px">
+ <input type="search" id="epgq" placeholder="Suchen an diesem Tag …" value="${esc(EPGQ)}" oninput="EPGQ=this.value;fillEpg()" onkeydown="if(event.key=='Enter')epgSearch()" style="flex:1;min-width:160px">
+ <button class="b sec" onclick="epgSearch()" title="Im ganzen Programm (alle Tage) suchen">Alle Tage durchsuchen</button>
  <label class="chk"><input type="checkbox" ${EPGE?'checked':''} onchange="EPGE=this.checked;fillEpg()"> Sender ohne Programm</label>
  <span class="muted">${esc(wday(EPG.start))}</span>`;
  const keep=$('#epgwrap').scrollTop,keepX=$('#epgwrap').scrollLeft;fillEpg();
@@ -75,7 +76,7 @@ function fillEpg(){const words=EPGQ.toLowerCase().split(/\s+/).filter(Boolean),m
 // Nur Rahmen, Hintergrund und eine eingeblendete Leiste – die Zellenhöhen bleiben dadurch gleich.
 function epgNow(){const now=Date.now()/1000;
  document.querySelectorAll('table.epg .ev').forEach(el=>{const s=+el.dataset.s,e=+el.dataset.e,on=s<=now&&now<e;
-  el.classList.toggle('now',on);if(on)el.style.setProperty('--p',((now-s)/(e-s)*100).toFixed(1)+'%');else el.style.removeProperty('--p')})}
+  el.classList.toggle('now',on);el.classList.toggle('past',e<=now);if(on)el.style.setProperty('--p',((now-s)/(e-s)*100).toFixed(1)+'%');else el.style.removeProperty('--p')})}
 setInterval(()=>{if(cur=='epg'&&$('table.epg'))epgNow()},60000);
 async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catch(err){return msg(err.message)}
  const schema=await formSchema('dvrautorec'),cfg=(schema.props.find(p=>p.id=='config_name')||{enum:[]}).enum;
@@ -103,6 +104,21 @@ async function eventPoster(e,tries=0){if(EVENT!==e||!$('#dlg').open)return;
  const p=res[e.poster_key],box=$('#evposter');if(EVENT!==e||!box)return;
  if(p==='pending'){if(tries<30)setTimeout(()=>eventPoster(e,tries+1),2000);else box.innerHTML='';return}
  box.innerHTML=p?posterFig(p):''}
-async function recordEvent(id){try{await api('/api/record',{event:id,config:$('#evcfg').value});$('#dlg').close();msg('Aufnahme geplant: '+EVENT.title,true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
+async function recordEvent(id){try{const r=await api('/api/record',{event:id,config:$('#evcfg').value});$('#dlg').close();
+ if(r.conflict)msg(`Aufnahme geplant: ${EVENT.title}\n\n⚠ Konflikt: Zu dieser Zeit sind schon ${r.conflict.titles.length-1} andere Aufnahme(n) auf anderen Transpondern geplant – es gibt aber nur ${r.tuners} Tuner. Eine davon wird nicht aufgenommen:\n${r.conflict.titles.join(', ')}`);
+ else msg('Aufnahme geplant: '+EVENT.title,true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
 async function saveSeries(form){const schema=await formSchema('dvrautorec'),conf=readIdnodeForm(form,schema);
  try{await api('/api/autorec-save',conf);$('#dlg').close();msg('Serienaufnahme angelegt: '+(conf.name||conf.title),true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
+
+// Suche über das ganze Programm (alle Tage). Ergebnisse ersetzen die Zeitschrift, bis „Zurück“ gedrückt wird.
+async function epgSearch(full){const q=($('#epgq')?.value||EPGQ).trim();if(q.length<2)return msg('Bitte mindestens 2 Zeichen eingeben');
+ $('#epgwrap').innerHTML='<p class="muted" style="padding:12px">Suche im ganzen Programm …</p>';
+ let r;try{r=await api('/api/epg-search?q='+encodeURIComponent(q)+(full?'&full=1':''))}catch(e){$('#epgwrap').innerHTML='';return msg(e.message)}
+ if(cur!='epg')return;EPGR=r;const days={};r.events.forEach(e=>(days[dkey(e.start)]??=[]).push(e));
+ $('#epgwrap').innerHTML=`<div class="srch"><div class="bar"><button class="b sec" onclick="EPGR=null;fillEpg();epgNow()">‹ Zurück zum Programm</button>
+  <span class="muted">${r.events.length} Sendungen mit „${esc(q)}“${full?' (auch in Beschreibungen)':''}</span>
+  ${full?'':`<button class="b sec" onclick="epgSearch(true)">Auch in Beschreibungen suchen</button>`}</div>
+  ${r.events.length?Object.entries(days).map(([d,evs])=>`<h3>${esc(wday(evs[0].start))}</h3><table>${evs.map(e=>`<tr class="hit" onclick="showEvent(${e.eventId})">
+   <td style="white-space:nowrap;width:110px"><b>${hm(e.start)}</b>–${hm(e.stop)}</td><td style="width:180px">${esc(e.channelName||'')}</td>
+   <td><b>${e.planned?'<span class="dot"></span>':''}${esc(e.title)}</b>${e.subtitle&&e.subtitle!=e.title?`<div class="muted">${esc(e.subtitle.split('\n')[0])}</div>`:''}${e.description?`<div class="muted ds2">${esc(e.description)}</div>`:''}</td></tr>`).join('')}</table>`).join(''):'<p class="muted">Nichts gefunden.</p>'}</div>`}
+let EPGR=null;

@@ -3,6 +3,9 @@
 Web-Oberfläche für TVHeadend 4.3, um
 
 - das **Programm** wie eine Fernsehzeitschrift zu zeigen – ein ganzer Tag, Sender als Spalten, sechs Zeilen zu je 4 Stunden mit allen Sendungen, die darin beginnen; die Schnellauswahl springt zum Block – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
+- im Programm **über alle Tage zu suchen** (Titel, auf Wunsch auch Beschreibungen); laufende Sendungen sind markiert, vorbeigelaufene grau,
+- den **Status** zu sehen: Tuner mit Signal und Fehlern, laufende Aufnahmen und Streams, Temperatur, Last und Speicher des Raspberry,
+- **Konflikte** zu erkennen, wenn mehr Aufnahmen gleichzeitig auf verschiedenen Transpondern geplant sind, als es Tuner gibt,
 - **Serienaufnahmen** zu verwalten (anlegen, bearbeiten, aktivieren/deaktivieren, löschen) und alle **geplanten Aufnahmen** einzeln zu sehen und zu löschen,
 - **Live-TV**: alle Sender mit Logo, der laufenden Sendung (mit Fortschrittsbalken) und den nächsten drei Sendungen anzuzeigen und einen Sender per Knopf in VLC abzuspielen,
 - **Aufnahmen** als Liste oder nach Ordnern gruppiert anzuzeigen, nach Name, Sender, Datum, Dauer oder Größe zu sortieren, zu durchsuchen, herunterzuladen, in VLC als Stream abzuspielen, Titel, Untertitel und Beschreibung zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen,
@@ -101,6 +104,9 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/epg.py` | Programmzeitschrift, Aufnahmen planen, Serienaufnahmen, geplante Aufnahmen, Formulare aus den TVHeadend-Klassen |
 | `tvh_aufnahmen/posters.py` | Bilder zu langen Sendungen aus der Wikipedia, im Hintergrund gesucht und zwischengespeichert |
 | `tvh_aufnahmen/scan.py` | Sendersuchlauf, Auswertung, neue Sender anlegen, verschwundene löschen |
+| `tvh_aufnahmen/status.py` | Status-Seite: Tuner, laufende Aufnahmen und Streams, Raspberry |
+| `tvh_aufnahmen/thumbs.py` | Vorschaubilder der Aufnahmen per ffmpeg |
+| `tvh_aufnahmen/jobs.py` | Hintergrundaufgaben: nächtliche Sicherung, Benachrichtigungen per ntfy |
 | `tvh_aufnahmen/state.py` | Abgleich Einträge ↔ Dateien: Aufnahmen, nicht eingetragene Dateien, Einträge ohne Datei |
 | `tvh_aufnahmen/recordings.py` | Ändern: importieren, bearbeiten, Datei ersetzen, löschen, Pfade reparieren |
 | `tvh_aufnahmen/backup.py` | Komplettsicherung des TVHeadend-Ordners und Wiederherstellung |
@@ -123,5 +129,9 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 - Das Formular für Serienaufnahmen wird aus der Klassenbeschreibung von TVHeadend (`api/idnode/class`) erzeugt und zeigt deshalb alle Optionen der installierten Version; selten gebrauchte stehen unter „Weitere Optionen“.
 - Programm: Die Zellen einer Zeile werden gleichmäßig gefüllt – laufen bei einem Sender viele Sendungen, fällt die Beschreibung weg, bei wenigen wird sie länger. Für Sendungen ab 80 Minuten sucht der Server im Hintergrund ein Bild, beim Öffnen einer Sendung im Detailfenster auch für kürzere (dann vorrangig, angezeigt nur dort). Gesucht wird der Artikel in der deutschen Wikipedia – nur bei genau passendem Titel und einer Kurzbeschreibung als Film, Serie, Sendung o. Ä.; bei gleichnamigen Artikeln zählt das Jahr aus dem EPG („Drama, USA 2005“). Das Bild kommt aus dem deutschen Artikel, sonst aus dem englischen (dort gibt es Filmplakate), sonst aus Wikidata. Höchstens eine Anfrage pro Sekunde; die Ergebnisse liegen in `~/.cache/tvh-aufnahmen/posters.json`, die Bilder lädt der Browser direkt von Wikimedia.
 - Suchlauf: Als neu gelten unverschlüsselte TV-Dienste ohne Sender, deren erste Tonspur deutsch ist. Testkanäle und Altlasten („Astra Demo“, „ALT_…“) werden ausgelassen; SD-, Regional- und Länderfassungen vorhandener Sender, Dienste ohne Sprachangabe und Erotikkanäle stehen getrennt und sind nicht vorausgewählt. Als verschwunden gilt ein Sender, dessen Dienste seit mindestens zwei Tagen vor dem Suchlauf nicht mehr gesehen wurden (TVHeadend aktualisiert „zuletzt gesehen“ nur grob).
+- Aufnahmen: Über der Liste stehen Belegung und freier Platz der Platte, die größten Ordner und eine Warnung, wenn Aufnahmen wegen vollem Speicher gescheitert sind. Jede Aufnahme bekommt ein Vorschaubild (Standbild bei ~15 % der Laufzeit, per ffmpeg, zwischengespeichert in `~/.cache/tvh-aufnahmen/thumbs`).
+- Automatische Sicherung: jede Nacht (Standard 03:30, im Reiter „Sicherung“ einstellbar) eine Komplettsicherung ohne Programmdaten und der JSON-Export, standardmäßig nach `<Platte>/Backup/tvheadend-sicherungen`; die letzten 14 bleiben. Fällt die Uhrzeit aus (Raspberry aus), wird nachgeholt. Die Sicherung enthält die TVHeadend-Passwörter – der Ordner sollte also nicht für andere freigegeben sein.
+- Benachrichtigungen (Einstellungen): über [ntfy](https://ntfy.sh) bei fertigen und fehlgeschlagenen Aufnahmen und wenn unter 10 % Speicher frei sind.
+- Als App: Die Oberfläche hat ein Web-App-Manifest. Auf dem iPhone über „Teilen → Zum Home-Bildschirm“ als eigene App ohne Browserleiste; auf Android legt „Zum Startbildschirm hinzufügen“ eine Verknüpfung an (als echte App mit eigenem Fenster nur über HTTPS).
 - Downloads unterstützen HTTP-Range, Player können also spulen.
 - Vor dem ersten großen Import am besten den Ordner `~/.hts/tvheadend/dvr/log` sichern.

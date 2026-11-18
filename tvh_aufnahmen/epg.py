@@ -57,6 +57,32 @@ def epg_day(tvh, posters, start=None):
             'channels': channels, 'events': events, 'posters_pending': attach(posters, events)}
 
 
+def epg_search(tvh, query, fulltext=False):
+    """Sucht im ganzen EPG (alle Tage) nach Titel – mit fulltext auch in Untertitel und Beschreibung."""
+    query = (query or '').strip()
+    if len(query) < 2:
+        raise ValueError('Bitte mindestens 2 Zeichen eingeben')
+    params = {'title': query, 'limit': 500}
+    if fulltext:
+        params['fulltext'] = 1
+    res = tvh.call('epg/events/grid', **params)
+    planned = upcoming_entries(tvh)
+    by_event = {e.get('broadcast') for e in planned if e.get('broadcast')}
+    by_time = {(e.get('channel'), e.get('start')) for e in planned}
+    now = time.time()
+    events = []
+    for e in res.get('entries', []):
+        if e.get('stop', 0) <= now:
+            continue
+        ev = {k: e.get(k) for k in EVENT_FIELDS + ('channelName',)}
+        if len(ev.get('description') or '') > 300:
+            ev['description'] = ev['description'][:300].rsplit(' ', 1)[0] + ' …'
+        ev['planned'] = e['eventId'] in by_event or (e.get('channelUuid'), e.get('start')) in by_time
+        events.append(ev)
+    events.sort(key=lambda e: e['start'])
+    return {'query': query, 'total': res.get('totalCount', len(events)), 'events': events}
+
+
 def event_detail(tvh, posters, event_id):
     res = tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or []
     if not res:
@@ -74,7 +100,32 @@ def record_event(tvh, event_id, config_uuid=''):
     uuids = res.get('uuid') or []
     if not uuids:
         raise ValueError('TVHeadend hat keine Aufnahme angelegt (schon geplant oder Sendung vorbei?)')
-    return {'uuid': uuids[0] if isinstance(uuids, list) else uuids}
+    uuid = uuids[0] if isinstance(uuids, list) else uuids
+    c = conflicts(tvh)
+    return {'uuid': uuid, 'conflict': next((g for g in c['groups'] if uuid in g['uuids']), None), 'tuners': c['tuners']}
+
+
+def conflicts(tvh, entries=None):
+    """Zeiten, in denen mehr Transponder gleichzeitig gebraucht werden, als es Tuner gibt.
+    Mehrere Sender auf demselben Transponder teilen sich einen Tuner. Vor- und Nachlauf zählen mit."""
+    entries = upcoming_entries(tvh) if entries is None else entries
+    tuners = len(tvh.call('status/inputs').get('entries', [])) or 1
+    svc_mux = {s['uuid']: s.get('multiplex_uuid') for s in
+               tvh.call('mpegts/service/grid', limit=100000, all=1).get('entries', [])}
+    chan_mux = {c['uuid']: next((svc_mux.get(u) for u in c.get('services', []) if svc_mux.get(u)), c['uuid'])
+                for c in tvh.call('channel/grid', limit=100000, all=1).get('entries', [])}
+    span = lambda e: (e.get('start_real') or e.get('start') or 0, e.get('stop_real') or e.get('stop') or 0)
+    active = [e for e in entries if e.get('enabled', True) is not False]
+    groups = []
+    for t in sorted({span(e)[0] for e in active}):
+        now = [e for e in active if span(e)[0] <= t < span(e)[1]]
+        muxes = {chan_mux.get(e.get('channel'), e.get('channel')) for e in now}
+        if len(muxes) > tuners:
+            uu = sorted(e['uuid'] for e in now)
+            if not groups or groups[-1]['uuids'] != uu:
+                groups.append({'start': t, 'uuids': uu, 'titles': [e.get('disp_title') or '' for e in now],
+                               'muxes': len(muxes)})
+    return {'tuners': tuners, 'groups': groups, 'uuids': sorted({u for g in groups for u in g['uuids']})}
 
 
 def resolve_enum(tvh, enum):
@@ -158,7 +209,10 @@ def upcoming(tvh):
                                           'start_real', 'stop_real', 'sched_status', 'status', 'autorec',
                                           'autorec_caption', 'enabled', 'config_name')})
     out.sort(key=lambda e: e.get('start') or 0)
-    return {'upcoming': out}
+    c = conflicts(tvh)
+    for e in out:
+        e['conflict'] = e['uuid'] in c['uuids']
+    return {'upcoming': out, 'tuners': c['tuners'], 'conflicts': c['groups']}
 
 
 def upcoming_cancel(tvh, uuid):

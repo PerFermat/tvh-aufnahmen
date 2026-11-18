@@ -2,8 +2,16 @@
 let VIEW=store('view')||'list',SORT=store('sort')||'date',DESC=(store('desc')??'1')=='1';const OPEN=new Set();
 const mins=r=>Math.round((r.stop-r.start)/60)+' min';
 const R=u=>S.recordings.find(r=>r.uuid===u);
+// Speicherplatz der Aufnahme-Platte und die größten Ordner
+function diskHtml(){const d=S.disk;if(!d)return'';const pct=d.used/d.total*100,lvl=pct>=95?'bad':pct>=88?'warn':'ok';
+ const sizes={};S.recordings.forEach(r=>{const f=folder(r)||'(Hauptordner)';sizes[f]=(sizes[f]||0)+r.size});
+ const top=Object.entries(sizes).sort((a,b)=>b[1]-a[1]).slice(0,8),max=top.length?top[0][1]:1;
+ return `<div class="disk ${lvl}"><div class="disk-head"><b>Speicher</b><span>${gb(d.used)} von ${gb(d.total)} belegt · <b>${gb(d.free)} frei</b></span></div>
+ <div class="meter"><div style="width:${pct.toFixed(1)}%"></div></div>
+ ${d.failed_full?`<p class="warn-t">⚠ ${d.failed_full} Aufnahme(n) sind wegen vollem Speicher fehlgeschlagen.</p>`:lvl!='ok'?'<p class="warn-t">⚠ Der Speicher wird knapp – alte Aufnahmen löschen, sonst scheitern neue.</p>':''}
+ <details><summary class="muted">Größte Ordner</summary><table class="bars">${top.map(([f,s])=>`<tr><td>${esc(f)}</td><td style="width:45%"><div class="meter sm"><div style="width:${(s/max*100).toFixed(1)}%"></div></div></td><td style="white-space:nowrap;text-align:right">${gb(s)}</td></tr>`).join('')}</table></details></div>`}
 function renderRecordings(){
- $('#main').innerHTML=`<div class="bar"><input id="q" type="search" placeholder="Suchen: Titel, Untertitel, Sender, Datei …" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
+ $('#main').innerHTML=diskHtml()+`<div class="bar"><input id="q" type="search" placeholder="Suchen: Titel, Untertitel, Sender, Datei …" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
  <span class="seg"><button id="v-list" onclick="setView('list')">Liste</button><button id="v-dir" onclick="setView('dir')">Ordner</button></span>
  <button class="b bad" onclick="removeSel()">Ausgewählte löschen</button>
  <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked)"> alle sichtbaren</label></div>
@@ -34,7 +42,7 @@ function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolea
   return `<tr class="fold" onclick="toggleFolder(this.dataset.f)" data-f="${esc(g[0])}"><td>${open?'▾':'▸'}</td><td colspan="2">📁 ${esc(g[0])} <span class="muted">(${g[1].length})</span></td><td colspan="2"><span class="muted">${gb(total(g))}</span></td></tr>`+(open?g[1].map(recRow).join(''):'')}).join('')
   +root.flatMap(g=>g[1]).map(recRow).join('')}
 const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
- <td>${esc(r.title)}${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
+ <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}" alt="" loading="lazy" onerror="this.remove()">${esc(r.title)}${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>

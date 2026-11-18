@@ -8,19 +8,22 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
 from .backup import check_password, restore, write_backup
-from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day,
+from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day, epg_search,
                   event_detail, poster_status, record_event, upcoming, upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
+from .status import status
 from .scan import scan_add, scan_delete, scan_result, scan_start, scan_status
 from .state import build_state
+from .thumbs import thumbnail
 from .transfer import export_all, plan_import
 from .tvh import entry_info
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
-                '.js': 'text/javascript; charset=utf-8'}
+                '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml',
+                '.webmanifest': 'application/manifest+json'}
 
 
 def make_handler(app):
@@ -115,6 +118,19 @@ def make_handler(app):
         def channel_playlist(self, uuid):
             self.send_m3u(*channel_playlist(app.tvh, uuid, self.headers.get('Host')))
 
+        def thumb(self, uuid):
+            path = thumbnail(entry_info(app.tvh, uuid).get('filename'))
+            if not path:
+                return self.send(404, {'error': 'kein Vorschaubild'})
+            with open(path, 'rb') as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'max-age=604800')
+            self.end_headers()
+            self.wfile.write(data)
+
         def icon(self, icon_id):
             data, ctype = channel_icon(app.tvh, icon_id)
             self.send_response(200)
@@ -179,12 +195,16 @@ def make_handler(app):
                 self.run(lambda: live_channels(app.tvh))
             elif url.path == '/api/channel-playlist':
                 self.run(lambda: self.channel_playlist(q['uuid']))
+            elif url.path == '/api/thumb':
+                self.run(lambda: self.thumb(q['uuid']))
             elif url.path == '/api/icon':
                 self.run(lambda: self.icon(q['id']))
             elif url.path == '/api/export':
                 self.run(self.export)
             elif url.path == '/api/epg':
                 self.run(lambda: epg_day(app.tvh, app.posters, q.get('start')))
+            elif url.path == '/api/epg-search':
+                self.run(lambda: epg_search(app.tvh, q.get('q'), q.get('full') == '1'))
             elif url.path == '/api/epg/event':
                 self.run(lambda: event_detail(app.tvh, app.posters, q['id']))
             elif url.path == '/api/form':
@@ -195,6 +215,10 @@ def make_handler(app):
                 self.run(lambda: autorec_load(app.tvh, q['uuid']))
             elif url.path == '/api/upcoming':
                 self.run(lambda: upcoming(app.tvh))
+            elif url.path == '/api/jobs':
+                self.run(app.jobs.settings)
+            elif url.path == '/api/status':
+                self.run(lambda: status(app.tvh, app.recdir))
             elif url.path == '/api/scan-status':
                 self.run(lambda: scan_status(app.tvh))
             elif url.path == '/api/scan-result':
@@ -242,6 +266,13 @@ def make_handler(app):
                 self.run(lambda: autorec_delete(app.tvh, req['uuid']))
             elif self.path == '/api/upcoming-cancel':
                 self.run(lambda: upcoming_cancel(app.tvh, req['uuid']))
+            elif self.path == '/api/jobs':
+                self.run(lambda: app.jobs.update(req))
+            elif self.path == '/api/backup-now':
+                self.run(app.jobs.run_backup)
+            elif self.path == '/api/notify-test':
+                self.run(lambda: {'sent': app.jobs.notify('Test von tvh-aufnahmen', 'Benachrichtigungen funktionieren.',
+                                                           'tada', 3, url=(req.get('url') or '').strip() or None)})
             elif self.path == '/api/backup':
                 self.run(lambda: self.backup(req))
             elif self.path in ('/api/import-preview', '/api/import-apply'):

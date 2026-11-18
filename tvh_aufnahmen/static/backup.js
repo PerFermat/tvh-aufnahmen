@@ -2,7 +2,8 @@
 let IMP=null;
 const SECT={tags:'Sender-Tags',channels:'Sender',autorecs:'Serien-Timer',recordings:'Aufnahmen'};
 function renderBackup(){
- $('#main').innerHTML=`<h3 style="margin-top:0">Komplettsicherung</h3>
+ $('#main').innerHTML=`<div id="autobk"><p class="muted">Lade …</p></div>
+ <h3>Komplettsicherung</h3>
  <p class="muted">Sichert den ganzen TVHeadend-Ordner: Aufnahmen, Sender, Timer, Tuner und Benutzer. Wiederhergestellt ist danach alles exakt wie vorher, auch der Gesehen-Status. Passt nur zur gleichen Hardware und gleichen oder neueren TVHeadend-Version.</p>
  <form class="ed" onsubmit="event.preventDefault();backupDownload(this)">
  <label>TVHeadend-Passwort (aus den Einstellungen)<input type="password" name="password" autocomplete="off"></label>
@@ -16,7 +17,26 @@ function renderBackup(){
  <div class="bar"><a class="b" style="text-decoration:none" href="/api/export">Export herunterladen</a>
  <label>Import-Datei <input type="file" id="imf" accept=".json,application/json" onchange="importPreview()"></label></div>
  <div id="imp"></div>`;
- if(IMP)showImport(IMP.result,IMP.done)}
+ if(IMP)showImport(IMP.result,IMP.done);renderAutoBackup()}
+// Automatische Sicherung: jede Nacht Komplettsicherung + JSON-Export in einen Ordner, die letzten N behalten
+async function renderAutoBackup(){let j;try{j=await api('/api/jobs')}catch(e){$('#autobk').innerHTML='';return}
+ if(cur!='backup'||!$('#autobk'))return;const b=j.autobackup,st=j.state.backup;
+ $('#autobk').innerHTML=`<h3 style="margin-top:0">Automatische Sicherung</h3>
+ <form class="ed" onsubmit="event.preventDefault();saveAutoBackup(this)">
+  <label class="chk wide"><input type="checkbox" name="enabled" ${b.enabled?'checked':''}> Jede Nacht automatisch sichern (Komplettsicherung und JSON-Export)</label>
+  <label class="wide">Ordner (am besten auf einer anderen Platte als das System)<input name="dir" value="${esc(b.dir)}"></label>
+  <label>Uhrzeit<input type="time" name="time" value="${pad(b.hour)}:${pad(b.minute)}" required></label>
+  <label>Wie viele behalten<input type="number" name="keep" min="1" max="365" value="${b.keep}"></label>
+  <div class="wide bar" style="margin:0"><button class="b">Speichern</button><button type="button" class="b sec" onclick="backupNow(this)">Jetzt sichern</button>
+   <span class="muted">${st?(st.ok?`Letzte Sicherung: ${fmt(st.ts)} (${(st.size/1048576).toFixed(1)} MB)`:`<span class="bad-t">Letzter Versuch ${fmt(st.ts)} fehlgeschlagen: ${esc(st.error)}</span>`):'Noch keine automatische Sicherung.'}</span></div></form>
+ ${j.backups.length?`<details style="margin-top:8px"><summary class="muted">Vorhandene Sicherungen (${j.backups.length})</summary><table class="bars">${j.backups.map(x=>`<tr><td>${esc(x.name)}</td><td class="muted">${fmt(x.mtime)}</td><td style="text-align:right">${(x.size/1048576).toFixed(1)} MB</td></tr>`).join('')}</table>
+  <p class="muted small">Einspielen: Datei unten unter „Sicherung einspielen“ bzw. „Import-Datei“ auswählen.</p></details>`:''}`}
+async function saveAutoBackup(f){const [h,m]=f.time.value.split(':').map(Number),j=await api('/api/jobs').catch(()=>null);
+ try{await api('/api/jobs',{autobackup:{enabled:f.enabled.checked,dir:f.dir.value,hour:h,minute:m,keep:+f.keep.value},notify:j?j.notify:{}});
+  msg('Automatische Sicherung gespeichert',true);renderAutoBackup()}catch(e){msg(e.message)}}
+async function backupNow(btn){btn.disabled=true;btn.textContent='Sichere …';
+ try{const r=await api('/api/backup-now',{});msg(`Gesichert: ${r.file} (${(r.size/1048576).toFixed(1)} MB) und JSON-Export`,true)}catch(e){msg(e.message)}
+ renderAutoBackup()}
 async function backupDownload(form){const f=Object.fromEntries(new FormData(form)),st=$('#bk');st.textContent='Sicherung wird erstellt …';
  try{const r=await fetch('/api/backup',{method:'POST',body:JSON.stringify({password:f.password,epg:!!f.epg})});
   if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||r.status)}
