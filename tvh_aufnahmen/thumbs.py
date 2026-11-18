@@ -1,4 +1,5 @@
-"""Vorschaubilder für Aufnahmen: ein Standbild bei etwa 15 % der Laufzeit, per ffmpeg erzeugt
+"""Vorschaubilder für Aufnahmen: ein Standbild 20 Minuten nach Beginn (bei kurzen Aufnahmen
+aus der Mitte) – dann ist der Vorlauf mit dem Ende der vorigen Sendung sicher vorbei. Per ffmpeg erzeugt
 und zwischengespeichert. Höchstens zwei gleichzeitig, damit der Raspberry nicht ausgelastet ist."""
 import hashlib
 import os
@@ -13,6 +14,8 @@ LIMIT = threading.BoundedSemaphore(2)
 
 
 SIZES = {'small': 320, 'large': 1280}
+POSITION = 20 * 60  # Sekunden nach Beginn
+VERSION = 'p20'  # im Cache-Schlüssel: neue Position → neue Bilder
 
 
 def thumbnail(filename, size='small'):
@@ -22,7 +25,7 @@ def thumbnail(filename, size='small'):
     if not file_exists(filename) or not shutil.which('ffmpeg'):
         return None
     st = os.stat(filename)
-    key = hashlib.sha1(('%s|%d|%d' % (filename, st.st_size, st.st_mtime)).encode()).hexdigest()
+    key = hashlib.sha1(('%s|%d|%d|%s' % (filename, st.st_size, st.st_mtime, VERSION)).encode()).hexdigest()
     if width != SIZES['small']:
         key += '-%d' % width
     out = os.path.join(CACHE, key + '.jpg')
@@ -33,7 +36,7 @@ def thumbnail(filename, size='small'):
         if os.path.exists(out):  # inzwischen von einer parallelen Anfrage erzeugt
             return out if os.path.getsize(out) else None
         dur = probe_duration(filename, st.st_mtime) or 0
-        pos = max(60, int(dur * 0.15)) if dur > 120 else 5
+        pos = min(POSITION, dur // 2) if dur else 5
         tmp = out + '.tmp.jpg'
         try:
             subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(pos), '-i', filename, '-frames:v', '1',

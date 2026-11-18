@@ -35,7 +35,7 @@ function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolea
   return `<tr class="fold" onclick="toggleFolder(this.dataset.f)" data-f="${esc(g[0])}"><td>${open?'▾':'▸'}</td><td colspan="2">📁 ${esc(g[0])} <span class="muted">(${g[1].length})</span></td><td colspan="2"><span class="muted">${gb(total(g))}</span></td></tr>`+(open?g[1].map(recRow).join(''):'')}).join('')
   +root.flatMap(g=>g[1]).map(recRow).join('')}
 const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
- <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}" alt="" loading="lazy" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="Vergrößern"><a class="rtitle" onclick="recInfo('${r.uuid}')" title="Details anzeigen">${esc(r.title)}</a>${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
+ <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}&v=p20" alt="" loading="lazy" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="Vergrößern"><a class="rtitle" onclick="recInfo('${r.uuid}')" title="Details anzeigen">${esc(r.title)}</a>${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>
@@ -76,7 +76,7 @@ function upload(u){const f=$('#up-'+u).files[0];if(!f)return msg('Bitte zuerst e
  x.send(f)}
 // Vorschaubild vergrößert: großes Standbild (1280 px) im Fenster, mit Titel
 function showThumb(u){const r=R(u);dialog(`<h3 style="margin:0 90px 10px 0">${esc(r.title)}</h3>${r.subtitle?`<div class="muted" style="margin:-6px 0 10px">${esc(r.subtitle.split('\n')[0])}</div>`:''}
- <div class="bigthumb"><img src="/api/thumb?uuid=${u}&size=large" alt="" onerror="this.parentNode.innerHTML='<p class=muted>Kein Bild verfügbar.</p>'"><p class="muted">Bild wird erzeugt …</p></div>
+ <div class="bigthumb"><img src="/api/thumb?uuid=${u}&size=large&v=p20" alt="" onerror="this.parentNode.innerHTML='<p class=muted>Kein Bild verfügbar.</p>'"><p class="muted">Bild wird erzeugt …</p></div>
  <p class="muted small">${esc(r.channel)} · ${fmt(r.start)} · ${mins(r)} · ${gb(r.size)}</p>`)}
 
 // ---------- Doppelte Aufnahmen ----------
@@ -114,7 +114,7 @@ function fillDuplicates(list){const groups=duplicateGroups(list);DUPS=new Map();
 // ---------- Details einer Aufnahme ----------
 // In der Ansicht „Doppelte“: links die zu behaltende Fassung, rechts die angeklickte (bzw. die erste Kopie)
 function recCard(r,label,keep){return `<div class="rcard${keep?' keep':''}"><div class="rcard-h"><span class="tag ${keep?'keep':''}">${label}</span> <span class="tag">${isHD(r)?'HD':'SD'}</span></div>
- <img class="rthumb" src="/api/thumb?uuid=${r.uuid}" alt="" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="Vergrößern">
+ <img class="rthumb" src="/api/thumb?uuid=${r.uuid}&v=p20" alt="" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="Vergrößern">
  <h3>${esc(r.title)}</h3>${r.subtitle&&r.subtitle!=r.title?`<div class="muted" style="white-space:pre-line">${esc(r.subtitle)}</div>`:''}
  <table class="kvt"><tr><td>Sender</td><td>${esc(r.channel)}</td></tr><tr><td>Gesendet</td><td>${esc(wday(r.start))}, ${hm(r.start)}–${hm(r.stop)}</td></tr>
  <tr><td>Dauer</td><td>${mins(r)}</td></tr><tr><td>Größe</td><td>${gb(r.size)} <span class="muted">(${(perMin(r)*8/60/1e6).toFixed(1)} Mbit/s)</span></td></tr>
