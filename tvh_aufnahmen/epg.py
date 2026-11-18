@@ -117,6 +117,34 @@ def record_event(tvh, event_id, config_uuid=''):
     return {'uuid': uuid, 'conflict': next((g for g in c['groups'] if uuid in g['uuids']), None), 'tuners': c['tuners']}
 
 
+def record_manual(tvh, lang, req):
+    """Aufnahme von Hand: fester Sender, Titel und Zeitraum (ohne Programmdaten)."""
+    title = (req.get('title') or '').strip()
+    start, stop = int(req.get('start') or 0), int(req.get('stop') or 0)
+    if not title:
+        raise ValueError('Bitte einen Titel angeben')
+    if not req.get('channel'):
+        raise ValueError('Bitte einen Sender wählen')
+    if stop <= start:
+        raise ValueError('Das Ende muss nach dem Beginn liegen')
+    if stop <= time.time():
+        raise ValueError('Das Ende liegt in der Vergangenheit')
+    if stop - start > 12 * 3600:
+        raise ValueError('Länger als 12 Stunden – bitte Zeiten prüfen')
+    conf = {'enabled': True, 'channel': req['channel'], 'start': start, 'stop': stop, 'title': {lang: title},
+            'comment': 'von Hand angelegt', 'start_extra': max(0, int(req.get('start_extra') or 0)),
+            'stop_extra': max(0, int(req.get('stop_extra') or 0))}
+    if (req.get('subtitle') or '').strip():
+        conf['subtitle'] = {lang: req['subtitle'].strip()}
+    if req.get('config'):
+        conf['config_name'] = req['config']
+    uuid = tvh.call('dvr/entry/create', conf=json.dumps(conf)).get('uuid')
+    if not uuid:
+        raise ValueError('TVHeadend hat die Aufnahme nicht angelegt')
+    c = conflicts(tvh)
+    return {'uuid': uuid, 'conflict': next((g for g in c['groups'] if uuid in g['uuids']), None), 'tuners': c['tuners']}
+
+
 def conflicts(tvh, entries=None):
     """Zeiten, in denen mehr Transponder gleichzeitig gebraucht werden, als es Tuner gibt.
     Mehrere Sender auf demselben Transponder teilen sich einen Tuner. Vor- und Nachlauf zählen mit."""

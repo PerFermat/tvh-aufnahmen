@@ -16,3 +16,29 @@ async function cancelUpcoming(uuid){const e=UP.find(x=>x.uuid==uuid);
  const q=e.sched_status=='recording'?`Laufende Aufnahme „${e.disp_title}“ stoppen? Das bisher Aufgenommene bleibt erhalten.`
   :`Geplante Aufnahme „${e.disp_title}“ am ${wday(e.start)} um ${hm(e.start)} löschen?`+(e.autorec?'\nDie Serienaufnahme bleibt bestehen.':'');
  if(!confirm(q))return;try{await api('/api/upcoming-cancel',{uuid});msg('Erledigt: '+e.disp_title,true);renderUpcoming()}catch(err){msg(err.message)}}
+// Aufnahme von Hand: fester Sender, Titel und Zeitraum – unabhängig von den Programmdaten
+async function manualRecording(){const schema=await formSchema('dvrautorec');
+ const chans=(schema.props.find(p=>p.id=='channel')||{enum:[]}).enum.filter(o=>o.key),cfgs=(schema.props.find(p=>p.id=='config_name')||{enum:[]}).enum;
+ const now=new Date(),d=new Date(Math.ceil(now.getTime()/900000)*900000),e=new Date(d.getTime()+3600000),last=store('manualchan');
+ const ymd=x=>x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate()),hhmm=x=>pad(x.getHours())+':'+pad(x.getMinutes());
+ dialog(`<h2 style="margin:0 90px 12px 0">Neue Aufnahme</h2>
+ <form class="ed" onsubmit="event.preventDefault();saveManual(this)">
+  <label class="wide">Sender<select name="channel" required>${chans.map(o=>`<option value="${esc(o.key)}" ${o.key==last?'selected':''}>${esc(o.val)}</option>`).join('')}</select></label>
+  <label class="wide">Titel<input name="title" required placeholder="z. B. Fußball-Länderspiel"></label>
+  <label class="wide">Untertitel (optional)<input name="subtitle"></label>
+  <label>Datum<input type="date" name="date" value="${ymd(d)}" required></label>
+  <label>Beginn<input type="time" name="from" value="${hhmm(d)}" required></label>
+  <label>Ende<input type="time" name="to" value="${hhmm(e)}" required></label>
+  <label>Vorlauf (Minuten)<input type="number" name="pre" min="0" max="60" value="2"></label>
+  <label>Nachlauf (Minuten)<input type="number" name="post" min="0" max="120" value="5"></label>
+  ${cfgs.length>1?`<label>Aufnahmeprofil<select name="config">${cfgs.map(o=>`<option value="${esc(o.key)}">${esc(o.val)}</option>`).join('')}</select></label>`:''}
+  <p class="muted wide" style="margin:0">Endet die Aufnahme vor dem Beginn (z. B. 23:00–01:00), geht sie bis zum nächsten Tag.</p>
+  <div class="wide bar" style="margin:0"><button class="b">Aufnahme planen</button></div></form>`)}
+async function saveManual(f){const start=new Date(f.date.value+'T'+f.from.value);let stop=new Date(f.date.value+'T'+f.to.value);
+ if(stop<=start)stop=new Date(stop.getTime()+86400000);
+ try{const r=await api('/api/record-manual',{channel:f.channel.value,title:f.title.value,subtitle:f.subtitle.value,
+  start:Math.floor(start/1000),stop:Math.floor(stop/1000),start_extra:+f.pre.value,stop_extra:+f.post.value,config:f.config?f.config.value:''});
+  store('manualchan',f.channel.value);$('#dlg').close();
+  if(r.conflict)msg(`Aufnahme geplant: ${f.title.value}\n\n⚠ Konflikt: Zu dieser Zeit sind schon ${r.conflict.titles.length-1} andere Aufnahme(n) auf anderen Transpondern geplant – es gibt aber nur ${r.tuners} Tuner:\n${r.conflict.titles.join(', ')}`);
+  else msg(`Aufnahme geplant: ${f.title.value}, ${wday(start/1000)} ${hm(start/1000)}–${hm(stop/1000)}`,true);
+  if(cur=='upcoming')renderUpcoming()}catch(e){msg(e.message)}}

@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler
 
 from .backup import check_password, restore, write_backup
 from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day, epg_search,
-                  event_detail, poster_status, record_event, upcoming, upcoming_cancel)
+                  event_detail, poster_status, record_event, record_manual, upcoming, upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels, qualities
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
@@ -260,6 +260,8 @@ def make_handler(app):
                 self.run(lambda: scan_add(app.tvh, req.get('uuids') or []))
             elif self.path == '/api/scan-delete':
                 self.run(lambda: scan_delete(app.tvh, req.get('uuids') or []))
+            elif self.path == '/api/record-manual':
+                self.run(lambda: record_manual(app.tvh, app.cfg.get('lang') or 'ger', req))
             elif self.path == '/api/record':
                 self.run(lambda: record_event(app.tvh, req['event'], req.get('config')))
             elif self.path == '/api/autorec-save':

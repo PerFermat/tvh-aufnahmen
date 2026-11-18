@@ -56,6 +56,8 @@ h1{margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--mut
 .hbtn.on{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--acc),var(--acc2))}
 .hbtn.dot::after{content:"";position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px var(--solid)}
 .hbtn[hidden]{display:none}
+.b.hact{height:36px;padding:0 14px;font-size:14px;white-space:nowrap}
+.hdrslot:has(.hact){justify-content:flex-end}
 .theme{flex:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:7px 12px;
  font:inherit;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;height:36px}
 .theme:hover{background:var(--hover)}
@@ -201,6 +203,7 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
  header{padding:6px 10px;gap:8px}
  .logo-mark{display:none}
  .theme span{display:none}.theme{padding:0;width:36px;justify-content:center}
+ .b.hact .lbl{display:none}.b.hact{width:36px;padding:0;font-size:18px}
  main{margin:8px 6px 20px;padding:12px;border-radius:12px}
  .bar{gap:6px}.bar input[type=search]{min-width:0!important;flex-basis:100%!important}
  /* Tabellen werden zu Karten – außer der Programmzeitschrift */
