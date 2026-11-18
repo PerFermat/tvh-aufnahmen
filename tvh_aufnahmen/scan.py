@@ -133,6 +133,12 @@ def scan_add(tvh, uuids):
             added.append({'name': s.get('svcname'), 'number': number})
         else:
             number -= 1
+    # Programmdaten: Transponder, deren EPG-Abfrage abgeschaltet ist (z. B. weil dort bisher kein
+    # eigener Sender lag), für die neuen Sender wieder auf „automatisch“ stellen
+    muxes = {svcs[u].get('multiplex_uuid') for u in uuids if u in svcs}
+    for m in grid(tvh, 'mpegts/mux/grid'):
+        if m['uuid'] in muxes and m.get('epg') == 0:
+            tvh.call('idnode/save', node=json.dumps({'uuid': m['uuid'], 'epg': 1}))
     return {'added': added}
 
 
