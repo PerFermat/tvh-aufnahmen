@@ -26,7 +26,15 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;render()}
 const TABS={live:()=>renderLive(),epg:()=>renderEpg(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup(),scan:()=>renderScan(),status:()=>renderStatus()};
 function tab(n){if(!TABS[n])n='live';cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');
- $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);render()}
+ $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);$('main').classList.toggle('tight',n=='epg');render();toolsState()}
+// Suche und Filter (Elemente mit class="tools") über 🔍 im Kopf ein-/ausblenden; gilt für alle Reiter und wird gemerkt
+const TOOLTABS=['live','epg','rec','upcoming'];
+const activeQuery=()=>({live:()=>LQ,epg:()=>EPGQ||EPGT,rec:()=>Q,upcoming:()=>UPQ}[cur]||(()=>''))();
+function toolsState(){const open=store('tools')=='open',b=$('#toolsbtn');document.body.classList.toggle('tools-closed',!open);
+ if(!b)return;b.hidden=!TOOLTABS.includes(cur);b.classList.toggle('on',open);b.classList.toggle('dot',!open&&!!activeQuery())}
+function toggleTools(){store('tools',store('tools')=='open'?'closed':'open');toolsState();
+ if(store('tools')=='open'){const i=document.querySelector('main .tools input[type=search],main input.tools[type=search]');if(i)i.focus()}
+ if(cur=='epg'&&typeof sizeEpg=='function')sizeEpg()}
 // Handy: Reiter als Klappmenü hinter dem ☰-Knopf
 function toggleMenu(open){const t=$('#top'),o=open??!t.classList.contains('open');t.classList.toggle('open',o);
  document.body.classList.toggle('menu-open',o);$('.menu').setAttribute('aria-expanded',o)}

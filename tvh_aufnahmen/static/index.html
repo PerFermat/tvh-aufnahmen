@@ -16,7 +16,8 @@
 <div class="top" id="top"><header>
  <button class="menu" onclick="toggleMenu()" aria-label="Menü" aria-controls="nav" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg></button>
  <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="2.5"/><path d="M10.5 9l4 2-4 2z" fill="currentColor"/><path d="M8 21h8"/></svg></div>
- <div class="brand"><h1>TVHeadend Aufnahmen</h1><div class="sub" id="info">Lade …</div><div class="sub cur" id="curtab"></div></div>
+ <div class="brand"><h1>TVHeadend Aufnahmen</h1><div class="sub cur" id="curtab"></div></div>
+ <button class="hbtn" id="toolsbtn" onclick="toggleTools()" title="Suche und Filter ein-/ausblenden" aria-label="Suche und Filter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
  <button class="theme" id="theme" onclick="cycleTheme()" title="Darstellung wechseln"></button>
 </header>
 <nav id="nav"><button id="t-live" onclick="tab('live')">Live-TV</button>
@@ -29,7 +30,8 @@
 <button id="t-status" onclick="tab('status')">Status</button>
 <button id="t-config" onclick="tab('config')">Einstellungen</button>
 <button id="t-backup" onclick="tab('backup')">Sicherung</button>
-<button id="t-scan" onclick="tab('scan')">Suchlauf</button></nav></div>
+<button id="t-scan" onclick="tab('scan')">Suchlauf</button>
+<div class="sub nav-info" id="info">Lade …</div></nav></div>
 <div class="scrim" onclick="toggleMenu(false)"></div>
 <div id="msg" onclick="this.className=''" title="Klicken zum Schließen"></div>
 <main id="main">Lade …</main>
@@ -47,5 +49,5 @@
 <script src="/static/backup.js"></script>
 <script src="/static/scan.js"></script>
 <script src="/static/status.js"></script>
-<script>applyTheme();tab(cur);load()</script>
+<script>applyTheme();toolsState();tab(cur);load()</script>
 </body></html>

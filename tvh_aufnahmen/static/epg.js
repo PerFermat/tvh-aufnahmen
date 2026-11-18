@@ -11,22 +11,23 @@ async function renderEpg(start,jump){
  // Sprungziel: angegeben; „Jetzt“ → aktueller Block; Reiter neu geöffnet → aktueller Block (heute) bzw. Tagesanfang
  EPGPT=jump??(start!==undefined?(start?0:blockOf(now)):fresh?(EPGS&&dkey(EPGS)!=dkey(now)?0:blockOf(now)):EPGPT);
  const seq=++EPGSEQ;let day;
- if(fresh)$('#main').innerHTML=`<div class="bar" id="epgbar"></div><div id="epgwrap" class="epgwrap"><p class="muted">Lade Programm …</p></div>`;
+ if(fresh)$('#main').innerHTML=`<div id="epgbar" class="epgbar"></div><div id="epgwrap" class="epgwrap"><p class="muted">Lade Programm …</p></div>`;
  try{day=await api('/api/epg'+(EPGS?'?start='+EPGS:''))}catch(e){if(seq===EPGSEQ)$('#epgwrap').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
  if(seq!==EPGSEQ||cur!='epg')return;  // inzwischen neuer angefordert oder Reiter gewechselt – verwerfen
  EPG=day;EPGS=EPG.start;const target=EPGPT;EPGPT=null;
  const tags=[...new Set(EPG.channels.flatMap(c=>c.tags))].sort();
- $('#epgbar').innerHTML=`<button class="b sec" onclick="renderEpg(EPG.prev,0)" title="Voriger Tag">‹</button>
- <input type="date" value="${dkey(EPG.start)}" onchange="epgDay(this.value)">
- <button class="b sec" onclick="renderEpg(EPG.next,0)" title="Nächster Tag">›</button>
- <span class="seg">${BLOCKS.map(h=>`<button id="jb${h}" onclick="epgJump(${h})">${h}–${h+4}</button>`).join('')}</span>
- <button class="b sec" onclick="renderEpg(0)">Jetzt</button>
- <select onchange="EPGT=this.value;store('epgtag',EPGT);fillEpg()"><option value="">Alle Sender</option>${tags.map(t=>`<option ${t==EPGT?'selected':''}>${esc(t)}</option>`).join('')}</select>
+ // Zeile 1 immer sichtbar und kompakt; Zeile 2 (Filter, Suche) über 🔍 im Kopf aufklappbar
+ $('#epgbar').innerHTML=`<div class="epgnav"><button class="b sec sq" onclick="renderEpg(EPG.prev,0)" title="Voriger Tag">‹</button>
+ <input type="date" value="${dkey(EPG.start)}" onchange="epgDay(this.value)" title="${esc(wday(EPG.start))}">
+ <button class="b sec sq" onclick="renderEpg(EPG.next,0)" title="Nächster Tag">›</button>
+ <span class="seg blocks">${BLOCKS.map(h=>`<button id="jb${h}" onclick="epgJump(${h})" title="${h}–${h+4} Uhr">${h}<span class="to">–${h+4}</span></button>`).join('')}</span>
+ <button class="b sec" onclick="renderEpg(0)">Jetzt</button></div>
+ <div class="bar tools" style="margin:8px 0 0"><select onchange="EPGT=this.value;store('epgtag',EPGT);fillEpg();toolsState()"><option value="">Alle Sender</option>${tags.map(t=>`<option ${t==EPGT?'selected':''}>${esc(t)}</option>`).join('')}</select>
  <input type="search" id="epgq" placeholder="Suchen an diesem Tag …" value="${esc(EPGQ)}" oninput="EPGQ=this.value;fillEpg()" onkeydown="if(event.key=='Enter')epgSearch()" style="flex:1;min-width:160px">
  <button class="b sec" onclick="epgSearch()" title="Im ganzen Programm (alle Tage) suchen">Alle Tage durchsuchen</button>
- <label class="chk"><input type="checkbox" ${EPGE?'checked':''} onchange="EPGE=this.checked;fillEpg()"> Sender ohne Programm</label>
- <span class="muted">${esc(wday(EPG.start))}</span>`;
+ <label class="chk"><input type="checkbox" ${EPGE?'checked':''} onchange="EPGE=this.checked;fillEpg()"> Sender ohne Programm</label></div>`;
  const keep=$('#epgwrap').scrollTop,keepX=$('#epgwrap').scrollLeft;fillEpg();
+ sizeEpg();toolsState();
  if(target!==null)epgJump(target);else{$('#epgwrap').scrollTop=keep;epgMark()}
  $('#epgwrap').scrollLeft=keepX;
  if(EPG.posters_pending)setTimeout(()=>epgPosters(EPG),4000)}
@@ -38,6 +39,10 @@ async function epgPosters(day,tries=0){if(day!==EPG||cur!='epg'||tries>60)return
  open.forEach(e=>{const p=res[e.poster_key];if(p==='pending')return;delete e.poster_pending;if(p){e.poster=p;found=true}});
  if(found&&cur=='epg'){const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x;epgMark()}
  if(EPG.events.some(e=>e.poster_pending))setTimeout(()=>epgPosters(day,tries+1),5000)}
+// Die Zeitschrift bekommt die ganze restliche Bildschirmhöhe (eigener Scrollbereich mit festem Kopf)
+function sizeEpg(){const w=$('#epgwrap');if(!w||cur!='epg')return;
+ w.style.maxHeight=Math.max(260,innerHeight-(w.getBoundingClientRect().top+scrollY)-14)+'px'}
+addEventListener('resize',()=>sizeEpg());
 function epgDay(v){if(!v)return;const [y,m,d]=v.split('-').map(Number);renderEpg(new Date(y,m-1,d,12).getTime()/1000,0)}
 function epgJump(h){const w=$('#epgwrap'),r=$('#blk'+h);if(!r)return;
  w.scrollTop=r.offsetTop-w.querySelector('thead').offsetHeight;w.scrollIntoView({block:'nearest'});epgMark()}

@@ -35,9 +35,14 @@ def epg_day(tvh, posters, archive, start=None):
     # Was bald läuft, gleich archivieren – TVHeadend löscht Sendungen, sobald sie vorbei sind
     archive.store([e for e in raw if e.get('start', 0) < time.time() + 3 * 3600])
     events = [{k: e.get(k) for k in EVENT_FIELDS} for e in raw if start <= e.get('start', 0) < end]
-    known = {e['eventId'] for e in events}
-    events += [dict({k: e.get(k) for k in EVENT_FIELDS}, archived=True)
-               for e in archive.day(start, end) if int(e['eventId']) not in known]
+    # Über Sender und Startzeit abgleichen – nach einem Neustart vergibt TVHeadend neue Kennungen
+    known = {(e['channelUuid'], e['start']) for e in events}
+    seen = set()
+    for e in sorted(archive.day(start, end), key=lambda e: -int(e['eventId'])):  # neueste Angaben zuerst
+        key = (e.get('channelUuid'), e['start'])
+        if key not in known and key not in seen:
+            seen.add(key)
+            events.append(dict({k: e.get(k) for k in EVENT_FIELDS}, archived=True))
     for e in events:
         if len(e.get('description') or '') > GRID_TEXT:
             e['description'] = e['description'][:GRID_TEXT].rsplit(' ', 1)[0] + ' …'

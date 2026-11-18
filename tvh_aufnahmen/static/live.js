@@ -1,7 +1,7 @@
 // Reiter „Live-TV“: Sender mit laufender und folgenden Sendungen, Abspielen in VLC
 let LIVE=null,LQ='',liveTimer=null;
 async function renderLive(){
- if(!$('#lbody')){$('#main').innerHTML=`<div class="bar"><input id="lq" type="search" placeholder="Suchen: Sender oder Sendung …" value="${esc(LQ)}" style="flex:1;min-width:220px" oninput="LQ=this.value;fillLive()"><span id="qsel"></span></div>
+ if(!$('#lbody')){$('#main').innerHTML=`<div class="bar"><input id="lq" class="tools" type="search" placeholder="Suchen: Sender oder Sendung …" value="${esc(LQ)}" style="flex:1;min-width:220px" oninput="LQ=this.value;fillLive()"><span id="qsel"></span></div>
  <p class="muted" id="lcount">Lade Sender …</p><table><tbody id="lbody"></tbody></table>`;qualitySelect().then(h=>{if($('#qsel'))$('#qsel').innerHTML=h});if(LIVE)fillLive()}
  clearTimeout(liveTimer);
  try{LIVE=await api('/api/live')}catch(e){if(cur=='live')$('#lcount').textContent=e.message;return}

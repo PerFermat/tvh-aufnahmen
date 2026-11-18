@@ -11,7 +11,7 @@ function diskHtml(){const d=S.disk;if(!d)return'';const pct=d.used/d.total*100,l
  ${d.failed_full?`<p class="warn-t">⚠ ${d.failed_full} Aufnahme(n) sind wegen vollem Speicher fehlgeschlagen.</p>`:lvl!='ok'?'<p class="warn-t">⚠ Der Speicher wird knapp – alte Aufnahmen löschen, sonst scheitern neue.</p>':''}
  <details><summary class="muted">Größte Ordner</summary><table class="bars">${top.map(([f,s])=>`<tr><td>${esc(f)}</td><td style="width:45%"><div class="meter sm"><div style="width:${(s/max*100).toFixed(1)}%"></div></div></td><td style="white-space:nowrap;text-align:right">${gb(s)}</td></tr>`).join('')}</table></details></div>`}
 function renderRecordings(){
- $('#main').innerHTML=diskHtml()+`<div class="bar"><input id="q" type="search" placeholder="Suchen: Titel, Untertitel, Sender, Datei …" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
+ $('#main').innerHTML=diskHtml()+`<div class="bar"><input id="q" class="tools" type="search" placeholder="Suchen: Titel, Untertitel, Sender, Datei …" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
  <span class="seg"><button id="v-list" onclick="setView('list')">Liste</button><button id="v-dir" onclick="setView('dir')">Ordner</button></span>
  <button class="b bad" onclick="removeSel()">Ausgewählte löschen</button>
  <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked)"> alle sichtbaren</label></div>

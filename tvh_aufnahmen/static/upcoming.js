@@ -2,7 +2,7 @@
 let UPQ='',UP=[];
 async function renderUpcoming(){let d;try{d=await api('/api/upcoming')}catch(e){$('#main').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
  if(cur!='upcoming')return;UP=d.upcoming;
- $('#main').innerHTML=`<div class="bar"><input type="search" placeholder="Suchen: Titel, Sender, Serie …" value="${esc(UPQ)}" oninput="UPQ=this.value;fillUpcoming()" style="flex:1;min-width:220px"></div>
+ $('#main').innerHTML=`<div class="bar tools"><input type="search" placeholder="Suchen: Titel, Sender, Serie …" value="${esc(UPQ)}" oninput="UPQ=this.value;fillUpcoming()" style="flex:1;min-width:220px"></div>
  ${d.conflicts.length?`<div class="alert">⚠ <b>${d.conflicts.length} Zeitraum/Zeiträume mit Konflikt:</b> Dort sollen mehr Sender von verschiedenen Transpondern gleichzeitig aufgenommen werden, als es Tuner gibt (${d.tuners}). Mindestens eine Aufnahme fällt dann aus – betroffene sind rot markiert.<ul>${d.conflicts.map(g=>`<li>${esc(wday(g.start))} ab ${hm(g.start)}: ${esc(g.titles.join(', '))}</li>`).join('')}</ul></div>`:''}
  <p class="muted" id="upcount"></p><table><thead><tr><th>Wann</th><th>Sender</th><th>Titel</th><th>Serie</th><th></th></tr></thead><tbody id="upbody"></tbody></table>`;fillUpcoming()}
 function fillUpcoming(){const words=UPQ.toLowerCase().split(/\s+/).filter(Boolean);
