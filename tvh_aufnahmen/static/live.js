@@ -11,12 +11,14 @@ function fillLive(){const words=LQ.toLowerCase().split(/\s+/).filter(Boolean),no
  const list=LIVE.channels.filter(c=>{const t=[c.name,c.now?.title,...c.next.map(e=>e.title)].join(' ').toLowerCase();return words.every(w=>t.includes(w))});
  $('#lcount').textContent=list.length+' von '+LIVE.channels.length+' Sendern';
  $('#lbody').innerHTML=list.map(c=>{const n=c.now,p=n?Math.min(100,Math.max(0,(now-n.start)/(n.stop-n.start)*100)):0;
-  return `<tr><td class="logo">${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}</td>
- <td style="width:22%"><b>${esc(c.name)}</b>${c.number?'<br><span class="muted">'+c.number+'</span>':''}</td>
- <td>${n?`<a class="evl" onclick="showEvent(${n.eventId})" title="Details"><b>${esc(n.title)}</b></a> <span class="muted">${hm(n.start)}–${hm(n.stop)}</span>${n.subtitle&&n.subtitle!=n.title?'<br><span class="muted">'+esc(n.subtitle.split('\n')[0])+'</span>':''}
+  // Spalten: Nr. | Logo | Sender | Zeit | laufende Sendung | danach | Abspielen (auf dem Handy: Nr./Zeit inline)
+  return `<tr><td class="lnr">${c.number||''}</td><td class="logo">${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}</td>
+ <td class="lname"><span class="mnum">${c.number?c.number+' ':''}</span><b>${esc(c.name)}</b></td>
+ <td class="ltime">${n?`${hm(n.start)}–${hm(n.stop)}`:''}</td>
+ <td>${n?`<a class="evl" onclick="showEvent(${n.eventId})" title="Details"><b>${esc(n.title)}</b></a> <span class="muted mtime">${hm(n.start)}–${hm(n.stop)}</span>${n.subtitle&&n.subtitle!=n.title?'<br><span class="muted">'+esc(n.subtitle.split('\n')[0])+'</span>':''}
   <div class="prog"><div style="width:${p.toFixed(1)}%"></div></div>`:'<span class="muted">Keine Programmdaten</span>'}
   <div class="nxt-in">${c.next.map(nextLink).join('')}</div></td>
  <td class="nxt-col">${c.next.map(nextLink).join('')||'<span class="muted">–</span>'}</td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="${playHref(c.uuid)}" data-play="${c.uuid}" title="Öffnet den Sender als Stream in VLC">Abspielen</a></td></tr>`}).join('')}
 // nächste Sendung: Zeit und Titel, ein Klick öffnet die Details (wie im Programm)
-const nextLink=e=>`<div class="nxt"><span class="muted">${hm(e.start)}</span> <a class="evl" onclick="showEvent(${e.eventId})" title="Details">${esc(e.title)}</a></div>`;
+const nextLink=e=>`<div class="nxt"><span class="muted">${hm(e.start)}</span><a class="evl" onclick="showEvent(${e.eventId})" title="Details">${esc(e.title)}</a></div>`;

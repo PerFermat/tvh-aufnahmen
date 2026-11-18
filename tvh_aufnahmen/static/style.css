@@ -156,6 +156,10 @@ a.rtitle{cursor:pointer;color:var(--fg);font-weight:600;text-decoration:none}a.r
 table.kvt td{padding:3px 8px 3px 0;border:0;font-size:13.5px}table.kvt td:first-child{color:var(--muted);white-space:nowrap}
 
 /* ---------- Live-TV ---------- */
+td.lnr{width:44px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;padding-right:6px;font-size:26px;line-height:38px;font-weight:700}
+td.lname{width:18%}td.ltime{width:100px;white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+.mnum,.mtime{display:none}
+.nxt{display:grid;grid-template-columns:44px 1fr;gap:6px}.nxt>span{font-variant-numeric:tabular-nums}
 td.logo{width:72px}td.logo img{width:60px;height:38px;object-fit:contain;display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
 .prog{height:5px;background:var(--line);border-radius:3px;margin:6px 0 8px;max-width:360px;overflow:hidden}
 .prog div{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px}
@@ -179,7 +183,10 @@ table.epg{border-collapse:separate;border-spacing:0;width:max-content}
 table.epg tbody tr:hover{background:none}
 table.epg th,table.epg td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:8px;width:190px;min-width:190px;max-width:190px}
 table.epg thead th{position:sticky;top:0;z-index:2;background:var(--solid);text-transform:none;letter-spacing:0;font-size:12px;color:var(--fg);text-align:center}
-table.epg thead th img{height:28px;max-width:80px;object-fit:contain;display:block;margin:0 auto 3px}
+table.epg thead th img{height:28px;max-width:80px;object-fit:contain;display:block}
+/* Sendernummer neben dem Logo, so hoch wie das Logo */
+.chh{display:flex;align-items:center;justify-content:center;gap:8px;height:30px;margin-bottom:3px}
+.chnr{font-size:22px;line-height:28px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 table.epg .tm{position:sticky;left:0;z-index:1;background:var(--solid);width:62px;min-width:62px;max-width:62px;font-size:14px;color:var(--fg)}
 table.epg thead .tm{z-index:3}
 table.epg tbody .tm{vertical-align:top}table.epg tbody .tm div{position:sticky;top:70px;font-weight:700}
@@ -228,6 +235,8 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
  main table:not(.epg) td{display:block;border:0;padding:2px 0;width:auto!important}
  main table:not(.epg) td:empty{display:none}
  main table:not(.epg) td.nxt-col{display:none}
+ main table:not(.epg) td.ltime{display:none}.mtime{display:inline}
+ main table:not(.epg) td.lnr{display:block;float:left;width:auto;min-width:30px;padding:2px 8px 0 0;text-align:right}
  main table:not(.epg) td:first-child:has(> input[type=checkbox]){position:absolute;right:4px;top:12px}
  main table:not(.epg) tr:has(> td:first-child > input[type=checkbox]){padding-right:30px}
  main table:not(.epg) td.logo{float:left;width:auto;margin:2px 12px 4px 0}
