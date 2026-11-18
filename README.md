@@ -9,6 +9,7 @@ Web-Oberfläche für TVHeadend 4.3, um
 - Videodateien aus dem Aufnahmeordner, die TVHeadend nicht (mehr) kennt, wieder als Aufnahme einzutragen – mit Titel, Untertitel, Sender, Zeit und Beschreibung,
 - alte Einträge, deren Datei nur in einen anderen Ordner gewandert ist, auf den neuen Pfad umzustellen,
 - Einträge zu löschen, deren Datei nicht mehr existiert. Videodateien werden dabei nie gelöscht,
+- einen **Sendersuchlauf** zu starten, neue unverschlüsselte deutschsprachige Fernsehsender anzulegen (fortlaufend nach der höchsten Nummer) und Sender zu löschen, die es nicht mehr gibt,
 - TVHeadend zu **sichern** – komplett oder gezielt Aufnahmen und Sender – und nach einer Neuinstallation wiederherzustellen.
 
 Python 3.7+, keine zusätzlichen Pakete. Benutzer und Passwörter mit Umlauten funktionieren. Läuft auf demselben Gerät wie TVHeadend, damit die Dateipfade übereinstimmen.
@@ -88,6 +89,7 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/live.py` | Live-TV: Sender mit Programmdaten, Stream-Playlist, Senderlogos |
 | `tvh_aufnahmen/epg.py` | Programmzeitschrift, Aufnahmen planen, Serienaufnahmen, geplante Aufnahmen, Formulare aus den TVHeadend-Klassen |
 | `tvh_aufnahmen/posters.py` | Bilder zu langen Sendungen aus der Wikipedia, im Hintergrund gesucht und zwischengespeichert |
+| `tvh_aufnahmen/scan.py` | Sendersuchlauf, Auswertung, neue Sender anlegen, verschwundene löschen |
 | `tvh_aufnahmen/state.py` | Abgleich Einträge ↔ Dateien: Aufnahmen, nicht eingetragene Dateien, Einträge ohne Datei |
 | `tvh_aufnahmen/recordings.py` | Ändern: importieren, bearbeiten, Datei ersetzen, löschen, Pfade reparieren |
 | `tvh_aufnahmen/backup.py` | Komplettsicherung des TVHeadend-Ordners und Wiederherstellung |
@@ -109,5 +111,6 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 - Live-TV abspielen: Die `.m3u`-Datei kommt von TVHeadend und enthält statt des Passworts ein Einmal-Ticket, das nur kurz gültig ist – die Datei also gleich öffnen. Gestreamt wird direkt von TVHeadend (Port 9981), unverändert wie empfangen. Wer die Oberfläche erreicht, kann damit auch Sender abspielen.
 - Das Formular für Serienaufnahmen wird aus der Klassenbeschreibung von TVHeadend (`api/idnode/class`) erzeugt und zeigt deshalb alle Optionen der installierten Version; selten gebrauchte stehen unter „Weitere Optionen“.
 - Programm: Die Zellen einer Zeile werden gleichmäßig gefüllt – laufen bei einem Sender viele Sendungen, fällt die Beschreibung weg, bei wenigen wird sie länger. Für Sendungen ab 80 Minuten sucht der Server im Hintergrund ein Bild, beim Öffnen einer Sendung im Detailfenster auch für kürzere (dann vorrangig, angezeigt nur dort). Gesucht wird der Artikel in der deutschen Wikipedia – nur bei genau passendem Titel und einer Kurzbeschreibung als Film, Serie, Sendung o. Ä.; bei gleichnamigen Artikeln zählt das Jahr aus dem EPG („Drama, USA 2005“). Das Bild kommt aus dem deutschen Artikel, sonst aus dem englischen (dort gibt es Filmplakate), sonst aus Wikidata. Höchstens eine Anfrage pro Sekunde; die Ergebnisse liegen in `~/.cache/tvh-aufnahmen/posters.json`, die Bilder lädt der Browser direkt von Wikimedia.
+- Suchlauf: Als neu gelten unverschlüsselte TV-Dienste ohne Sender, deren erste Tonspur deutsch ist. Testkanäle und Altlasten („Astra Demo“, „ALT_…“) werden ausgelassen; SD-, Regional- und Länderfassungen vorhandener Sender, Dienste ohne Sprachangabe und Erotikkanäle stehen getrennt und sind nicht vorausgewählt. Als verschwunden gilt ein Sender, dessen Dienste seit mindestens zwei Tagen vor dem Suchlauf nicht mehr gesehen wurden (TVHeadend aktualisiert „zuletzt gesehen“ nur grob).
 - Downloads unterstützen HTTP-Range, Player können also spulen.
 - Vor dem ersten großen Import am besten den Ordner `~/.hts/tvheadend/dvr/log` sichern.

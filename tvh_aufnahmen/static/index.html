@@ -14,7 +14,8 @@
 <button id="t-unknown" onclick="tab('unknown')">Nicht eingetragene Dateien</button>
 <button id="t-missing" onclick="tab('missing')">Einträge ohne Datei</button>
 <button id="t-config" onclick="tab('config')">Einstellungen</button>
-<button id="t-backup" onclick="tab('backup')">Sicherung</button></nav>
+<button id="t-backup" onclick="tab('backup')">Sicherung</button>
+<button id="t-scan" onclick="tab('scan')">Suchlauf</button></nav>
 <main id="main">Lade …</main>
 <datalist id="chans"></datalist>
 <dialog id="dlg"></dialog>
@@ -28,5 +29,6 @@
 <script src="/static/missing.js"></script>
 <script src="/static/settings.js"></script>
 <script src="/static/backup.js"></script>
+<script src="/static/scan.js"></script>
 <script>tab(cur);load()</script>
 </body></html>

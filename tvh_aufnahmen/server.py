@@ -13,6 +13,7 @@ from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_fo
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
+from .scan import scan_add, scan_delete, scan_result, scan_start, scan_status
 from .state import build_state
 from .transfer import export_all, plan_import
 from .tvh import entry_info
@@ -194,6 +195,10 @@ def make_handler(app):
                 self.run(lambda: autorec_load(app.tvh, q['uuid']))
             elif url.path == '/api/upcoming':
                 self.run(lambda: upcoming(app.tvh))
+            elif url.path == '/api/scan-status':
+                self.run(lambda: scan_status(app.tvh))
+            elif url.path == '/api/scan-result':
+                self.run(lambda: scan_result(app.tvh))
             else:
                 self.send(404, {'error': 'nicht gefunden'})
 
@@ -223,6 +228,12 @@ def make_handler(app):
                 self.run(lambda: app.update(req))
             elif self.path == '/api/posters':
                 self.run(lambda: poster_status(app.posters, req.get('keys') or [], bool(req.get('urgent'))))
+            elif self.path == '/api/scan-start':
+                self.run(lambda: scan_start(app.tvh))
+            elif self.path == '/api/scan-add':
+                self.run(lambda: scan_add(app.tvh, req.get('uuids') or []))
+            elif self.path == '/api/scan-delete':
+                self.run(lambda: scan_delete(app.tvh, req.get('uuids') or []))
             elif self.path == '/api/record':
                 self.run(lambda: record_event(app.tvh, req['event'], req.get('config')))
             elif self.path == '/api/autorec-save':
