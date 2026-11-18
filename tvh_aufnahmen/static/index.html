@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TVHeadend Aufnahmen</title>
+<link rel="stylesheet" href="/static/style.css">
+</head><body>
+<header><h1>TVHeadend Aufnahmen</h1><div class="sub" id="info">Lade …</div></header>
+<div id="msg"></div>
+<nav><button id="t0" class="on" onclick="tab(0)">Aufnahmen</button>
+<button id="t1" onclick="tab(1)">Nicht eingetragene Dateien</button>
+<button id="t2" onclick="tab(2)">Einträge ohne Datei</button>
+<button id="t3" onclick="tab(3)">Einstellungen</button></nav>
+<main id="main">Lade …</main>
+<datalist id="chans"></datalist>
+<script src="/static/common.js"></script>
+<script src="/static/recordings.js"></script>
+<script src="/static/unknown.js"></script>
+<script src="/static/missing.js"></script>
+<script src="/static/settings.js"></script>
+<script>load()</script>
+</body></html>

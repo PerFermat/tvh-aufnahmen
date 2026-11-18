@@ -11,9 +11,11 @@ Python 3.7+, keine zusätzlichen Pakete. Benutzer und Passwörter mit Umlauten f
 
 ## Installation
 
+Kopiert werden der Starter `tvh-aufnahmen.py` und der Ordner `tvh_aufnahmen` daneben:
+
 ```bash
-scp tvh-aufnahmen.py hts@<tvheadend-rechner>:~/
-ssh hts@<tvheadend-rechner> python3 ~/tvh-aufnahmen.py
+rsync -a --exclude __pycache__ tvh-aufnahmen.py tvh_aufnahmen hts@<tvheadend-rechner>:~/tvh-aufnahmen/
+ssh hts@<tvheadend-rechner> python3 ~/tvh-aufnahmen/tvh-aufnahmen.py
 ```
 
 Dann im Browser `http://<tvheadend-rechner>:8099/` öffnen. Unter **Einstellungen** stellst du ein:
@@ -44,7 +46,7 @@ After=network.target tvheadend.service
 
 [Service]
 User=hts
-ExecStart=/usr/bin/python3 /home/hts/tvh-aufnahmen.py
+ExecStart=/usr/bin/python3 /home/hts/tvh-aufnahmen/tvh-aufnahmen.py
 Restart=on-failure
 
 [Install]
@@ -54,6 +56,22 @@ WantedBy=multi-user.target
 ```bash
 sudo systemctl enable --now tvh-aufnahmen
 ```
+
+## Aufbau
+
+| Datei | Inhalt |
+|---|---|
+| `tvh-aufnahmen.py` | Starter, ruft `tvh_aufnahmen.cli.main()` auf (alternativ `python3 -m tvh_aufnahmen`) |
+| `tvh_aufnahmen/cli.py` | Startparameter, Server starten |
+| `tvh_aufnahmen/config.py` | Einstellungen laden, prüfen, speichern |
+| `tvh_aufnahmen/tvh.py` | Zugriff auf die TVHeadend-API (Digest-Login mit UTF-8) |
+| `tvh_aufnahmen/files.py` | Videodateien finden, Titel und Zeiten aus dem Dateinamen raten |
+| `tvh_aufnahmen/state.py` | Abgleich Einträge ↔ Dateien: Aufnahmen, nicht eingetragene Dateien, Einträge ohne Datei |
+| `tvh_aufnahmen/recordings.py` | Ändern: importieren, bearbeiten, Datei ersetzen, löschen, Pfade reparieren |
+| `tvh_aufnahmen/server.py` | HTTP-Routen, Download, Playlist, Auslieferung der Oberfläche |
+| `tvh_aufnahmen/static/` | Oberfläche: `index.html`, `style.css` und ein JavaScript pro Reiter (`common.js` für Gemeinsames) |
+
+Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul), eine Route in `server.py` und die Bedienung im passenden Skript unter `static/`.
 
 ## Hinweise
 
