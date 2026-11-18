@@ -10,6 +10,14 @@ from .tvh import entry_info, file_moved
 UNKNOWN_CHANNEL = 'Unbekannt'
 
 
+def create_entry(tvh, conf):
+    """Legt einen Aufnahme-Eintrag an und gibt die neue uuid zurück (None, wenn TVHeadend ablehnt).
+    Ohne Sender legt TVHeadend stillschweigend nichts an (Antwort 200 mit leerem {})."""
+    if not conf.get('channel') and not conf.get('channelname'):
+        conf = dict(conf, channelname=UNKNOWN_CHANNEL)
+    return tvh.call('dvr/entry/create', conf=json.dumps(conf)).get('uuid')
+
+
 def do_import(tvh, recdir, lang, req):
     path = req['path']
     real = os.path.realpath(path)
@@ -32,12 +40,11 @@ def do_import(tvh, recdir, lang, req):
             conf[key] = {lang: val}
     if req.get('channel'):
         conf['channel'] = req['channel']
-    # Ohne Sender legt TVHeadend stillschweigend nichts an (Antwort 200 mit leerem {}).
-    conf['channelname'] = (req.get('channelname') or '').strip() or UNKNOWN_CHANNEL
-    res = tvh.call('dvr/entry/create', conf=json.dumps(conf))
-    if not res.get('uuid'):
+    conf['channelname'] = (req.get('channelname') or '').strip()
+    uuid = create_entry(tvh, conf)
+    if not uuid:
         raise ValueError('TVHeadend hat den Eintrag nicht angelegt: ' + os.path.basename(path))
-    return res
+    return {'uuid': uuid}
 
 
 def do_delete(tvh, uuids):
@@ -100,8 +107,6 @@ def recreate_entry(tvh, uuid, info, lang, title, subtitle, desc):
         conf['subtitle'] = {lang: subtitle}
     if desc:
         conf['description'] = {lang: desc}
-    if not conf.get('channel') and not conf.get('channelname'):
-        conf['channelname'] = UNKNOWN_CHANNEL
     placeholder = fn + '.alter-eintrag'
     open(placeholder, 'wb').close()
     new = None
@@ -109,7 +114,7 @@ def recreate_entry(tvh, uuid, info, lang, title, subtitle, desc):
         file_moved(tvh, fn, placeholder)
         if entry_info(tvh, uuid).get('filename') != placeholder:
             raise ValueError('TVHeadend hat den alten Eintrag nicht umgestellt; nichts geändert')
-        new = tvh.call('dvr/entry/create', conf=json.dumps(conf)).get('uuid')
+        new = create_entry(tvh, conf)
         if not new:
             raise ValueError('TVHeadend hat den neuen Eintrag nicht angelegt; nichts geändert')
         tvh.call('idnode/delete', uuid=json.dumps([uuid]))

@@ -10,7 +10,8 @@
 <button id="t-rec" onclick="tab('rec')">Aufnahmen</button>
 <button id="t-unknown" onclick="tab('unknown')">Nicht eingetragene Dateien</button>
 <button id="t-missing" onclick="tab('missing')">Einträge ohne Datei</button>
-<button id="t-config" onclick="tab('config')">Einstellungen</button></nav>
+<button id="t-config" onclick="tab('config')">Einstellungen</button>
+<button id="t-backup" onclick="tab('backup')">Sicherung</button></nav>
 <main id="main">Lade …</main>
 <datalist id="chans"></datalist>
 <script src="/static/common.js"></script>
@@ -19,5 +20,6 @@
 <script src="/static/unknown.js"></script>
 <script src="/static/missing.js"></script>
 <script src="/static/settings.js"></script>
+<script src="/static/backup.js"></script>
 <script>tab(cur);load()</script>
 </body></html>

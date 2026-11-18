@@ -6,6 +6,7 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  <label>Benutzer<input name="user" value="${esc(c.user)}" autocomplete="off"></label>
  <label>Passwort<input type="password" name="password" autocomplete="new-password" placeholder="${c.has_password?'gespeichert – leer lassen = unverändert':''}"></label>
  <label>Sprachcode<input name="lang" value="${esc(c.lang)}" placeholder="ger"></label>
+ <label class="wide">TVHeadend-Konfigurationsordner (für die Komplettsicherung)<input name="tvhconf" value="${esc(c.tvhconf)}" placeholder="/home/hts/.config/hts"></label>
  ${c.has_password?'<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="clear_password"> Passwort entfernen</label>':''}
  <div class="wide muted">Gespeichert in ${esc(c.config_file)}</div>
  <div class="wide"><button class="b">Verbindung prüfen und speichern</button></div></form>`}

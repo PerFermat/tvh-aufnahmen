@@ -2,14 +2,17 @@
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
+from .backup import check_password, restore, write_backup
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
 from .state import build_state
+from .transfer import export_all, plan_import
 from .tvh import entry_info
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
@@ -119,15 +122,40 @@ def make_handler(app):
             self.wfile.write(data)
 
         def send_m3u(self, title, body):
-            name = re.sub(r'[\\/:*?"<>|]', '_', title) + '.m3u'
+            self.send_file_headers(title + '.m3u', 'audio/x-mpegurl; charset=utf-8', len(body))
+            self.wfile.write(body)
+
+        def send_file_headers(self, name, ctype, length=None):
+            """Kopfzeilen für einen Download; ohne Länge endet die Antwort mit dem Verbindungsende."""
+            name = re.sub(r'[\\/:*?"<>|]', '_', name)
             ascii_name = name.encode('ascii', 'replace').decode()
             self.send_response(200)
-            self.send_header('Content-Type', 'audio/x-mpegurl; charset=utf-8')
+            self.send_header('Content-Type', ctype)
             self.send_header('Content-Disposition', 'attachment; filename="%s"; filename*=UTF-8\'\'%s'
                              % (ascii_name, urllib.parse.quote(name)))
-            self.send_header('Content-Length', str(len(body)))
+            if length is None:
+                self.close_connection = True
+            else:
+                self.send_header('Content-Length', str(length))
             self.end_headers()
+
+        def export(self):
+            body = json.dumps(export_all(app.tvh, app.recdir), indent=1, ensure_ascii=False).encode()
+            self.send_file_headers('tvh-export-%s.json' % time.strftime('%Y-%m-%d'),
+                                   'application/json; charset=utf-8', len(body))
             self.wfile.write(body)
+
+        def backup(self, req):
+            check_password(app.cfg, req.get('password'))
+            conf = app.tvhconf
+            info = {'tvh_version': app.tvh.call('serverinfo').get('sw_version'),
+                    'created': time.strftime('%Y-%m-%d %H:%M'), 'tvhconf': conf,
+                    'recdir': app.cfg.get('recdir') or ''}
+            self.send_file_headers('tvheadend-sicherung-%s.tar.gz' % time.strftime('%Y-%m-%d'), 'application/gzip')
+            try:
+                write_backup(conf, self.wfile, info, with_epg=bool(req.get('epg', True)))
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # Download im Browser abgebrochen
 
         def do_GET(self):
             url = urllib.parse.urlsplit(self.path)
@@ -150,6 +178,8 @@ def make_handler(app):
                 self.run(lambda: self.channel_playlist(q['uuid']))
             elif url.path == '/api/icon':
                 self.run(lambda: self.icon(q['id']))
+            elif url.path == '/api/export':
+                self.run(self.export)
             else:
                 self.send(404, {'error': 'nicht gefunden'})
 
@@ -159,6 +189,10 @@ def make_handler(app):
             if url.path == '/api/upload':  # Rohdaten der Datei, kein JSON
                 q = dict(urllib.parse.parse_qsl(url.query))
                 self.run(lambda: replace_file(app.tvh, q['uuid'], q.get('name', ''), length, self.rfile))
+                return
+            if url.path == '/api/restore':  # Rohdaten der Sicherung
+                q = dict(urllib.parse.parse_qsl(url.query))
+                self.run(lambda: restore(app, length, self.rfile, force=q.get('force') == '1'))
                 return
             req = json.loads(self.rfile.read(length) or b'{}')
             if self.path == '/api/edit':
@@ -173,6 +207,11 @@ def make_handler(app):
                 self.run(lambda: do_move(app.tvh, req['moves']))
             elif self.path == '/api/config':
                 self.run(lambda: app.update(req))
+            elif self.path == '/api/backup':
+                self.run(lambda: self.backup(req))
+            elif self.path in ('/api/import-preview', '/api/import-apply'):
+                self.run(lambda: plan_import(app.tvh, app.recdir, req.get('data'),
+                                             req.get('sections') or (), self.path == '/api/import-apply'))
             else:
                 self.send(404, {'error': 'nicht gefunden'})
     return Handler
