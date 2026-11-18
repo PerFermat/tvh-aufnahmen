@@ -118,8 +118,8 @@ def make_handler(app):
         def channel_playlist(self, uuid, profile=None):
             self.send_m3u(*channel_playlist(app.tvh, uuid, self.headers.get('Host'), profile))
 
-        def thumb(self, uuid):
-            path = thumbnail(entry_info(app.tvh, uuid).get('filename'))
+        def thumb(self, uuid, size='small'):
+            path = thumbnail(entry_info(app.tvh, uuid).get('filename'), size)
             if not path:
                 return self.send(404, {'error': 'kein Vorschaubild'})
             with open(path, 'rb') as f:
@@ -198,7 +198,7 @@ def make_handler(app):
             elif url.path == '/api/qualities':
                 self.run(lambda: qualities(app.tvh))
             elif url.path == '/api/thumb':
-                self.run(lambda: self.thumb(q['uuid']))
+                self.run(lambda: self.thumb(q['uuid'], q.get('size', 'small')))
             elif url.path == '/api/icon':
                 self.run(lambda: self.icon(q['id']))
             elif url.path == '/api/export':

@@ -34,7 +34,7 @@ function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolea
   return `<tr class="fold" onclick="toggleFolder(this.dataset.f)" data-f="${esc(g[0])}"><td>${open?'▾':'▸'}</td><td colspan="2">📁 ${esc(g[0])} <span class="muted">(${g[1].length})</span></td><td colspan="2"><span class="muted">${gb(total(g))}</span></td></tr>`+(open?g[1].map(recRow).join(''):'')}).join('')
   +root.flatMap(g=>g[1]).map(recRow).join('')}
 const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
- <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}" alt="" loading="lazy" onerror="this.remove()">${esc(r.title)}${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
+ <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}" alt="" loading="lazy" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="Vergrößern">${esc(r.title)}${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>
@@ -72,3 +72,7 @@ function upload(u){const f=$('#up-'+u).files[0];if(!f)return msg('Bitte zuerst e
   if(x.status==200){pr.textContent='';msg('Datei ersetzt: '+f.name,true);load()}else{pr.textContent='';msg(j.error||'Fehler '+x.status)}};
  x.onerror=()=>{pr.textContent='';msg('Upload abgebrochen')};
  x.send(f)}
+// Vorschaubild vergrößert: großes Standbild (1280 px) im Fenster, mit Titel
+function showThumb(u){const r=R(u);dialog(`<h3 style="margin:0 90px 10px 0">${esc(r.title)}</h3>${r.subtitle?`<div class="muted" style="margin:-6px 0 10px">${esc(r.subtitle.split('\n')[0])}</div>`:''}
+ <div class="bigthumb"><img src="/api/thumb?uuid=${u}&size=large" alt="" onerror="this.parentNode.innerHTML='<p class=muted>Kein Bild verfügbar.</p>'"><p class="muted">Bild wird erzeugt …</p></div>
+ <p class="muted small">${esc(r.channel)} · ${fmt(r.start)} · ${mins(r)} · ${gb(r.size)}</p>`)}

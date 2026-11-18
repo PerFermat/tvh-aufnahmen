@@ -12,12 +12,19 @@ CACHE = os.path.expanduser('~/.cache/tvh-aufnahmen/thumbs')
 LIMIT = threading.BoundedSemaphore(2)
 
 
-def thumbnail(filename):
-    """Pfad zum JPEG (erzeugt es bei Bedarf) oder None, wenn es nicht geht."""
+SIZES = {'small': 320, 'large': 1280}
+
+
+def thumbnail(filename, size='small'):
+    """Pfad zum JPEG (erzeugt es bei Bedarf) oder None, wenn es nicht geht.
+    size: 'small' für die Liste, 'large' für die vergrößerte Ansicht."""
+    width = SIZES.get(size, SIZES['small'])
     if not file_exists(filename) or not shutil.which('ffmpeg'):
         return None
     st = os.stat(filename)
     key = hashlib.sha1(('%s|%d|%d' % (filename, st.st_size, st.st_mtime)).encode()).hexdigest()
+    if width != SIZES['small']:
+        key += '-%d' % width
     out = os.path.join(CACHE, key + '.jpg')
     if os.path.exists(out):
         return out if os.path.getsize(out) else None  # leere Datei = ging nicht, nicht erneut versuchen
@@ -30,7 +37,7 @@ def thumbnail(filename):
         tmp = out + '.tmp.jpg'
         try:
             subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(pos), '-i', filename, '-frames:v', '1',
-                            '-vf', 'scale=320:-2', '-q:v', '5', '-y', tmp], capture_output=True, timeout=90)
+                            '-vf', 'yadif=0,scale=%d:-2' % width, '-q:v', '4' if width > 320 else '5', '-y', tmp], capture_output=True, timeout=90)
         except subprocess.SubprocessError:
             pass
         if os.path.exists(tmp) and os.path.getsize(tmp):
