@@ -120,19 +120,6 @@ fieldset{border:1px solid var(--line);border-radius:var(--rs);font-size:12px;col
 #msg.ok,#msg.err{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #msg.ok{border-left:4px solid var(--ok)}#msg.err{border-left:4px solid var(--bad)}
 
-/* ---------- Speicher ---------- */
-.disk{padding:10px 14px;margin-bottom:12px;border:1px solid var(--line);border-radius:var(--r);background:color-mix(in srgb,var(--solid) 55%,transparent)}
-.disk-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;font-size:13.5px}
-.disk .meter:not(.sm){height:6px}.disk details summary{padding:4px 0 0;font-size:12.5px}
-.meter{height:10px;border-radius:999px;background:var(--line);overflow:hidden}.meter.sm{height:6px;margin-top:7px}
-.meter div{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
-.disk.warn .meter:not(.sm) div{background:linear-gradient(90deg,#f59e0b,#f97316)}
-.disk.bad .meter:not(.sm) div{background:linear-gradient(90deg,var(--bad),#f97316)}
-.warn-t{margin:8px 0 0;color:#d97706;font-weight:600}.disk.bad .warn-t{color:var(--bad)}
-table.bars td{padding:5px 6px;border:0}
-
-img.thumb{float:left;width:112px;height:63px;object-fit:cover;border-radius:8px;margin:0 12px 4px 0;background:var(--line);box-shadow:var(--shadow)}
-
 /* ---------- Hinweise ---------- */
 .alert{padding:12px 16px;margin-bottom:14px;border-radius:var(--r);border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);
  background:color-mix(in srgb,var(--bad) 10%,transparent)}.alert ul{margin:6px 0 0;padding-left:20px}
@@ -221,7 +208,6 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
  main table:not(.epg) tr[hidden]{display:none}
  tr.fold td{padding:8px!important;border-radius:8px}
  .ed{grid-template-columns:1fr;padding:12px}
- .disk-head b:first-child{display:none}.disk-head{font-size:12.5px}
  .seg.blocks .to{display:none}
  .epgnav{flex-wrap:wrap;overflow:visible}.epgnav>*{flex:none}
  .seg.blocks{order:9;flex:1 1 100%;display:flex}.seg.blocks button{flex:1;padding:6px 0}
@@ -231,3 +217,6 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
  #msg{bottom:12px}
 }
 code{font-size:12.5px;padding:1px 6px;border-radius:6px;background:var(--line)}
+.meter{height:10px;border-radius:999px;background:var(--line);overflow:hidden}.meter.sm{height:6px;margin-top:7px}
+.meter div{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.warn-t{margin:8px 0 0;color:#d97706;font-weight:600}
