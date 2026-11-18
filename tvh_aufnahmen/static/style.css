@@ -44,6 +44,12 @@ header{display:flex;align-items:center;gap:14px;padding:12px 24px;
 .brand{min-width:0;flex:1}
 h1{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em}
 .sub{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu{display:none;flex:none;width:40px;height:40px;place-items:center;border:1px solid var(--line);border-radius:12px;
+ background:var(--card);color:var(--fg);cursor:pointer;padding:0}
+.menu svg{width:22px;height:22px}.menu path{transition:transform .2s,opacity .2s;transform-origin:center}
+.top.open .menu .l1{transform:translateY(5px) rotate(45deg)}.top.open .menu .l2{opacity:0}.top.open .menu .l3{transform:translateY(-5px) rotate(-45deg)}
+.sub.cur{display:none;color:var(--acc);font-weight:600}
+.scrim{display:none}
 .theme{flex:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:7px 12px;
  font:inherit;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}
 .theme:hover{background:var(--hover)}
@@ -151,7 +157,16 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
  header{padding:10px 14px;gap:10px}
  .logo-mark{width:34px;height:34px}
  h1{font-size:16px}.theme span{display:none}
- nav{padding:10px 14px}
+ /* Reiter als Klappmenü */
+ .menu{display:grid}
+ .sub#info{display:none}.sub.cur{display:block}
+ nav{display:none;position:absolute;left:10px;right:10px;top:calc(100% + 6px);flex-direction:column;gap:4px;padding:8px;margin:0;
+  max-height:calc(100vh - 90px);overflow-y:auto;background:var(--solid);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+ .top.open nav{display:flex;animation:pop .16s ease-out}
+ nav button{width:100%;text-align:left;border-radius:10px;padding:12px 14px;font-size:15px;background:transparent;border-color:transparent}
+ .top.open~.scrim{display:block;position:fixed;inset:0;z-index:15;background:rgba(8,10,24,.35);backdrop-filter:blur(2px)}
+ body.menu-open{overflow:hidden}
+ main{margin-top:12px}
  main{margin:0 10px 24px;padding:14px;border-radius:12px}
  .bar{gap:6px}.bar input[type=search]{min-width:0!important;flex-basis:100%!important}
  /* Tabellen werden zu Karten – außer der Programmzeitschrift */

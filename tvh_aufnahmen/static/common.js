@@ -23,9 +23,14 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#t-rec').textContent=`Aufnahmen (${S.recordings.length})`;
  $('#t-unknown').textContent=`Nicht eingetragene Dateien (${S.unknown.length})`;
  $('#t-missing').textContent=`Einträge ohne Datei (${S.missing.length})`;
- $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');render()}
+ $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;render()}
 const TABS={live:()=>renderLive(),epg:()=>renderEpg(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup(),scan:()=>renderScan()};
-function tab(n){if(!TABS[n])n='live';cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');render()}
+function tab(n){if(!TABS[n])n='live';cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');
+ $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);render()}
+// Handy: Reiter als Klappmenü hinter dem ☰-Knopf
+function toggleMenu(open){const t=$('#top'),o=open??!t.classList.contains('open');t.classList.toggle('open',o);
+ document.body.classList.toggle('menu-open',o);$('.menu').setAttribute('aria-expanded',o)}
+addEventListener('keydown',e=>{if(e.key=='Escape')toggleMenu(false)})
 function render(){if(['live','epg','autorec','upcoming','config','backup','scan'].includes(cur))return TABS[cur]();if(!S){$('#main').innerHTML='<p class="muted">Keine Daten – bitte Einstellungen prüfen.</p>';return}
  TABS[cur]()}
 // Formulare aus der Klassenbeschreibung von TVHeadend (/api/form) – zeigt alle Optionen einer Klasse
