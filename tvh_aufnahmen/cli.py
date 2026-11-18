@@ -4,6 +4,7 @@ import os
 from http.server import ThreadingHTTPServer
 
 from .config import App, find_tvhconf, load_config
+from .epg_archive import EpgArchive
 from .jobs import Jobs
 from .posters import Posters
 from .server import make_handler
@@ -44,6 +45,7 @@ def main():
         cfg['tvhconf'] = os.path.abspath(os.path.expanduser(cfg['tvhconf']))
     app = App(a.config, cfg, a.tvh_service)
     app.posters = Posters(os.path.expanduser('~/.cache/tvh-aufnahmen/posters.json'))
+    app.archive = EpgArchive()
     app.jobs = Jobs(app)
     srv = ThreadingHTTPServer((a.bind, a.port), make_handler(app))
     print('Oberfläche läuft auf http://%s:%d/ (Strg+C beendet)' % (a.bind, a.port))

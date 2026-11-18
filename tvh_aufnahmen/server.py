@@ -202,11 +202,11 @@ def make_handler(app):
             elif url.path == '/api/export':
                 self.run(self.export)
             elif url.path == '/api/epg':
-                self.run(lambda: epg_day(app.tvh, app.posters, q.get('start')))
+                self.run(lambda: epg_day(app.tvh, app.posters, app.archive, q.get('start')))
             elif url.path == '/api/epg-search':
                 self.run(lambda: epg_search(app.tvh, q.get('q'), q.get('full') == '1'))
             elif url.path == '/api/epg/event':
-                self.run(lambda: event_detail(app.tvh, app.posters, q['id']))
+                self.run(lambda: event_detail(app.tvh, app.posters, app.archive, q['id']))
             elif url.path == '/api/form':
                 self.run(lambda: class_form(app.tvh, q['class']))
             elif url.path == '/api/autorecs':

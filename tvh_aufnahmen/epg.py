@@ -25,15 +25,19 @@ def upcoming_entries(tvh):
     return tvh.call('dvr/entry/grid_upcoming', limit=100000).get('entries', [])
 
 
-def epg_day(tvh, posters, start=None):
+def epg_day(tvh, posters, archive, start=None):
     start = day_start(int(start) if start else time.time())
     end = day_end(start)
     # Zwei Bedingungen auf dasselbe Feld wertet TVHeadend nicht zuverlässig aus.
     flt = [{'field': 'stop', 'type': 'numeric', 'value': start, 'comparison': 'gt'},
            {'field': 'start', 'type': 'numeric', 'value': end, 'comparison': 'lt'}]
-    events = [{k: e.get(k) for k in EVENT_FIELDS}
-              for e in tvh.call('epg/events/grid', filter=json.dumps(flt), limit=100000).get('entries', [])
-              if start <= e.get('start', 0) < end]
+    raw = tvh.call('epg/events/grid', filter=json.dumps(flt), limit=100000).get('entries', [])
+    # Was bald läuft, gleich archivieren – TVHeadend löscht Sendungen, sobald sie vorbei sind
+    archive.store([e for e in raw if e.get('start', 0) < time.time() + 3 * 3600])
+    events = [{k: e.get(k) for k in EVENT_FIELDS} for e in raw if start <= e.get('start', 0) < end]
+    known = {e['eventId'] for e in events}
+    events += [dict({k: e.get(k) for k in EVENT_FIELDS}, archived=True)
+               for e in archive.day(start, end) if int(e['eventId']) not in known]
     for e in events:
         if len(e.get('description') or '') > GRID_TEXT:
             e['description'] = e['description'][:GRID_TEXT].rsplit(' ', 1)[0] + ' …'
@@ -83,10 +87,13 @@ def epg_search(tvh, query, fulltext=False):
     return {'query': query, 'total': res.get('totalCount', len(events)), 'events': events}
 
 
-def event_detail(tvh, posters, event_id):
+def event_detail(tvh, posters, archive, event_id):
     res = tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or []
-    if not res:
-        raise ValueError('Sendung nicht mehr im Programm')
+    if not res:  # schon vorbei und von TVHeadend gelöscht – aus dem Archiv
+        old = archive.find(event_id)
+        if not old:
+            raise ValueError('Sendung nicht mehr im Programm')
+        res = [dict(old, archived=True)]
     attach(posters, res, min_duration=0, urgent=True)  # beim Öffnen für jede Sendung, sofort
     return res[0]
 

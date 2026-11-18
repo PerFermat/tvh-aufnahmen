@@ -10,6 +10,7 @@ import urllib.request
 
 from .backup import write_backup
 from .config import save_config
+from .epg_archive import archive_upcoming
 from .state import disk_info
 from .transfer import export_all
 
@@ -174,11 +175,18 @@ class Jobs:
     def loop(self):
         while True:
             time.sleep(60)
-            for step in (self.maybe_backup, self.check_recordings, self.check_disk):
+            for step in (self.archive_epg, self.maybe_backup, self.check_recordings, self.check_disk):
                 try:
                     step()
                 except Exception as e:  # ein Fehler darf die anderen Aufgaben nicht stoppen
                     print('Hintergrundaufgabe %s: %s' % (step.__name__, e))
+
+    def archive_epg(self):
+        """Alle 10 Minuten laufende und bald beginnende Sendungen archivieren (siehe epg_archive)."""
+        if time.time() - getattr(self, 'archived_at', 0) >= 600:
+            archive_upcoming(self.app.tvh, self.app.archive)
+            self.app.archive.prune()
+            self.archived_at = time.time()
 
     def maybe_backup(self):
         b = self.settings()['autobackup']
