@@ -37,6 +37,11 @@ class Tvh:
             body = r.read().decode('utf-8', 'replace')
         return json.loads(body) if body.strip() else {}
 
+    def get(self, path):
+        """Rohdaten außerhalb von /api, z. B. Playlists und Senderlogos."""
+        with self.opener.open(self.url + path, timeout=60) as r:
+            return r.read(), r.headers.get('Content-Type')
+
     def entries(self):
         seen = {}
         for grid in ('grid', 'grid_finished', 'grid_failed', 'grid_removed'):

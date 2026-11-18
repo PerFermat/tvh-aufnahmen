@@ -10,4 +10,4 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  <div class="wide muted">Gespeichert in ${esc(c.config_file)}</div>
  <div class="wide"><button class="b">Verbindung prüfen und speichern</button></div></form>`}
 async function saveConfig(form){const f=Object.fromEntries(new FormData(form));f.clear_password=!!f.clear_password;
- try{await api('/api/config',f);msg('Einstellungen gespeichert',true);await load();if(S)tab(0)}catch(e){msg(e.message)}}
+ try{await api('/api/config',f);msg('Einstellungen gespeichert',true);await load();if(S)tab('live')}catch(e){msg(e.message)}}

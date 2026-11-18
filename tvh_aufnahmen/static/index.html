@@ -6,16 +6,18 @@
 </head><body>
 <header><h1>TVHeadend Aufnahmen</h1><div class="sub" id="info">Lade …</div></header>
 <div id="msg"></div>
-<nav><button id="t0" class="on" onclick="tab(0)">Aufnahmen</button>
-<button id="t1" onclick="tab(1)">Nicht eingetragene Dateien</button>
-<button id="t2" onclick="tab(2)">Einträge ohne Datei</button>
-<button id="t3" onclick="tab(3)">Einstellungen</button></nav>
+<nav><button id="t-live" onclick="tab('live')">Live-TV</button>
+<button id="t-rec" onclick="tab('rec')">Aufnahmen</button>
+<button id="t-unknown" onclick="tab('unknown')">Nicht eingetragene Dateien</button>
+<button id="t-missing" onclick="tab('missing')">Einträge ohne Datei</button>
+<button id="t-config" onclick="tab('config')">Einstellungen</button></nav>
 <main id="main">Lade …</main>
 <datalist id="chans"></datalist>
 <script src="/static/common.js"></script>
+<script src="/static/live.js"></script>
 <script src="/static/recordings.js"></script>
 <script src="/static/unknown.js"></script>
 <script src="/static/missing.js"></script>
 <script src="/static/settings.js"></script>
-<script>load()</script>
+<script>tab(cur);load()</script>
 </body></html>

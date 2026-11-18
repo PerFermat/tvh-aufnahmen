@@ -7,6 +7,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
 from .files import file_exists
+from .live import channel_icon, channel_playlist, live_channels
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
 from .state import build_state
 from .tvh import entry_info
@@ -103,6 +104,21 @@ def make_handler(app):
             host = self.headers.get('Host') or '%s:%d' % self.server.server_address[:2]
             body = ('#EXTM3U\n#EXTINF:%d,%s\nhttp://%s/api/download?uuid=%s\n'
                     % (dur, title, host, urllib.parse.quote(uuid))).encode()
+            self.send_m3u(title, body)
+
+        def channel_playlist(self, uuid):
+            self.send_m3u(*channel_playlist(app.tvh, uuid, self.headers.get('Host')))
+
+        def icon(self, icon_id):
+            data, ctype = channel_icon(app.tvh, icon_id)
+            self.send_response(200)
+            self.send_header('Content-Type', ctype)
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'max-age=86400')
+            self.end_headers()
+            self.wfile.write(data)
+
+        def send_m3u(self, title, body):
             name = re.sub(r'[\\/:*?"<>|]', '_', title) + '.m3u'
             ascii_name = name.encode('ascii', 'replace').decode()
             self.send_response(200)
@@ -128,6 +144,12 @@ def make_handler(app):
                 self.run(lambda: self.download(q['uuid']))
             elif url.path == '/api/playlist':
                 self.run(lambda: self.playlist(q['uuid']))
+            elif url.path == '/api/live':
+                self.run(lambda: live_channels(app.tvh))
+            elif url.path == '/api/channel-playlist':
+                self.run(lambda: self.channel_playlist(q['uuid']))
+            elif url.path == '/api/icon':
+                self.run(lambda: self.icon(q['id']))
             else:
                 self.send(404, {'error': 'nicht gefunden'})
 
