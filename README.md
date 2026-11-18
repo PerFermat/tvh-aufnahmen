@@ -118,7 +118,7 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 
 ## Hinweise
 
-- Die Oberfläche hat kein eigenes Login. Sie ist für das Heimnetz gedacht; mit `--bind 127.0.0.1` ist sie nur lokal erreichbar.
+- Die Oberfläche hat kein eigenes Login. Sie ist für das Heimnetz gedacht; mit `--bind 127.0.0.1` ist sie nur lokal erreichbar. Standard ist `::` (IPv6 und IPv4).
 - Start- und Endzeit werden aus dem Dateinamen (z. B. `Tatort-2023-05-14-20-15.ts`) und der Änderungszeit geraten. Ist `ffprobe` installiert (`sudo apt install ffmpeg`), wird die echte Laufzeit verwendet.
 - Ohne Sender legt TVHeadend keinen Eintrag an. Das Tool schlägt den Sender anderer Aufnahmen im selben Ordner vor, sonst „Unbekannt“.
 - Das Ende einer Aufnahme muss in der Vergangenheit liegen, sonst würde TVHeadend einen Aufnahme-Timer anlegen. Das Tool verhindert das.

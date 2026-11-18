@@ -1,6 +1,7 @@
 """Startparameter auswerten und den Server starten."""
 import argparse
 import os
+import socket
 from http.server import ThreadingHTTPServer
 
 from .config import App, find_tvhconf, load_config
@@ -8,6 +9,26 @@ from .epg_archive import EpgArchive
 from .jobs import Jobs
 from .posters import Posters
 from .server import make_handler
+
+
+class DualStackServer(ThreadingHTTPServer):
+    """Lauscht auf IPv6 und IPv4 zugleich – Handys nehmen für „raspi5.fritz.box“ oft die IPv6-Adresse."""
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        super().server_bind()
+
+
+def make_server(bind, port, handler):
+    if ':' in bind:  # IPv6-Adresse, z. B. „::“ = alle
+        try:
+            return DualStackServer((bind, port), handler)
+        except OSError:
+            if bind != '::':
+                raise
+            bind = '0.0.0.0'  # kein IPv6 auf diesem Rechner
+    return ThreadingHTTPServer((bind, port), handler)
 
 
 def main():
@@ -26,7 +47,7 @@ def main():
                    help='systemd-Dienst, der beim Wiederherstellen gestoppt und gestartet wird; '
                         'leer = nicht anfassen (Standard: %(default)s)')
     p.add_argument('--port', type=int, default=8099, help='Port der Oberfläche (Standard: %(default)s)')
-    p.add_argument('--bind', default='0.0.0.0', help='Adresse (Standard: %(default)s)')
+    p.add_argument('--bind', default='::', help='Adresse (Standard: %(default)s = IPv6 und IPv4)')
     a = p.parse_args()
 
     default_dir = os.path.expanduser('~/Tvheadend/Extern/Aufnahmen')
@@ -47,8 +68,8 @@ def main():
     app.posters = Posters(os.path.expanduser('~/.cache/tvh-aufnahmen/posters.json'))
     app.archive = EpgArchive()
     app.jobs = Jobs(app)
-    srv = ThreadingHTTPServer((a.bind, a.port), make_handler(app))
-    print('Oberfläche läuft auf http://%s:%d/ (Strg+C beendet)' % (a.bind, a.port))
+    srv = make_server(a.bind, a.port, make_handler(app))
+    print('Oberfläche läuft auf Port %d, Adresse %s (Strg+C beendet)' % (a.port, a.bind))
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
