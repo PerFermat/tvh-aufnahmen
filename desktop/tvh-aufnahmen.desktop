@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TVHeadend Aufnahmen
+Comment=Aufnahmen, Programm und Live-TV verwalten
+Exec=xdg-open http://raspi5:8099/
+Icon=tvh-aufnahmen
+Terminal=false
+Categories=AudioVideo;Video;TV;
+StartupNotify=true

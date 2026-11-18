@@ -63,6 +63,17 @@ WantedBy=multi-user.target
 sudo systemctl enable --now tvh-aufnahmen
 ```
 
+## Desktop-Verknüpfung (Linux)
+
+Im Ordner `desktop/` liegen eine Verknüpfung und ein Icon. Installieren fürs Startmenü:
+
+```bash
+install -Dm644 desktop/tvh-aufnahmen.svg ~/.local/share/icons/hicolor/scalable/apps/tvh-aufnahmen.svg
+install -Dm755 desktop/tvh-aufnahmen.desktop ~/.local/share/applications/tvh-aufnahmen.desktop
+```
+
+Danach lässt sie sich aus dem Startmenü oder direkt aus `desktop/` auf den Schreibtisch ziehen. Sie öffnet `http://raspi5:8099/` im Standardbrowser. Klappt der Name `raspi5` unterwegs per VPN nicht (der VPN-Zugang liefert die Namen aus dem Heimnetz nicht mit), in der Zeile `Exec=` die IP-Adresse eintragen.
+
 ## Sicherung
 
 Der Reiter **Sicherung** bietet zwei Wege:
