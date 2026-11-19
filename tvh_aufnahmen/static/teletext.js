@@ -16,9 +16,12 @@ async function openTeletext(ch,name){TT.ch=ch;TT.page=+store('ttpage-'+ch)||100;
   <span class="ttsub"><button class="b sec" onclick="ttSub(-1)" title="Vorige Unterseite">‹</button><span id="ttsubl">–</span><button class="b sec" onclick="ttSub(1)" title="Nächste Unterseite">›</button></span>
   <button class="b sec" onclick="ttGo(100)">100</button><button class="b sec" onclick="TT.reveal=!TT.reveal;ttDraw()" title="Verdeckten Text zeigen (z. B. Rätsellösungen)">?</button></div>
  <p class="muted small" style="margin:6px 0 0">Seitenzahlen im Text sind anklickbar. Ziffern tippen springt direkt zur Seite.</p>`);
- $('#ttc').addEventListener('click',ttClick);
- $('#dlg').addEventListener('close',()=>{clearTimeout(TT.timer);TT.ch=null;document.removeEventListener('keydown',ttKey)},{once:true});
+ $('#ttc').addEventListener('click',ttClick);ttSize();const ro=new ResizeObserver(()=>ttSize()&&ttDraw());ro.observe($('#ttc'));
+ $('#dlg').addEventListener('close',()=>{clearTimeout(TT.timer);TT.ch=null;ro.disconnect();document.removeEventListener('keydown',ttKey)},{once:true});
  document.addEventListener('keydown',ttKey);ttLoad()}
+// in echter Bildschirmauflösung zeichnen (Anzeigebreite × Pixeldichte), sonst wird die Schrift beim Hochskalieren unscharf
+function ttSize(){const c=$('#ttc');if(!c||!c.clientWidth)return false;const W=Math.max(8,Math.floor(c.clientWidth*(window.devicePixelRatio||1)/40)),H=Math.round(W*5/3);
+ if(W==TT.W&&c.width==40*W)return false;TT.W=W;TT.H=H;c.width=40*W;c.height=25*H;return true}
 async function ttLoad(){clearTimeout(TT.timer);if(!TT.ch||!$('#ttc'))return;
  try{const d=await api(`/api/vt?ch=${TT.ch}&p=${TT.page}`+(TT.sub!=null?`&s=${TT.sub}`:''));if(!TT.ch)return;
   const changed=JSON.stringify(d.rows)!==JSON.stringify(TT.data&&TT.data.rows)||JSON.stringify(d.header)!==JSON.stringify(TT.data&&TT.data.header);
@@ -65,8 +68,8 @@ function ttDraw(){const c=$('#ttc');if(!c)return;const g=c.getContext('2d'),W=TT
  clearTimeout(TT.ftimer);if(flashUsed)TT.ftimer=setTimeout(()=>{TT.flash=!TT.flash;ttDraw()},TT.flash?900:400)}
 function ttCell(g,x,r,b,fg,bg,mos,sep,dbl,_a,_b,nat){const W=TT.W,H=TT.H,h=dbl?2*H:H,X=x*W,Y=r*H;
  g.fillStyle=TTCOL[bg];g.fillRect(X,Y,W,h);if(b==0x20)return;g.fillStyle=TTCOL[fg];
- if(mos){const bits=[b&1,b&2,b&4,b&8,b&16,b&64],cw=W/2,ch=h/3,gap=sep?Math.max(1,Math.round(W/6)):0;
-  bits.forEach((on,i)=>{if(on)g.fillRect(X+(i%2)*cw+gap/2,Y+Math.floor(i/2)*ch+gap/2,cw-gap,ch-gap)});return}
+ if(mos){const bits=[b&1,b&2,b&4,b&8,b&16,b&64],xs=[X,X+Math.round(W/2),X+W],ys=[Y,Y+Math.round(h/3),Y+Math.round(2*h/3),Y+h],gap=sep?Math.max(1,Math.round(W/6)):0;
+  bits.forEach((on,i)=>{const cx=i%2,cy=Math.floor(i/2);if(on)g.fillRect(xs[cx]+gap,ys[cy]+gap,xs[cx+1]-xs[cx]-gap,ys[cy+1]-ys[cy]-gap)});return}
  if(b==0x7F){g.fillRect(X+1,Y+1,W-2,h-2);return}
  const k=TTPOS.indexOf(b),chr=k>=0?nat[k]:String.fromCharCode(b);
  g.save();g.font=`${Math.round(H*0.82)}px "DejaVu Sans Mono","Courier New",monospace`;g.textBaseline='top';
