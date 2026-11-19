@@ -15,8 +15,13 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
 // Qualität beim Abspielen – gilt nur für dieses Gerät (Handy z. B. „Mobil“, PC „Home“)
 async function renderQuality(){const q=await qualities();if(cur!='config'||!$('#qualitycfg'))return;
  if(q.length<2){$('#qualitycfg').innerHTML='';return}
- $('#qualitycfg').innerHTML=`<h3>Qualität beim Abspielen (dieses Gerät)</h3>
- <p class="muted">Gilt für „Abspielen“ in Live-TV und im Programm. Jedes Gerät merkt sich seine eigene Einstellung. Die kleineren Stufen rechnet der Raspberry um – das schafft er nur für einen Stream gleichzeitig.</p>
+ $('#qualitycfg').innerHTML=`<h3>Abspielen (dieses Gerät)</h3>
+ <div class="ed" style="margin-bottom:12px">
+  <label class="chk wide"><input type="radio" name="player" value="intern" ${playerMode()=='intern'?'checked':''} onchange="store('player','intern');msg('Abspielen im internen Player',true)"> <b>Interner Player</b>&nbsp;<span class="muted">– direkt hier im Browser, auf Handy und PC</span></label>
+  <label class="chk wide"><input type="radio" name="player" value="extern" ${playerMode()=='extern'?'checked':''} onchange="store('player','extern');msg('Abspielen mit externem Player (m3u-Datei, z. B. VLC)',true)"> <b>Externer Player</b>&nbsp;<span class="muted">– lädt eine m3u-Datei für VLC o. Ä. (wie bisher)</span></label>
+  ${canPlayInline()?'':'<p class="muted wide" style="margin:0">⚠ Dieser Browser kann den internen Player nicht nutzen (z. B. iPhone) – hier wird immer der externe verwendet.</p>'}</div>
+ <h3>Qualität beim Abspielen (dieses Gerät)</h3>
+ <p class="muted">Gilt für „Abspielen“ in Live-TV, im Programm und – im internen Player – auch für Aufnahmen. Jedes Gerät merkt sich seine eigene Einstellung. Die kleineren Stufen rechnet der Raspberry um – das schafft er nur für einen Stream gleichzeitig. „Home“ kostet bei HD-Sendern kaum Rechenleistung.</p>
  <div class="ed">${q.map(x=>`<label class="chk wide"><input type="radio" name="quality" value="${esc(x.profile)}" ${x.profile==quality()?'checked':''} onchange="store('quality',this.value);msg('Qualität auf diesem Gerät: ${esc(x.name)}',true)"> <b>${esc(x.name)}</b>&nbsp;<span class="muted">– ${esc(x.info)}</span></label>`).join('')}</div>`}
 // Benachrichtigungen aufs Handy über ntfy (App „ntfy“, kostenlos, ohne Konto)
 async function renderNotify(){let j;try{j=await api('/api/jobs')}catch(e){return}if(cur!='config'||!$('#notifycfg'))return;const n=j.notify;

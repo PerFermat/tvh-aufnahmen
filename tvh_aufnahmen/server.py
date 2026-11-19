@@ -13,6 +13,7 @@ from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_fo
                   upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels, qualities
+from .player import live_source, recording_source, stream as player_stream
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
 from .status import status
 from .scan import scan_add, scan_delete, scan_result, scan_start, scan_status
@@ -56,7 +57,8 @@ def make_handler(app):
         def static(self, name):
             path = os.path.join(STATIC_DIR, name)
             ctype = STATIC_TYPES.get(os.path.splitext(name)[1])
-            if '/' in name or not ctype or not os.path.isfile(path):
+            # nur Dateien direkt in static/ oder static/vendor/ (Bibliotheken), kein „..“
+            if not re.fullmatch(r'(vendor/)?[\w.-]+', name) or '..' in name or not ctype or not os.path.isfile(path):
                 return self.send(404, {'error': 'nicht gefunden'})
             with open(path, 'rb') as f:
                 self.send(200, f.read(), ctype)
@@ -224,6 +226,11 @@ def make_handler(app):
                 self.run(app.jobs.settings)
             elif url.path == '/api/status':
                 self.run(lambda: status(app.tvh, app.recdir))
+            elif url.path == '/api/play-live':
+                self.run(lambda: player_stream(self, *live_source(app.tvh, q.get('uuid')), q.get('q', 'pass')))
+            elif url.path == '/api/play-rec':
+                self.run(lambda: player_stream(self, *recording_source(app.tvh, q.get('uuid')), q.get('q', 'pass'),
+                                               int(float(q.get('t') or 0))))
             elif url.path == '/api/scan-status':
                 self.run(lambda: scan_status(app.tvh))
             elif url.path == '/api/scan-result':

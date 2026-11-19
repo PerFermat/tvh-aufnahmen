@@ -39,7 +39,7 @@ const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></t
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">Download</a>
- <a class="b sec" style="text-decoration:none;display:inline-block" href="/api/playlist?uuid=${r.uuid}" title="Öffnet die Aufnahme als Stream in VLC">Abspielen</a>
+ <a class="b sec" style="text-decoration:none;display:inline-block" href="/api/playlist?uuid=${r.uuid}" data-playrec="${r.uuid}" title="Aufnahme abspielen">Abspielen</a>
  <button class="b sec" id="eb-${r.uuid}" onclick="editRec('${r.uuid}')">Bearbeiten</button>
  <button class="b bad" onclick="removeRec(['${r.uuid}'])" title="Diese Aufnahme samt Datei löschen">Löschen</button></td></tr>
  <tr id="er-${r.uuid}" hidden><td colspan="5"></td></tr>`;
@@ -120,7 +120,7 @@ function recCard(r,label,keep){return `<div class="rcard${keep?' keep':''}"><div
  <tr><td>Dauer</td><td>${mins(r)}</td></tr><tr><td>Größe</td><td>${gb(r.size)} <span class="muted">(${(perMin(r)*8/60/1e6).toFixed(1)} Mbit/s)</span></td></tr>
  <tr><td>Datei</td><td class="f">${esc(r.rel)}</td></tr>${r.status&&r.status!='Completed OK'?`<tr><td>Status</td><td>${esc(r.status)}</td></tr>`:''}</table>
  <p style="white-space:pre-line">${esc(r.description||'Keine Beschreibung.')}</p>
- <div class="bar" style="margin:0"><a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${r.uuid}">Abspielen</a>
+ <div class="bar" style="margin:0"><a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${r.uuid}" data-playrec="${r.uuid}">Abspielen</a>
   <a class="b sec" style="text-decoration:none" href="/api/download?uuid=${r.uuid}">Download</a>
   <button class="b bad" onclick="removeRec(['${r.uuid}'])">Löschen</button></div></div>`}
 function recInfo(u){const r=R(u),g=VIEW=='dup'?DUPS.get(u):null;

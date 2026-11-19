@@ -259,3 +259,6 @@ code{font-size:12.5px;padding:1px 6px;border-radius:6px;background:var(--line)}
 .warn-t{margin:8px 0 0;color:#d97706;font-weight:600}
 dialog:has(.cmp){max-width:1180px}
 table.reps td{padding:7px 8px;vertical-align:middle}
+.pwrap{margin:12px 0 0;background:#000;border-radius:12px;overflow:hidden}.pwrap video{display:block;width:100%;max-height:70vh;background:#000}
+.pbar{display:flex;align-items:center;gap:10px;margin-top:10px;font-variant-numeric:tabular-nums;font-size:13px}.pbar input{flex:1;accent-color:var(--acc)}
+dialog:has(.pwrap){max-width:1100px}
