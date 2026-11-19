@@ -16,6 +16,17 @@ const THEMES={auto:['◐','Automatisch'],light:['☀','Hell'],dark:['☾','Dunke
 function applyTheme(){const t=store('theme')||'auto',[icon,name]=THEMES[t]||THEMES.auto;
  if(t=='auto')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=t;
  const b=$('#theme');if(b)b.innerHTML=`${icon} <span>${name}</span>`}
+// Vollbild für die ganze Seite (auf dem iPhone gibt es das nicht – dort bleibt der Knopf weg)
+const FSICON={on:'<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',off:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'};
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+function fsState(){const b=$('#fsbtn');if(!b)return;const on=!!fsEl();b.hidden=!(document.fullscreenEnabled||document.webkitFullscreenEnabled);
+ b.title=on?'Vollbild beenden':'Vollbild';b.setAttribute('aria-label',b.title);b.classList.toggle('on',on);
+ b.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${on?FSICON.on:FSICON.off}</svg>`}
+function toggleFullscreen(){const d=document,e=d.documentElement;
+ const r=fsEl()?(d.exitFullscreen||d.webkitExitFullscreen).call(d):(e.requestFullscreen||e.webkitRequestFullscreen).call(e);
+ if(r&&r.catch)r.catch(err=>msg('Vollbild nicht möglich: '+err.message))}
+document.addEventListener('fullscreenchange',fsState);document.addEventListener('webkitfullscreenchange',fsState);
+document.addEventListener('DOMContentLoaded',fsState);
 function cycleTheme(){const k=Object.keys(THEMES),t=store('theme')||'auto';store('theme',k[(k.indexOf(t)+1)%k.length]);applyTheme()}
 async function api(p,body){const r=await fetch(p,body?{method:'POST',body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
 async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').textContent='Fehler: '+e.message;tab('config');msg(e.message);return}
