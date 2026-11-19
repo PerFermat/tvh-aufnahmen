@@ -89,7 +89,14 @@ function layoutEpg(){
    const room=bottom-(evs[evs.length-1].getBoundingClientRect().bottom-ct);if(room<=1)return;
    const S=[];evs.forEach((ev,j)=>S[j]=Math.max(j?S[j-1]:0,y(+ev.dataset.s)-tops[j]));
    for(let j=evs.length-1;j>=0;j--)S[j]=Math.max(0,Math.min(S[j],room,j+1<evs.length?S[j+1]:room));
-   evs.forEach((ev,j)=>{const dlt=S[j]-(j?S[j-1]:0);if(dlt>=1)ev.style.marginTop=(parseFloat(getComputedStyle(ev).marginTop)+dlt)+'px'})})}}
+   // Der Abstand gehört zur Sendung davor (deren Kasten wird länger, Hover und „Jetzt“ decken ihn mit ab);
+   // nur vor der ersten Sendung bleibt er frei – dort läuft noch die Sendung aus dem Block davor.
+   const grow=(el,px)=>el.style.paddingBottom=(parseFloat(getComputedStyle(el).paddingBottom)+px)+'px';
+   evs.forEach((ev,j)=>{const dlt=S[j]-(j?S[j-1]:0);if(dlt<1)return;
+    if(j)grow(evs[j-1],dlt);else ev.style.marginTop=(parseFloat(getComputedStyle(ev).marginTop)+dlt)+'px'});
+   // die letzte Sendung bis zu ihrem Ende ziehen (höchstens bis zum Zellenende)
+   const last=evs[evs.length-1],lb=last.getBoundingClientRect().bottom-c.getBoundingClientRect().top,want=Math.min(y(+last.dataset.e),bottom);
+   if(want-lb>=1)grow(last,want-lb)})}}
 // Volle Zelle: CELLMAX Sendungen zeigen, aber die laufende muss dabei sein – davor liegende
 // verschwinden dann oben unter „+ n frühere“, spätere wie bisher unten unter „+ n weitere“.
 function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);
