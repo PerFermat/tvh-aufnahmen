@@ -9,6 +9,7 @@ from .epg_archive import EpgArchive
 from .jobs import Jobs
 from .posters import Posters
 from .server import make_handler
+from .teletext import TeletextService
 
 
 class DualStackServer(ThreadingHTTPServer):
@@ -67,6 +68,7 @@ def main():
     app = App(a.config, cfg, a.tvh_service)
     app.posters = Posters(os.path.expanduser('~/.cache/tvh-aufnahmen/posters.json'))
     app.archive = EpgArchive()
+    app.teletext = TeletextService(lambda: app.tvh)
     app.jobs = Jobs(app)
     srv = make_server(a.bind, a.port, make_handler(app))
     print('Oberfläche läuft auf Port %d, Adresse %s (Strg+C beendet)' % (a.port, a.bind))

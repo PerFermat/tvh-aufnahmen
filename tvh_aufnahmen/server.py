@@ -226,6 +226,9 @@ def make_handler(app):
                 self.run(app.jobs.settings)
             elif url.path == '/api/status':
                 self.run(lambda: status(app.tvh, app.recdir))
+            elif url.path == '/api/vt':
+                self.run(lambda: app.teletext.page(q.get('ch'), int(q.get('p') or 100),
+                                                   int(q['s']) if q.get('s') not in (None, '') else None))
             elif url.path == '/api/play-live':
                 self.run(lambda: player_stream(self, *live_source(app.tvh, q.get('uuid')), q.get('q', 'pass')))
             elif url.path == '/api/play-rec':

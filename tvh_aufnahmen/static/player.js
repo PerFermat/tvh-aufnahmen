@@ -25,7 +25,8 @@ const qualityName=()=>{const q=(QUALS||[]).find(x=>x.profile==quality());return 
 
 async function playLive(uuid){await qualities();const c=(LIVE&&LIVE.channels.find(x=>x.uuid==uuid))||(EPG&&EPG.channels.find(x=>x.uuid==uuid))||{name:'Sender'};
  playerDialog(c.name,'Live · Qualität: '+qualityName(),`<div class="bar" style="margin:8px 0 0"><button class="b sec" onclick="playLive('${uuid}')">Neu laden</button>
-  <a class="b sec" style="text-decoration:none" href="${playHref(uuid)}" onclick="event.stopPropagation()">In VLC öffnen</a></div>`);
+  <a class="b sec" style="text-decoration:none" href="${playHref(uuid)}" onclick="event.stopPropagation()">In VLC öffnen</a>
+  <button class="b sec" onclick="openTeletext('${uuid}','${esc(c.name).replace(/'/g,'')}')">Videotext</button></div>`);
  startPlayer(`/api/play-live?uuid=${uuid}&q=${encodeURIComponent(quality())}`);
  $('#pv').addEventListener('playing',()=>$('#pmsg').textContent='',{once:true})}
 

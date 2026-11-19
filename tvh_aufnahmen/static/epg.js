@@ -103,7 +103,8 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
  ${extra.length?`<table>${extra.map(x=>`<tr><td class="muted">${x[0]}</td><td>${esc(x[1])}</td></tr>`).join('')}</table>`:''}
  ${e.dvrUuid?`<p class="tag">Aufnahme ist geplant</p>`:''}
  ${e.stop<=Date.now()/1000?`<p class="muted" style="margin-top:14px">Diese Sendung ist vorbei${e.archived?' (aus dem Archiv dieses Tools)':''}.</p>`:`<div class="bar" style="margin-top:14px"><select id="evcfg">${cfg.map(o=>`<option value="${esc(o.key)}">${esc(o.val)}</option>`).join('')}</select>
-  ${e.start<=Date.now()/1000&&e.channelUuid?`<a class="b" style="text-decoration:none" href="${playHref(e.channelUuid)}" data-play="${e.channelUuid}" title="Öffnet den Sender als Stream in VLC">▶ Abspielen</a>`:''}
+  ${e.start<=Date.now()/1000&&e.channelUuid?`<a class="b" style="text-decoration:none" href="${playHref(e.channelUuid)}" data-play="${e.channelUuid}" title="Öffnet den Sender als Stream in VLC">▶ Abspielen</a>
+  <button class="b sec" data-ch="${e.channelUuid}" data-n="${esc(e.channelName||'')}" onclick="openTeletext(this.dataset.ch,this.dataset.n)">Videotext</button>`:''}
   <button class="b" onclick="recordEvent(${e.eventId})">Aufnehmen</button>
   <button class="b sec" onclick="$('#serform').hidden=!$('#serform').hidden">Serienaufnahme …</button></div>`}
  ${e.start<=Date.now()/1000?`<div class="bar" style="margin-top:10px"><button class="b sec" onclick="findRepeats(${e.eventId},this)">🔁 Wiederholungen suchen</button></div><div id="reps"></div>`:''}

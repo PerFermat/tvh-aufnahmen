@@ -19,6 +19,7 @@ function fillLive(){const words=LQ.toLowerCase().split(/\s+/).filter(Boolean),no
   <div class="prog"><div style="width:${p.toFixed(1)}%"></div></div>`:'<span class="muted">Keine Programmdaten</span>'}
   <div class="nxt-in">${c.next.map(nextLink).join('')}</div></td>
  <td class="nxt-col">${c.next.map(nextLink).join('')||'<span class="muted">–</span>'}</td>
- <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="${playHref(c.uuid)}" data-play="${c.uuid}" title="Öffnet den Sender als Stream in VLC">Abspielen</a></td></tr>`}).join('')}
+ <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="${playHref(c.uuid)}" data-play="${c.uuid}" title="Sender abspielen">Abspielen</a>
+ <button class="b sec" data-ch="${c.uuid}" data-n="${esc(c.name)}" onclick="openTeletext(this.dataset.ch,this.dataset.n)" title="Videotext dieses Senders">Videotext</button></td></tr>`}).join('')}
 // nächste Sendung: Zeit und Titel, ein Klick öffnet die Details (wie im Programm)
 const nextLink=e=>`<div class="nxt"><span class="muted">${hm(e.start)}</span><a class="evl" onclick="showEvent(${e.eventId})" title="Details">${esc(e.title)}</a></div>`;
