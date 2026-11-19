@@ -75,21 +75,29 @@ function layoutEpg(){
    ds.forEach(d=>{let n=lines;const img=d.parentNode.querySelector('.poster');
     if(img&&n*LINE_PX>=IMG_PX+4*LINE_PX){img.hidden=false;n-=Math.ceil(IMG_PX/LINE_PX)}
     if(n>=MIN_DESC){d.hidden=false;d.style.webkitLineClamp=n}})})}}
+// Volle Zelle: CELLMAX Sendungen zeigen, aber die laufende muss dabei sein – davor liegende
+// verschwinden dann oben unter „+ n frühere“, spätere wie bisher unten unter „+ n weitere“.
+function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);
+ return i<CELLMAX?0:Math.min(i,all.length-CELLMAX)}
 function fillEpg(){const words=EPGQ.toLowerCase().split(/\s+/).filter(Boolean),match=e=>words.every(w=>(e.title+' '+(e.subtitle||'')+' '+(e.description||'')).toLowerCase().includes(w));
  const chans=EPG.channels.filter(c=>(EPGE||c.epg)&&(!EPGT||c.tags.includes(EPGT)));
- const evs=EPG.events.filter(match),cell={};evs.forEach(e=>{(cell[blockOf(e.start)+'|'+e.channelUuid]??=[]).push(e)});
+ const evs=EPG.events.filter(match),cell={};evs.forEach(e=>{(cell[blockOf(e.start)+'|'+e.channelUuid]??=[]).push(e)});EPGCELLS=cell;
  if(!chans.length||!evs.length){$('#epgwrap').innerHTML='<p class="muted">Keine Sendungen an diesem Tag.</p>';return}
  const rows=BLOCKS.map(h=>{
-  const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];return {k,all,list:EPGX.has(k)?all:all.slice(0,CELLMAX)}});
-  return `<tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${cells.map(x=>`<td><div class="cell">${x.list.map(evHtml).join('')}${x.all.length>x.list.length?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${x.all.length-x.list.length} weitere</button>`:''}</div></td>`).join('')}</tr>`});
+  const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];const from=cellCut(all,k);return {k,all,from,list:EPGX.has(k)?all:all.slice(from,from+CELLMAX)}});
+  return `<tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${x.from} frühere</button>`:''}${x.list.map(evHtml).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${after} weitere</button>`:''}</div></td>`}).join('')}</tr>`});
  $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th><div class="chh">${c.number?`<span class="chnr">${c.number}</span>`:''}${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}</div><div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
- epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
+ EPGCUT=cutSig();epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
+// Fingerabdruck aller Ausschnitte – ändert er sich (die laufende Sendung ist aus dem Ausschnitt gewandert), neu zeichnen
+let EPGCUT='',EPGCELLS={};
+const cutSig=()=>Object.entries(EPGCELLS).map(([k,a])=>cellCut(a,EPGS+'|'+k)).join(',');
 // Laufende Sendung je Sender hervorheben, mit Fortschritt; jede Minute aktualisiert.
 // Nur Rahmen, Hintergrund und eine eingeblendete Leiste – die Zellenhöhen bleiben dadurch gleich.
 function epgNow(){const now=Date.now()/1000;
  document.querySelectorAll('table.epg .ev').forEach(el=>{const s=+el.dataset.s,e=+el.dataset.e,on=s<=now&&now<e;
   el.classList.toggle('now',on);el.classList.toggle('past',e<=now);if(on)el.style.setProperty('--p',((now-s)/(e-s)*100).toFixed(1)+'%');else el.style.removeProperty('--p')})}
-setInterval(()=>{if(cur=='epg'&&$('table.epg'))epgNow()},60000);
+setInterval(()=>{if(cur!='epg'||!$('table.epg'))return;
+ if(cutSig()!==EPGCUT){const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x}else epgNow()},60000);
 async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catch(err){return msg(err.message)}
  const schema=await formSchema('dvrautorec'),cfg=(schema.props.find(p=>p.id=='config_name')||{enum:[]}).enum;
  const flags=['hd','widescreen','subtitled','audiodesc','deafsigned','new','repeat'].filter(k=>e[k]).map(k=>({hd:'HD',widescreen:'16:9',subtitled:'Untertitel',audiodesc:'Audiodeskription',deafsigned:'Gebärdensprache',new:'Neu',repeat:'Wiederholung'})[k]);
