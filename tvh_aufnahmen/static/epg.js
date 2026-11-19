@@ -1,6 +1,6 @@
 // Reiter „Programm“: Fernsehzeitschrift für einen ganzen Tag – Sender als Spalten, sechs Zeilen zu je 4 Stunden.
 // In einer Zeile stehen alle Sendungen, die in diesem Zeitraum beginnen; die Schnellauswahl springt nur dorthin.
-let EPG=null,EPGS=0,EPGQ='',EPGT=store('epgtag')||'',EPGE=false,EPGSEQ=0,EPGPT=null;  // EPGPT: Sprungziel, das noch aussteht
+let EPG=null,EPGS=0,EPGQ='',EPGT=store('epgtag')||'',EPGSEQ=0,EPGPT=null;  // EPGPT: Sprungziel, das noch aussteht
 const BLOCKS=[0,4,8,12,16,20],CELLMAX=10,EPGX=new Set();  // EPGX: aufgeklappte Zellen
 const dkey=t=>{const d=new Date(t*1000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 const wday=t=>new Date(t*1000).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
@@ -25,7 +25,7 @@ async function renderEpg(start,jump){
  <button class="b sec" onclick="renderEpg(0)">Jetzt</button></div>
  <div class="bar tools" style="margin:8px 0 0"><select onchange="EPGT=this.value;store('epgtag',EPGT);fillEpg();toolsState()"><option value="">Alle Sender</option>${tags.map(t=>`<option ${t==EPGT?'selected':''}>${esc(t)}</option>`).join('')}</select>
  <input type="search" id="epgq" placeholder="Im ganzen Programm suchen …" value="${esc(EPGQ)}" oninput="epgTyped(this.value)" onkeydown="if(event.key=='Enter'){clearTimeout(EPGQT);epgSearch(EPGFULL)}" style="flex:1;min-width:160px">
- <label class="chk"><input type="checkbox" ${EPGE?'checked':''} onchange="EPGE=this.checked;fillEpg()"> Sender ohne Programm</label></div>`;
+ <label class="chk" title="Suchbegriff auch in Untertitel und Beschreibung der Sendungen suchen, nicht nur im Titel"><input type="checkbox" ${EPGFULL?'checked':''} onchange="EPGFULL=this.checked;store('epgfull',EPGFULL?'1':'');if(EPGQ.trim().length>=2)epgSearch(EPGFULL)"> Auch in Beschreibungen</label></div>`;
  const keep=$('#epgwrap').scrollTop,keepX=$('#epgwrap').scrollLeft;fillEpg();
  placeEpgNav();toolsState();
  if(target!==null)epgJump(target);else{$('#epgwrap').scrollTop=keep;epgMark()}
@@ -101,7 +101,7 @@ function layoutEpg(){
 function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);
  return i<CELLMAX?0:Math.min(i,all.length-CELLMAX)}
 function fillEpg(){if(EPGQ.trim().length>=2)return epgSearch(EPGFULL);  // Suchtext da: Ergebnisliste statt Zeitschrift
- const chans=EPG.channels.filter(c=>(EPGE||c.epg)&&(!EPGT||c.tags.includes(EPGT)));
+ const chans=EPG.channels.filter(c=>c.epg&&(!EPGT||c.tags.includes(EPGT)));
  const evs=EPG.events,cell={};evs.forEach(e=>{(cell[blockOf(e.start)+'|'+e.channelUuid]??=[]).push(e)});EPGCELLS=cell;
  if(!chans.length||!evs.length){$('#epgwrap').innerHTML='<p class="muted">Keine Sendungen an diesem Tag.</p>';return}
  const rows=BLOCKS.map(h=>{
@@ -156,11 +156,11 @@ async function saveSeries(form){const schema=await formSchema('dvrautorec'),conf
 
 // Suche über das ganze Programm (alle Tage). Sie startet beim Tippen nach einer kurzen Pause (EPG_DELAY ms),
 // Ergebnisse ersetzen die Zeitschrift; Feld leeren oder „Zurück“ zeigt wieder die Zeitschrift.
-const EPG_DELAY=500;let EPGQT=null,EPGFULL=false,EPGRSEQ=0;
+const EPG_DELAY=500;let EPGQT=null,EPGFULL=store('epgfull')=='1',EPGRSEQ=0;
 function epgTyped(v){EPGQ=v;clearTimeout(EPGQT);
- if(!v.trim()){EPGR=null;EPGFULL=false;EPGRSEQ++;fillEpg();epgNow();return}
+ if(!v.trim()){EPGR=null;EPGRSEQ++;fillEpg();epgNow();return}
  if(v.trim().length>=2)EPGQT=setTimeout(()=>epgSearch(EPGFULL),EPG_DELAY)}
-function epgBack(){EPGQ='';EPGR=null;EPGFULL=false;EPGRSEQ++;const i=$('#epgq');if(i)i.value='';fillEpg();epgNow();toolsState()}
+function epgBack(){EPGQ='';EPGR=null;EPGRSEQ++;const i=$('#epgq');if(i)i.value='';fillEpg();epgNow();toolsState()}
 async function epgSearch(full){const q=EPGQ.trim();if(q.length<2)return msg('Bitte mindestens 2 Zeichen eingeben');
  EPGFULL=!!full;const seq=++EPGRSEQ;
  if(!$('#epgwrap .srch'))$('#epgwrap').innerHTML='<p class="muted" style="padding:12px">Suche im ganzen Programm …</p>';  // alte Treffer bis zu den neuen stehen lassen
@@ -169,7 +169,7 @@ async function epgSearch(full){const q=EPGQ.trim();if(q.length<2)return msg('Bit
  const days={};r.events.forEach(e=>(days[dkey(e.start)]??=[]).push(e));
  $('#epgwrap').innerHTML=`<div class="srch"><div class="bar"><button class="b sec" onclick="epgBack()">‹ Zurück zum Programm</button>
   <span class="muted">${r.events.length} Sendungen mit „${esc(q)}“${full?' (auch in Beschreibungen)':''}</span>
-  ${full?'':`<button class="b sec" onclick="epgSearch(true)">Auch in Beschreibungen suchen</button>`}</div>
+</div>
   ${r.events.length?Object.entries(days).map(([d,evs])=>`<h3>${esc(wday(evs[0].start))}</h3><table>${evs.map(e=>`<tr class="hit" onclick="showEvent(${e.eventId})">
    <td style="white-space:nowrap;width:110px"><b>${hm(e.start)}</b>–${hm(e.stop)}</td><td style="width:180px">${esc(e.channelName||'')}</td>
    <td><b>${e.planned?'<span class="dot"></span>':''}${esc(e.title)}</b>${e.subtitle&&e.subtitle!=e.title?`<div class="muted">${esc(e.subtitle.split('\n')[0])}</div>`:''}${e.description?`<div class="muted ds2">${esc(e.description)}</div>`:''}</td></tr>`).join('')}</table>`).join(''):'<p class="muted">Nichts gefunden.</p>'}</div>`}
