@@ -57,10 +57,12 @@ function epgMark(){const w=$('#epgwrap'),th=w&&w.querySelector('thead');if(!th)r
  const top=w.scrollTop+th.offsetHeight+5,h=BLOCKS.filter(b=>$('#blk'+b).offsetTop<=top).pop()??0;
  BLOCKS.forEach(b=>$('#jb'+b)&&($('#jb'+b).className=b==h?'on':''))}
 function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x}
-// Zellen gleichmäßig füllen: Erst ohne Beschreibung zeichnen und messen. Die vollste Zelle der Zeile
-// (mindestens ROW_MIN px) bestimmt die Höhe; den übrigen Platz jeder Zelle bekommen ihre Beschreibungen –
-// bei vielen Sendungen bleibt keiner, bei wenigen werden sie lang, bei viel Platz kommt ein Bild dazu.
-const ROW_MIN=300,LINE_PX=16,IMG_PX=110,MIN_DESC=2,MAX_DESC=40;
+// Zellen füllen: Erst ohne Beschreibung zeichnen und messen. Die vollste Zelle der Zeile (mindestens ROW_MIN px)
+// bestimmt die Höhe. Innerhalb der Zelle steht jede Sendung möglichst an der Stelle ihrer Uhrzeit (die Zeile ist
+// eine Zeitachse über 4 Stunden) – so stehen gleichzeitige Sendungen verschiedener Sender nebeneinander.
+// Den freien Platz bis zur nächsten Sendung bekommt die Beschreibung (lange Sendungen also mehr), bei viel Platz ein Bild.
+const ROW_MIN=300,LINE_PX=16,IMG_PX=110,MIN_DESC=2,MAX_DESC=40,EV_GAP=7;
+const blockAt=h=>{const d=new Date(EPGS*1000);d.setHours(h,0,0,0);return d.getTime()/1000};
 function evHtml(e){
  return `<div class="ev${e.planned?' pl':''}" data-s="${e.start}" data-e="${e.stop}" onclick="showEvent(${e.eventId})">
   ${e.poster?`<img class="poster" src="${esc(e.poster.thumb)}" alt="" loading="lazy" hidden onerror="this.remove()">`:''}
@@ -68,13 +70,26 @@ function evHtml(e){
   ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}${e.description?`<div class="ds" hidden>${esc(e.description)}</div>`:''}</div>`}
 function layoutEpg(){
  for(const tr of document.querySelectorAll('table.epg tbody tr')){
+  const h=+tr.id.slice(3),B=blockAt(h),E=blockAt(h+4);
   const cells=[...tr.querySelectorAll('td > .cell')],base=cells.map(c=>c.offsetHeight);
   const H=Math.max(ROW_MIN,...base);
-  cells.forEach((c,i)=>{const ds=[...c.querySelectorAll('.ds')];if(!ds.length)return;
-   let lines=Math.min(MAX_DESC,Math.floor((H-base[i])/LINE_PX/ds.length));
-   ds.forEach(d=>{let n=lines;const img=d.parentNode.querySelector('.poster');
+  cells.forEach((c,i)=>{const evs=[...c.querySelectorAll(':scope > .ev')];if(!evs.length)return;
+   const first=c.querySelector(':scope > .more.first'),more=c.querySelector(':scope > .more:not(.first)');
+   const top0=first?first.offsetHeight+EV_GAP:0,bottom=H-(more?more.offsetHeight+EV_GAP:0);
+   const y=t=>top0+(Math.min(Math.max(t,B),E)-B)/(E-B)*(bottom-top0);  // Uhrzeit → Höhe in der Zelle
+   // 1. Beschreibungen: Platz bis zur Uhrzeit der nächsten Sendung, zusammen höchstens der freie Platz der Zelle
+   const free=evs.map((ev,j)=>Math.max(0,(j+1<evs.length?y(+evs[j+1].dataset.s):bottom)-y(+ev.dataset.s)-ev.offsetHeight-EV_GAP));
+   const sum=free.reduce((a,b)=>a+b,0),k=sum>0?Math.min(1,(H-base[i])/sum):0;
+   evs.forEach((ev,j)=>{const d=ev.querySelector('.ds');if(!d)return;
+    let n=Math.min(MAX_DESC,Math.floor(free[j]*k/LINE_PX));const img=ev.querySelector('.poster');
     if(img&&n*LINE_PX>=IMG_PX+4*LINE_PX){img.hidden=false;n-=Math.ceil(IMG_PX/LINE_PX)}
-    if(n>=MIN_DESC){d.hidden=false;d.style.webkitLineClamp=n}})})}}
+    if(n>=MIN_DESC){d.hidden=false;d.style.webkitLineClamp=n}});
+   // 2. Verschieben: jede Sendung nach unten bis zu ihrer Uhrzeit, aber nie über das Zellenende hinaus
+   const ct=c.getBoundingClientRect().top,tops=evs.map(ev=>ev.getBoundingClientRect().top-ct);
+   const room=bottom-(evs[evs.length-1].getBoundingClientRect().bottom-ct);if(room<=1)return;
+   const S=[];evs.forEach((ev,j)=>S[j]=Math.max(j?S[j-1]:0,y(+ev.dataset.s)-tops[j]));
+   for(let j=evs.length-1;j>=0;j--)S[j]=Math.max(0,Math.min(S[j],room,j+1<evs.length?S[j+1]:room));
+   evs.forEach((ev,j)=>{const dlt=S[j]-(j?S[j-1]:0);if(dlt>=1)ev.style.marginTop=(parseFloat(getComputedStyle(ev).marginTop)+dlt)+'px'})})}}
 // Volle Zelle: CELLMAX Sendungen zeigen, aber die laufende muss dabei sein – davor liegende
 // verschwinden dann oben unter „+ n frühere“, spätere wie bisher unten unter „+ n weitere“.
 function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);
