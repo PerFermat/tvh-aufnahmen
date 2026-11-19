@@ -66,7 +66,8 @@ def main():
     if cfg.get('tvhconf'):
         cfg['tvhconf'] = os.path.abspath(os.path.expanduser(cfg['tvhconf']))
     app = App(a.config, cfg, a.tvh_service)
-    app.posters = Posters(os.path.expanduser('~/.cache/tvh-aufnahmen/posters.json'))
+    app.posters = Posters(os.path.expanduser('~/.cache/tvh-aufnahmen/posters.json'),
+                          client_id=lambda: app.cfg.get('trakt_id'))
     app.archive = EpgArchive()
     app.teletext = TeletextService(lambda: app.tvh)
     app.jobs = Jobs(app)

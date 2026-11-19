@@ -11,7 +11,8 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  <div class="wide muted">Gespeichert in ${esc(c.config_file)}</div>
  <div class="wide"><button class="b">Verbindung prüfen und speichern</button></div></form>
  <div id="qualitycfg"></div>
- <div id="notifycfg"></div>`;renderQuality();renderNotify()}
+ <div id="notifycfg"></div>
+ <div id="traktcfg"></div>`;renderQuality();renderNotify();renderTrakt(c)}
 // Qualität beim Abspielen – gilt nur für dieses Gerät (Handy z. B. „Mobil“, PC „Home“)
 async function renderQuality(){const q=await qualities();if(cur!='config'||!$('#qualitycfg'))return;
  if(q.length<2){$('#qualitycfg').innerHTML='';return}
@@ -37,5 +38,16 @@ async function saveNotify(f){const j=await api('/api/jobs').catch(()=>null);
  try{await api('/api/jobs',{autobackup:j?j.autobackup:{},notify:{url:f.url.value,done:f.done.checked,failed:f.failed.checked,disk:f.disk.checked}});msg('Benachrichtigungen gespeichert',true)}catch(e){msg(e.message)}}
 async function testNotify(f){if(!f.url.value.trim())return msg('Bitte zuerst die ntfy-Adresse eintragen');
  try{const r=await api('/api/notify-test',{url:f.url.value});msg(r.sent?'Testnachricht gesendet – sie sollte gleich auf dem Handy erscheinen':'Nicht gesendet',r.sent)}catch(e){msg(e.message)}}
+// Bilder von Trakt: Filme und Serien, die Wikipedia und TVmaze nicht kennen
+function renderTrakt(c){$('#traktcfg').innerHTML=`<h3>Bilder von Trakt</h3>
+ <p class="muted">Für Filme (und Serien), zu denen Wikipedia und TVmaze kein Bild haben. Dafür braucht es eine kostenlose „Client ID“:
+ bei <a href="https://trakt.tv" target="_blank" rel="noopener">trakt.tv</a> anmelden, unter
+ <a href="https://trakt.tv/oauth/applications/new" target="_blank" rel="noopener">Applications → New Application</a> als Name z. B. <code>tvh-aufnahmen</code>
+ und als Redirect URI <code>urn:ietf:wg:oauth:2.0:oob</code> eintragen, speichern – dann die angezeigte <b>Client ID</b> hier einfügen (das „Client Secret“ wird nicht gebraucht).</p>
+ <form class="ed" onsubmit="event.preventDefault();saveTrakt(this)">
+  <label class="wide">Client ID<input name="id" autocomplete="off" spellcheck="false" placeholder="${c.has_trakt?'gespeichert – leer lassen = unverändert':''}"></label>
+  <div class="wide bar" style="margin:0"><button class="b">Prüfen und speichern</button>${c.has_trakt?'<button type="button" class="b sec" onclick="saveTrakt(null)">Entfernen</button>':''}</div></form>`}
+async function saveTrakt(f){if(f&&!f.id.value.trim())return msg('Bitte die Client ID einfügen');
+ try{const c=await api('/api/trakt',f?{id:f.id.value}:{clear:true});renderTrakt(c);msg(f?'Trakt-Client-ID gespeichert – Bilder werden nach und nach nachgeladen':'Trakt-Client-ID entfernt',true)}catch(e){msg(e.message)}}
 async function saveConfig(form){const f=Object.fromEntries(new FormData(form));f.clear_password=!!f.clear_password;
  try{await api('/api/config',f);msg('Einstellungen gespeichert',true);await load();if(S)tab('live')}catch(e){msg(e.message)}}

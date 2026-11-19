@@ -6,7 +6,9 @@ Sekunde, weil Wikipedia sonst mit HTTP 429 abblockt – und das Ergebnis dauerha
 zwischengespeichert, auch „kein Bild gefunden“.
 
 Findet die Wikipedia nichts oder nur ein Wikidata-Bild (meist ein Logo), wird bei TVmaze nach einer
-Serie gesucht (freie API ohne Schlüssel, Daten unter CC BY-SA, Rücklink zur Serie im Detailfenster)."""
+Serie gesucht (freie API ohne Schlüssel, Daten unter CC BY-SA, Rücklink zur Serie im Detailfenster).
+Hilft auch das nicht und ist unter „Einstellungen“ eine Trakt-Client-ID eingetragen, wird bei Trakt
+nach einem Film oder einer Serie gesucht."""
 import json
 import os
 import re
@@ -97,23 +99,36 @@ def wiki_lookup(title, year=None):
             'src': img.get('src', 'wikipedia')}
 
 
-def tvmaze_lookup(title, year=None):
-    """Plakat einer gleichnamigen Serie bei TVmaze oder None. Folgennummern („(S01/E03)“) fallen weg;
-    ohne Treffer wird mit dem Teil vor „ - “ bzw. „: “ gesucht – dort hängt im EPG oft der Folgentitel."""
+def search_titles(title):
+    """Suchtitel für TVmaze und Trakt: Folgennummern („(S01/E03)“) fallen weg; als zweiter Versuch
+    der Teil vor „ - “ bzw. „: “ – dort hängt im EPG oft der Folgentitel."""
     name = re.sub(r'\s*\([^)]*\)\s*$', '', re.sub(r'\s*\(S\d+\s*/\s*E\d+\)', '', title)).strip()
     tries = [name]
     short = re.split(r' - |: ', name, maxsplit=1)[0].strip()
     if short != name and len(short) >= 3:
         tries.append(short)
-    for i, q in enumerate(tries):
+    return tries
+
+
+def same_title(a, b):
+    return norm(a).replace(' ', '') == norm(b).replace(' ', '')  # „Christies“ = „Christie's“
+
+
+def is_logo(poster):
+    """Kein Bild oder nur das Wikidata-Bild (meist ein Logo) – dann lohnt eine weitere Quelle."""
+    return not poster or poster.get('src') == 'wikidata' or 'Special:FilePath' in poster.get('thumb', '')
+
+
+def tvmaze_lookup(title, year=None):
+    """Plakat einer gleichnamigen Serie bei TVmaze oder None."""
+    for i, q in enumerate(search_titles(title)):
         if i:
             time.sleep(1)
         req = urllib.request.Request('https://api.tvmaze.com/search/shows?' + urllib.parse.urlencode({'q': q}),
                                      headers={'User-Agent': USER_AGENT})
         with urllib.request.urlopen(req, timeout=15) as r:
             res = json.load(r)
-        same = lambda n: norm(n).replace(' ', '') == norm(q).replace(' ', '')  # „Christies“ = „Christie's“
-        shows = [x for x in res if same(x['show'].get('name')) and (x['show'].get('image') or {}).get('medium')]
+        shows = [x for x in res if same_title(x['show'].get('name'), q) and (x['show'].get('image') or {}).get('medium')]
         if year:  # Serie, die zum Jahr der Sendung schon lief, zuerst
             shows.sort(key=lambda x: (x['show'].get('premiered') or '9999')[:4] > year)
         if shows:
@@ -125,11 +140,56 @@ def tvmaze_lookup(title, year=None):
     return None
 
 
+class TraktKeyError(Exception):
+    pass
+
+
+def trakt_lookup(client_id, title, year=None):
+    """Plakat eines gleichnamigen Films oder einer Serie bei Trakt oder None. Bei Filmen mit
+    bekanntem Jahr muss es auf ±1 passen. TraktKeyError bei ungültiger Client-ID."""
+    for i, q in enumerate(search_titles(title)):
+        if i:
+            time.sleep(1)
+        req = urllib.request.Request('https://api.trakt.tv/search/movie,show?' + urllib.parse.urlencode(
+            {'query': q, 'extended': 'images', 'limit': 10}), headers={
+            'User-Agent': USER_AGENT, 'Content-Type': 'application/json',
+            'trakt-api-version': '2', 'trakt-api-key': client_id})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                res = json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                raise TraktKeyError('Trakt-Client-ID ungültig') from None
+            raise
+        hits = []
+        for x in res:
+            kind = x.get('type')
+            item = x.get(kind) or {}
+            posters = (item.get('images') or {}).get('poster') or []
+            if kind not in ('movie', 'show') or not posters or not same_title(item.get('title'), q):
+                continue
+            y = item.get('year')
+            if year and kind == 'movie' and y and abs(int(year) - y) > 1:
+                continue
+            hits.append((kind, item, posters[0]))
+        if year:  # passendes Jahr zuerst
+            hits.sort(key=lambda h: abs(int(year) - (h[1].get('year') or 0)) > 1)
+        if hits:
+            kind, item, img = hits[0]
+            img = img if img.startswith('http') else 'https://' + img
+            slug = (item.get('ids') or {}).get('slug') or ''
+            return {'thumb': img.replace('/medium/', '/thumb/'), 'image': img,
+                    'page': 'https://trakt.tv/%s/%s' % (kind + 's', slug),
+                    'caption': item.get('title', q) + (' (%s)' % item['year'] if item.get('year') else '')
+                    + (' – Film' if kind == 'movie' else ' – Serie'), 'src': 'trakt'}
+    return None
+
+
 def still_valid(entry):
     p, old = entry.get('poster'), entry.get('v', 1) < CACHE_VERSION
     if not p:
         return not old  # „nichts gefunden“ aus einer älteren Suche: neu versuchen
-    if p.get('src') == 'tvmaze':
+    if p.get('src') in ('tvmaze', 'trakt'):
         return True
     if 'Special:FilePath' in p.get('thumb', ''):
         return not old  # Wikidata-Bild (meist ein Logo) aus einer Suche ohne TVmaze
@@ -137,8 +197,10 @@ def still_valid(entry):
 
 
 class Posters:
-    def __init__(self, path):
+    def __init__(self, path, client_id=lambda: None):
         self.path = path
+        self.client_id = client_id  # Trakt-Client-ID aus den Einstellungen (oder None)
+        self.trakt_bad = None       # zuletzt abgelehnte ID – nicht bei jedem Titel neu probieren
         self.lock = threading.Lock()
         self.queue = []
         self.wake = threading.Event()
@@ -159,6 +221,9 @@ class Posters:
         title = key
         with self.lock:
             hit = self.cache.get(title)
+            cid = self.client_id()
+            if hit and is_logo(hit.get('poster')) and cid and cid != self.trakt_bad and not hit.get('trakt'):
+                hit = None  # Trakt neu eingetragen – auch dort suchen
             if hit and (hit.get('poster') or time.time() - hit.get('ts', 0) < RETRY_NONE):
                 return hit.get('poster')
             if urgent and title in self.queue:
@@ -180,9 +245,17 @@ class Posters:
             try:
                 name, _, year = title.partition('|')
                 poster = wiki_lookup(name, year or None)
-                if not poster or poster.get('src') == 'wikidata':
+                if is_logo(poster):
                     time.sleep(1)
                     poster = tvmaze_lookup(name, year or None) or poster
+                cid, trakt = self.client_id(), False
+                if is_logo(poster) and cid and cid != self.trakt_bad:
+                    time.sleep(1)
+                    try:
+                        poster = trakt_lookup(cid, name, year or None) or poster
+                        trakt = True
+                    except TraktKeyError:
+                        self.trakt_bad = cid
             except urllib.error.HTTPError as e:
                 with self.lock:
                     self.queue.append(title)  # später noch einmal
@@ -193,7 +266,7 @@ class Posters:
                 time.sleep(10)  # kein Internet o. Ä. – Titel bleibt ungeklärt und wird beim nächsten Abruf neu angefragt
                 continue
             with self.lock:
-                self.cache[title] = {'poster': poster, 'ts': int(time.time()), 'v': CACHE_VERSION}
+                self.cache[title] = {'poster': poster, 'ts': int(time.time()), 'v': CACHE_VERSION, 'trakt': trakt}
                 self.save()
             time.sleep(1)
 

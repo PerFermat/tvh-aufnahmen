@@ -3,6 +3,7 @@ import json
 import os
 import re
 
+from .posters import TraktKeyError, trakt_lookup
 from .tvh import Tvh
 
 
@@ -19,6 +20,7 @@ class App:
     def public(self):
         c = {k: self.cfg.get(k) or '' for k in self.KEYS if k != 'password'}
         c['has_password'] = bool(self.cfg.get('password'))
+        c['has_trakt'] = bool(self.cfg.get('trakt_id'))
         c['config_file'] = self.path
         return c
 
@@ -42,6 +44,26 @@ class App:
         tvh.call('serverinfo')  # Verbindung und Login prüfen, bevor gespeichert wird
         self.cfg, self.tvh = new, tvh
         save_config(self.path, new)
+        return self.public()
+
+    def set_trakt(self, client_id='', clear=False):
+        """Trakt-Client-ID für die Bildersuche prüfen und speichern (wie das Passwort nie ausgeliefert)."""
+        new = dict(self.cfg)
+        if clear:
+            new.pop('trakt_id', None)
+        else:
+            client_id = (client_id or '').strip()
+            if not re.fullmatch(r'[A-Za-z0-9_-]{20,128}', client_id):
+                raise ValueError('Das sieht nicht wie eine Client ID aus (lange Zeichenfolge aus Ziffern und Buchstaben)')
+            try:
+                trakt_lookup(client_id, 'Titanic')
+            except TraktKeyError:
+                raise ValueError('Trakt lehnt diese Client ID ab') from None
+            except OSError as e:
+                raise ValueError('Trakt nicht erreichbar: %s' % e) from None
+            new['trakt_id'] = client_id
+        save_config(self.path, new)
+        self.cfg = new
         return self.public()
 
     @property

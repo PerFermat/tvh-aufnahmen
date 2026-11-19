@@ -268,6 +268,8 @@ def make_handler(app):
                 self.run(lambda: do_move(app.tvh, req['moves']))
             elif self.path == '/api/config':
                 self.run(lambda: app.update(req))
+            elif self.path == '/api/trakt':
+                self.run(lambda: app.set_trakt(req.get('id'), bool(req.get('clear'))))
             elif self.path == '/api/posters':
                 self.run(lambda: poster_status(app.posters, req.get('keys') or [], bool(req.get('urgent'))))
             elif self.path == '/api/scan-start':
