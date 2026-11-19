@@ -13,7 +13,7 @@ from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_fo
                   upcoming_cancel)
 from .files import file_exists
 from .live import channel_icon, channel_playlist, live_channels, qualities
-from .player import live_source, recording_source, stream as player_stream
+from .player import live_source, recording_source, stream as player_stream, subtitles
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
 from .status import status
 from .scan import scan_add, scan_delete, scan_result, scan_start, scan_status
@@ -230,10 +230,13 @@ def make_handler(app):
                 self.run(lambda: app.teletext.page(q.get('ch'), int(q.get('p') or 100),
                                                    int(q['s']) if q.get('s') not in (None, '') else None))
             elif url.path == '/api/play-live':
-                self.run(lambda: player_stream(self, *live_source(app.tvh, q.get('uuid')), q.get('q', 'pass')))
+                self.run(lambda: player_stream(self, *live_source(app.tvh, q.get('uuid')), q.get('q', 'pass'),
+                                               0, q.get('sid')))
             elif url.path == '/api/play-rec':
                 self.run(lambda: player_stream(self, *recording_source(app.tvh, q.get('uuid')), q.get('q', 'pass'),
-                                               int(float(q.get('t') or 0))))
+                                               int(float(q.get('t') or 0)), q.get('sid')))
+            elif url.path == '/api/subs':
+                self.run(lambda: subtitles(q.get('sid')))
             elif url.path == '/api/scan-status':
                 self.run(lambda: scan_status(app.tvh))
             elif url.path == '/api/scan-result':
