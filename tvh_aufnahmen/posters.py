@@ -3,7 +3,10 @@ Das EPG liefert keine Bilder. Gesucht wird der passende Artikel in der deutschen
 hat er kein Bild – Filmplakate sind dort aus Urheberrechtsgründen nicht erlaubt –, wird über
 den Sprachlink das Bild des englischen Artikels genommen, dort gibt es meist das Plakat. Gesucht wird im Hintergrund – höchstens eine Anfrage pro
 Sekunde, weil Wikipedia sonst mit HTTP 429 abblockt – und das Ergebnis dauerhaft
-zwischengespeichert, auch „kein Bild gefunden“."""
+zwischengespeichert, auch „kein Bild gefunden“.
+
+Findet die Wikipedia nichts oder nur ein Wikidata-Bild (meist ein Logo), wird bei TVmaze nach einer
+Serie gesucht (freie API ohne Schlüssel, Daten unter CC BY-SA, Rücklink zur Serie im Detailfenster)."""
 import json
 import os
 import re
@@ -15,7 +18,7 @@ import urllib.request
 
 MIN_DURATION = 80 * 60  # in der Programmübersicht nur für lange Sendungen
 DE, EN = 'de.wikipedia.org', 'en.wikipedia.org'
-CACHE_VERSION = 3  # 2: Plakat aus der englischen Wikipedia, 3: Wikidata, Jahr, breitere Prüfung
+CACHE_VERSION = 4  # 2: Plakat aus der englischen Wikipedia, 3: Wikidata, Jahr, breitere Prüfung, 4: TVmaze
 USER_AGENT = 'tvh-aufnahmen/1.0 (https://github.com/PerFermat/tvh-aufnahmen)'  # Wikimedia verlangt Kontakt
 # Art der Sendung in der Kurzbeschreibung des Artikels („Filmdrama von …“, „deutsche Kochsendung“).
 # „Fernsehsender“ zählt nicht, Personen („Filmschauspieler“, „Regisseur“), Spiele, Bücher, Musik o. Ä. auch nicht.
@@ -59,7 +62,7 @@ def wikidata_image(item):
             name = ((c.get('mainsnak') or {}).get('datavalue') or {}).get('value')
             if isinstance(name, str):
                 url = 'https://commons.wikimedia.org/wiki/Special:FilePath/' + urllib.parse.quote(name.replace(' ', '_'))
-                return {'thumbnail': {'source': url + '?width=400'}, 'original': {'source': url}}
+                return {'thumbnail': {'source': url + '?width=400'}, 'original': {'source': url}, 'src': 'wikidata'}
     return {}
 
 
@@ -90,13 +93,47 @@ def wiki_lookup(title, year=None):
         return None
     return {'thumb': img['thumbnail']['source'], 'image': (img.get('original') or img['thumbnail'])['source'],
             'page': 'https://de.wikipedia.org/wiki/' + urllib.parse.quote(page['title'].replace(' ', '_')),
-            'caption': page['title'] + (' – ' + page['description'] if page.get('description') else '')}
+            'caption': page['title'] + (' – ' + page['description'] if page.get('description') else ''),
+            'src': img.get('src', 'wikipedia')}
+
+
+def tvmaze_lookup(title, year=None):
+    """Plakat einer gleichnamigen Serie bei TVmaze oder None. Folgennummern („(S01/E03)“) fallen weg;
+    ohne Treffer wird mit dem Teil vor „ - “ bzw. „: “ gesucht – dort hängt im EPG oft der Folgentitel."""
+    name = re.sub(r'\s*\([^)]*\)\s*$', '', re.sub(r'\s*\(S\d+\s*/\s*E\d+\)', '', title)).strip()
+    tries = [name]
+    short = re.split(r' - |: ', name, maxsplit=1)[0].strip()
+    if short != name and len(short) >= 3:
+        tries.append(short)
+    for i, q in enumerate(tries):
+        if i:
+            time.sleep(1)
+        req = urllib.request.Request('https://api.tvmaze.com/search/shows?' + urllib.parse.urlencode({'q': q}),
+                                     headers={'User-Agent': USER_AGENT})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            res = json.load(r)
+        same = lambda n: norm(n).replace(' ', '') == norm(q).replace(' ', '')  # „Christies“ = „Christie's“
+        shows = [x for x in res if same(x['show'].get('name')) and (x['show'].get('image') or {}).get('medium')]
+        if year:  # Serie, die zum Jahr der Sendung schon lief, zuerst
+            shows.sort(key=lambda x: (x['show'].get('premiered') or '9999')[:4] > year)
+        if shows:
+            show = shows[0]['show']
+            start = (show.get('premiered') or '')[:4]
+            return {'thumb': show['image']['medium'], 'image': show['image'].get('original') or show['image']['medium'],
+                    'page': show['url'], 'caption': show['name'] + (' (%s)' % start if start else '') + ' – Serie',
+                    'src': 'tvmaze'}
+    return None
 
 
 def still_valid(entry):
-    if entry.get('poster'):
-        return is_programme(entry['poster'].get('caption', '').split(' – ', 1)[-1])
-    return entry.get('v', 1) >= CACHE_VERSION
+    p, old = entry.get('poster'), entry.get('v', 1) < CACHE_VERSION
+    if not p:
+        return not old  # „nichts gefunden“ aus einer älteren Suche: neu versuchen
+    if p.get('src') == 'tvmaze':
+        return True
+    if 'Special:FilePath' in p.get('thumb', ''):
+        return not old  # Wikidata-Bild (meist ein Logo) aus einer Suche ohne TVmaze
+    return is_programme(p.get('caption', '').split(' – ', 1)[-1])
 
 
 class Posters:
@@ -143,6 +180,9 @@ class Posters:
             try:
                 name, _, year = title.partition('|')
                 poster = wiki_lookup(name, year or None)
+                if not poster or poster.get('src') == 'wikidata':
+                    time.sleep(1)
+                    poster = tvmaze_lookup(name, year or None) or poster
             except urllib.error.HTTPError as e:
                 with self.lock:
                     self.queue.append(title)  # später noch einmal

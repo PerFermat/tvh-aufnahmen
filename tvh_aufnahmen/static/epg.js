@@ -142,7 +142,7 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
   ${idnodeForm(schema,{name:e.title,title:'^'+e.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$',channel:e.channelUuid,weekdays:[wdv]})}
   <div class="bar" style="margin-top:12px"><button class="b">Serienaufnahme anlegen</button></div></form>`)}
 let EVENT=null;
-const posterFig=p=>`<figure class="wp"><a href="${esc(p.page)}" target="_blank" rel="noopener"><img src="${esc(p.thumb)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">Bild: <a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.caption)}</a> (Wikipedia)</figcaption></figure>`;
+const posterFig=p=>`<figure class="wp"><a href="${esc(p.page)}" target="_blank" rel="noopener"><img src="${esc(p.thumb)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">Bild: <a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.caption)}</a> (${p.src=='tvmaze'?'TVmaze':p.src=='wikidata'||String(p.thumb).includes('Special:FilePath')?'Wikidata':'Wikipedia'})</figcaption></figure>`;
 // Bild für die geöffnete Sendung: Der Server sucht es vorrangig, hier nachfragen, bis es da ist (max. 1 Minute)
 async function eventPoster(e,tries=0){if(EVENT!==e||!$('#dlg').open)return;
  let res;try{res=await api('/api/posters',{keys:[e.poster_key],urgent:true})}catch(err){return}
