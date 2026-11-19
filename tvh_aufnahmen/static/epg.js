@@ -156,7 +156,7 @@ async function saveSeries(form){const schema=await formSchema('dvrautorec'),conf
 
 // Suche über das ganze Programm (alle Tage). Sie startet beim Tippen nach einer kurzen Pause (EPG_DELAY ms),
 // Ergebnisse ersetzen die Zeitschrift; Feld leeren oder „Zurück“ zeigt wieder die Zeitschrift.
-const EPG_DELAY=400;let EPGQT=null,EPGFULL=false,EPGRSEQ=0;
+const EPG_DELAY=500;let EPGQT=null,EPGFULL=false,EPGRSEQ=0;
 function epgTyped(v){EPGQ=v;clearTimeout(EPGQT);
  if(!v.trim()){EPGR=null;EPGFULL=false;EPGRSEQ++;fillEpg();epgNow();return}
  if(v.trim().length>=2)EPGQT=setTimeout(()=>epgSearch(EPGFULL),EPG_DELAY)}
@@ -165,7 +165,8 @@ async function epgSearch(full){const q=EPGQ.trim();if(q.length<2)return msg('Bit
  EPGFULL=!!full;const seq=++EPGRSEQ;
  if(!$('#epgwrap .srch'))$('#epgwrap').innerHTML='<p class="muted" style="padding:12px">Suche im ganzen Programm …</p>';  // alte Treffer bis zu den neuen stehen lassen
  let r;try{r=await api('/api/epg-search?q='+encodeURIComponent(q)+(full?'&full=1':''))}catch(e){if(seq===EPGRSEQ)msg(e.message);return}
- if(cur!='epg'||seq!==EPGRSEQ)return;EPGR=r;  // inzwischen weitergetippt – veraltetes Ergebnis verwerfenconst days={};r.events.forEach(e=>(days[dkey(e.start)]??=[]).push(e));
+ if(cur!='epg'||seq!==EPGRSEQ)return;EPGR=r;  // inzwischen weitergetippt – veraltetes Ergebnis verwerfen
+ const days={};r.events.forEach(e=>(days[dkey(e.start)]??=[]).push(e));
  $('#epgwrap').innerHTML=`<div class="srch"><div class="bar"><button class="b sec" onclick="epgBack()">‹ Zurück zum Programm</button>
   <span class="muted">${r.events.length} Sendungen mit „${esc(q)}“${full?' (auch in Beschreibungen)':''}</span>
   ${full?'':`<button class="b sec" onclick="epgSearch(true)">Auch in Beschreibungen suchen</button>`}</div>
