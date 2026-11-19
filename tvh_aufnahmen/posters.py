@@ -178,7 +178,8 @@ def trakt_lookup(client_id, title, year=None):
             kind, item, img = hits[0]
             img = img if img.startswith('http') else 'https://' + img
             slug = (item.get('ids') or {}).get('slug') or ''
-            return {'thumb': img.replace('/medium/', '/thumb/'), 'image': img,
+            # media.trakt.tv/…/medium/poster.webp – Größen: thumb (klein), medium (600×900), full (1000×1500)
+            return {'thumb': img.replace('/medium/', '/thumb/'), 'image': img.replace('/medium/', '/full/'),
                     'page': 'https://trakt.tv/%s/%s' % (kind + 's', slug),
                     'caption': item.get('title', q) + (' (%s)' % item['year'] if item.get('year') else '')
                     + (' – Film' if kind == 'movie' else ' – Serie'), 'src': 'trakt'}
