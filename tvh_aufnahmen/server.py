@@ -24,6 +24,7 @@ from .thumbs import thumbnail
 from .transfer import export_all, plan_import
 from .tvh import entry_info
 
+OPEN_PATHS = {'/api/login', '/api/logout', '/api/me'}  # ohne Anmeldung erreichbar
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
                 '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml',
@@ -122,9 +123,11 @@ def make_handler(app):
                 raise ValueError(_('srv.file_not_found'))
             title = ' '.join((info.get('disp_title') or 'Aufnahme').split())
             dur = max(0, (info.get('stop') or 0) - (info.get('start') or 0))
-            host = self.headers.get('Host') or '%s:%d' % self.server.server_address[:2]
-            body = ('#EXTM3U\n#EXTINF:%d,%s\nhttp://%s/api/download?uuid=%s\n'
-                    % (dur, title, host, urllib.parse.quote(uuid))).encode()
+            host = self.headers.get('X-Forwarded-Host') or self.headers.get('Host') or '%s:%d' % self.server.server_address[:2]
+            scheme = 'https' if (self.headers.get('X-Forwarded-Proto') or '').lower() == 'https' else 'http'
+            # VLC schickt kein Anmelde-Cookie mit – der Link ist deshalb signiert und gilt einige Stunden
+            link = app.auth.sign('/api/download?uuid=%s' % urllib.parse.quote(uuid))
+            body = ('#EXTM3U\n#EXTINF:%d,%s\n%s://%s%s\n' % (dur, title, scheme, host, link)).encode()
             self.send_m3u(title, body)
 
         def channel_playlist(self, uuid, profile=None):
@@ -188,10 +191,34 @@ def make_handler(app):
             except (BrokenPipeError, ConnectionResetError):
                 pass  # Download im Browser abgebrochen
 
+        def gate(self, path, q=None):
+            """Zugriffskontrolle (siehe auth.py): Oberfläche, Texte und Anmelden sind frei, die Daten unter /api
+            nur mit Anmeldung (bzw. im Heimnetz). Downloads dürfen auch über einen signierten Link kommen (VLC).
+            Gibt True zurück, wenn die Anfrage weiter darf, sonst ist die Antwort schon gesendet."""
+            if not path.startswith('/api/') or path in OPEN_PATHS:
+                return True
+            ok, why = app.auth.allowed(self)
+            if ok or (path == '/api/download' and q and
+                      app.auth.verify('/api/download?uuid=%s' % q.get('uuid', ''), q.get('exp'), q.get('sig'))):
+                return True
+            self.send(401, {'error': why, 'login': True})
+            return False
+
+        def send_cookie(self, body, cookie):
+            data = json.dumps(body).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Set-Cookie', cookie)
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self):
             url = urllib.parse.urlsplit(self.path)
             q = dict(urllib.parse.parse_qsl(url.query))
             code = self.lang()
+            if not self.gate(url.path, q):
+                return
             if url.path == '/':
                 url = url._replace(path='/static/index.html')
             if url.path == '/lang.js':  # Texte der Oberfläche, vor allen anderen Skripten geladen
@@ -204,6 +231,10 @@ def make_handler(app):
                 self.wfile.write(data)
             elif url.path.startswith('/static/'):
                 self.static(url.path[len('/static/'):])
+            elif url.path == '/api/me':
+                self.run(lambda: app.auth.info(self, full=False))
+            elif url.path == '/api/users':
+                self.run(lambda: app.auth.info(self))
             elif url.path == '/api/state':
                 self.run(lambda: build_state(app.tvh, app.recdir))
             elif url.path == '/api/config':
@@ -266,6 +297,14 @@ def make_handler(app):
             self.lang()
             length = int(self.headers.get('Content-Length') or 0)
             url = urllib.parse.urlsplit(self.path)
+            # Nur von der eigenen Oberfläche: kommt die Anfrage von einer fremden Seite (Origin), ablehnen
+            origin = self.headers.get('Origin')
+            if origin and urllib.parse.urlsplit(origin).netloc != (self.headers.get('X-Forwarded-Host') or self.headers.get('Host')):
+                self.close_connection = True
+                return self.send(403, {'error': _('srv.bad_origin')})
+            if not self.gate(url.path):
+                self.close_connection = True  # Upload nicht gelesen
+                return
             if url.path == '/api/upload':  # Rohdaten der Datei, kein JSON
                 q = dict(urllib.parse.parse_qsl(url.query))
                 self.run(lambda: replace_file(app.tvh, q['uuid'], q.get('name', ''), length, self.rfile))
@@ -275,7 +314,17 @@ def make_handler(app):
                 self.run(lambda: restore(app, length, self.rfile, force=q.get('force') == '1'))
                 return
             req = json.loads(self.rfile.read(length) or b'{}')
-            if self.path == '/api/edit':
+            if self.path == '/api/login':
+                try:
+                    cookie = app.auth.login(self, req.get('user'), req.get('password'))
+                except ValueError as e:
+                    return self.send(401, {'error': str(e)})
+                self.send_cookie({'ok': True}, cookie)
+            elif self.path == '/api/logout':
+                self.send_cookie({'ok': True}, app.auth.logout(self))
+            elif self.path == '/api/users':
+                self.run(lambda: app.auth.manage(self, req))
+            elif self.path == '/api/edit':
                 self.run(lambda: do_edit(app.tvh, app.cfg.get('lang') or 'ger', req))
             elif self.path == '/api/remove':
                 self.run(lambda: do_remove(app.tvh, req['uuids']))

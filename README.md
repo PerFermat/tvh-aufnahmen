@@ -115,6 +115,26 @@ Oberfläche und Meldungen gibt es auf **Deutsch** und **Englisch**. Die Sprache 
 
 Die Texte liegen je Sprache in einer JSON-Datei unter `tvh_aufnahmen/lang/` (`de.json`, `en.json`) – Schlüssel und Text, Platzhalter in geschweiften Klammern (`"rec.count": "{n} von {total} Aufnahmen"`). `_name` ist der Name der Sprache, `_locale` das Format für Datum und Zahlen. Für eine weitere Sprache `de.json` kopieren, z. B. als `fr.json`, und die Texte übersetzen; nach einem Neustart steht sie zur Auswahl. Fehlt ein Text, gilt der deutsche.
 
+## Anmeldung (Zugriff von außen)
+
+Unter „Einstellungen“ → „Anmeldung“ legt man Benutzer an (Name und Passwort, mindestens 8 Zeichen) und wählt, wann eine Anmeldung nötig ist:
+
+- **nur von außen** (Standard): Geräte im Heimnetz kommen ohne Anmeldung herein – private IPv4-Adressen (auch über das VPN der Fritzbox), IPv6-ULA- und Link-Local-Adressen sowie das IPv6-Netz dieses Rechners. Alle anderen müssen sich anmelden. Solange es keinen Benutzer gibt, kommt von außen niemand herein.
+- **immer**: auch im Heimnetz (umstellen geht nur angemeldet, damit man sich nicht aussperrt).
+- **nie**: ohne jede Anmeldung – nur fürs Heimnetz.
+
+Passwörter werden mit scrypt gespeichert, Sitzungen über ein Cookie (HttpOnly, SameSite=Lax, bei HTTPS Secure) und gelten 30 Tage. Nach 5 Fehlversuchen ist eine Adresse 15 Minuten gesperrt. Anfragen von fremden Seiten (Origin) werden abgelehnt. Die m3u-Dateien für den externen Player enthalten signierte Links, die 12 Stunden gelten, weil VLC kein Anmelde-Cookie mitschickt. Live-TV im externen Player streamt direkt von TVHeadend (Port 9981) und geht von außen nur, wenn auch TVHeadend erreichbar ist – der interne Player braucht das nicht.
+
+**HTTPS ist Pflicht**, sonst gehen Passwörter im Klartext durchs Netz. Das Tool selbst spricht nur HTTP; davor gehört ein Proxy mit Zertifikat, z. B. [Caddy](https://caddyserver.com) mit Let's Encrypt (`/etc/caddy/Caddyfile`, Port 80 und 443 an der Fritzbox auf den Rechner freigeben):
+
+```
+meintv.example.de {
+    reverse_proxy localhost:8099
+}
+```
+
+Der Proxy muss den ursprünglichen Host (`Host` oder `X-Forwarded-Host`), die Absenderadresse (`X-Forwarded-For`) und `X-Forwarded-Proto` weitergeben – Caddy tut das von selbst, bei nginx `proxy_set_header` für alle drei setzen. Läuft der Proxy auf demselben Rechner, gilt die Adresse aus `X-Forwarded-For` (sonst sähe jeder Zugriff wie einer aus dem Heimnetz aus); Startparameter `--bind 127.0.0.1` sorgt dann dafür, dass niemand am Proxy vorbei direkt auf Port 8099 zugreift.
+
 ## Sicherung
 
 Der Reiter **Sicherung** bietet zwei Wege:
@@ -153,6 +173,7 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/backup.py` | Komplettsicherung des TVHeadend-Ordners und Wiederherstellung |
 | `tvh_aufnahmen/transfer.py` | JSON-Export/-Import von Tags, Sendern, Serien-Timern und Aufnahmen |
 | `tvh_aufnahmen/server.py` | HTTP-Routen, Download, Playlist, Auslieferung der Oberfläche |
+| `tvh_aufnahmen/auth.py` | Anmeldung: Benutzer, Passwörter (scrypt), Sitzungen, Heimnetz-Erkennung, Sperre nach Fehlversuchen, signierte Links |
 | `tvh_aufnahmen/i18n.py` | Sprachen: Texte aus `lang/*.json`, Sprache je Anfrage (Cookie bzw. Browser) |
 | `tvh_aufnahmen/lang/` | Sprachdateien `de.json`, `en.json` |
 | `tvh_aufnahmen/static/` | Oberfläche: `index.html`, `style.css` und ein JavaScript pro Reiter (`common.js` für Gemeinsames) |
@@ -161,7 +182,7 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 
 ## Hinweise
 
-- Die Oberfläche hat kein eigenes Login. Sie ist für das Heimnetz gedacht; mit `--bind 127.0.0.1` ist sie nur lokal erreichbar. Standard ist `::` (IPv6 und IPv4).
+- Erreichbarkeit: Standard ist `::` (IPv6 und IPv4); mit `--bind 127.0.0.1` ist die Oberfläche nur auf dem Rechner selbst erreichbar (z. B. hinter einem Proxy). Zugriff von außen: siehe „Anmeldung“.
 - Start- und Endzeit werden aus dem Dateinamen (z. B. `Tatort-2023-05-14-20-15.ts`) und der Änderungszeit geraten. Ist `ffprobe` installiert (`sudo apt install ffmpeg`), wird die echte Laufzeit verwendet.
 - Ohne Sender legt TVHeadend keinen Eintrag an. Das Tool schlägt den Sender anderer Aufnahmen im selben Ordner vor, sonst „Unbekannt“.
 - Das Ende einer Aufnahme muss in der Vergangenheit liegen, sonst würde TVHeadend einen Aufnahme-Timer anlegen. Das Tool verhindert das.

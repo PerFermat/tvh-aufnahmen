@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TVHeadend Aufnahmen</title>
+<meta name="theme-color" content="#4f46e5">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<script>try{const t=localStorage.getItem('theme');if(t&&t!='auto')document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="/static/style.css">
+</head><body>
+<main class="login"><form class="ed" onsubmit="event.preventDefault();doLogin(this)">
+ <h2 class="wide" data-i18n="login.title">Anmelden</h2>
+ <label class="wide"><span data-i18n="cfg.user">Benutzer</span><input name="user" autocomplete="username" required autofocus></label>
+ <label class="wide"><span data-i18n="cfg.password">Passwort</span><input type="password" name="password" autocomplete="current-password" required></label>
+ <div class="wide"><button class="b" data-i18n="login.submit">Anmelden</button></div>
+ <p class="wide muted small" id="lmsg"></p></form></main>
+<div id="msg"></div>
+<script src="/lang.js"></script>
+<script src="/static/common.js"></script>
+<script>
+applyI18n();applyTheme();
+async function doLogin(f){$('#lmsg').textContent='';
+ try{await api('/api/login',{user:f.user.value,password:f.password.value});location.href='/'}
+ catch(e){$('#lmsg').textContent=e.message;f.password.value='';f.password.focus()}}
+</script>
+</body></html>

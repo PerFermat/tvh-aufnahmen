@@ -41,9 +41,13 @@ function toggleFullscreen(){const d=document,e=d.documentElement;
 document.addEventListener('fullscreenchange',fsState);document.addEventListener('webkitfullscreenchange',fsState);
 document.addEventListener('DOMContentLoaded',fsState);
 function cycleTheme(){const k=Object.keys(THEMES),t=store('theme')||'auto';store('theme',k[(k.indexOf(t)+1)%k.length]);applyTheme()}
-async function api(p,body){const r=await fetch(p,body?{method:'POST',body:JSON.stringify(body)}:{});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
+async function api(p,body){const r=await fetch(p,body?{method:'POST',body:JSON.stringify(body)}:{});const j=await r.json();
+ if(r.status==401&&j.login&&!location.pathname.endsWith('login.html'))location.href='/static/login.html';  // Anmeldung nötig (von außen)
+ if(!r.ok)throw new Error(j.error||r.status);return j}
+async function logout(){await api('/api/logout',{}).catch(()=>{});location.href='/static/login.html'}
 async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').textContent=L('common.error',{err:e.message});tab('config');msg(e.message);return}
  $('#info').textContent=L('nav.info',{dir:S.recdir,n:S.known_count});
+ api('/api/me').then(m=>{if(m.me)$('#info').insertAdjacentHTML('beforeend',` · ${esc(m.me)} · <a href="#" onclick="logout();return false">${L('auth.logout')}</a>`)}).catch(()=>{});
  $('#t-rec').textContent=L('nav.rec_n',{n:S.recordings.length});
  $('#t-unknown').textContent=L('nav.unknown_n',{n:S.unknown.length});
  $('#t-missing').textContent=L('nav.missing_n',{n:S.missing.length});

@@ -5,6 +5,7 @@ import socket
 from http.server import ThreadingHTTPServer
 
 from . import i18n
+from .auth import Auth
 from .config import App, find_tvhconf, load_config
 from .epg_archive import EpgArchive
 from .i18n import _
@@ -72,6 +73,7 @@ def main():
     app.archive = EpgArchive()
     app.teletext = TeletextService(lambda: app.tvh)
     app.jobs = Jobs(app)
+    app.auth = Auth(app)
     srv = make_server(a.bind, a.port, make_handler(app))
     print(_('cli.running', port=a.port, bind=a.bind))
     try:

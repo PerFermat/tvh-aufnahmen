@@ -291,3 +291,4 @@ dialog:has(.pwrap){max-width:1100px}
 .ttbar{justify-content:center;margin-top:10px}.ttbar #ttnum{width:64px;text-align:center;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
 .ttsub{display:inline-flex;align-items:center;gap:4px}.ttsub #ttsubl{min-width:36px;text-align:center;font-variant-numeric:tabular-nums}
 video::cue{background:rgba(0,0,0,.78);color:#fff;font-size:clamp(14px,2.6vw,26px);line-height:1.35;font-family:system-ui,sans-serif}
+.login{max-width:380px;margin:12vh auto 0}

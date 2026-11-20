@@ -48,6 +48,11 @@ class App:
         save_config(self.path, new)
         return self.public()
 
+    def save(self, new):
+        """Geänderte Konfiguration übernehmen und speichern (z. B. Benutzer der Anmeldung)."""
+        save_config(self.path, new)
+        self.cfg = new
+
     def set_ui_lang(self, code):
         """Sprache für Meldungen ohne Anfrage (Benachrichtigungen); die Oberfläche merkt sich ihre per Cookie."""
         if code not in i18n.LANGS:

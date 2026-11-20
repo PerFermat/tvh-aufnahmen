@@ -18,7 +18,26 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  <div class="wide"><button class="b">${L('cfg.save')}</button></div></form>
  <div id="qualitycfg"></div>
  <div id="notifycfg"></div>
- <div id="traktcfg"></div>`;renderQuality();renderNotify();renderTrakt(c)}
+ <div id="traktcfg"></div>
+ <div id="authcfg"></div>`;renderQuality();renderNotify();renderTrakt(c);renderAuth()}
+// Anmeldung für den Zugriff von außen: wann nötig, Benutzer anlegen/ändern/löschen
+async function renderAuth(a){if(!a)try{a=await api('/api/users')}catch(e){return}if(cur!='config'||!$('#authcfg'))return;
+ $('#authcfg').innerHTML=`<h3>${L('auth.title')}</h3>
+ <p class="muted">${L('auth.hint')} ${a.me?L('auth.as',{u:esc(a.me)})+` <a href="#" onclick="logout();return false">${L('auth.logout')}</a>`:a.local?L('auth.local')+(a.users.length?` <a href="/static/login.html">${L('login.title')}</a>`:''):''}</p>
+ <div class="ed" style="margin-bottom:12px"><label class="wide">${L('auth.mode')}<select onchange="authDo({action:'mode',mode:this.value})">
+  ${['external','always','off'].map(m=>`<option value="${m}" ${a.mode==m?'selected':''}>${L('auth.mode_'+m)}</option>`).join('')}</select></label>
+  ${a.mode=='off'?`<p class="wide bad-t" style="margin:0">⚠ ${L('auth.off_warn')}</p>`:''}
+  ${a.mode!='off'&&!a.users.length?`<p class="wide warn-t" style="margin:0">${L('auth.no_users')}</p>`:''}</div>
+ ${a.users.length?`<table><thead><tr><th>${L('cfg.user')}</th><th></th></tr></thead><tbody>${a.users.map(u=>`<tr><td><b>${esc(u)}</b>${u==a.me?` <span class="tag">${L('auth.you')}</span>`:''}</td>
+  <td style="white-space:nowrap;text-align:right"><button class="b sec" data-u="${esc(u)}" onclick="authPw(this.dataset.u)">${L('auth.change_pw')}</button>
+  <button class="b bad" data-u="${esc(u)}" onclick="authDel(this.dataset.u)">${L('common.delete')}</button></td></tr>`).join('')}</tbody></table>`:''}
+ <form class="ed" style="margin-top:10px" onsubmit="event.preventDefault();authDo({action:'set',name:this.name.value,password:this.pw.value},this)">
+  <label>${L('auth.new_user')}<input name="name" autocomplete="off" required></label>
+  <label>${L('cfg.password')}<input type="password" name="pw" autocomplete="new-password" minlength="8" required></label>
+  <div class="wide"><button class="b">${L('auth.add')}</button></div></form>`}
+async function authDo(req,form){try{const a=await api('/api/users',req);msg(L('auth.saved'),true);if(form)form.reset();renderAuth(a)}catch(e){msg(e.message);renderAuth()}}
+function authPw(u){const pw=prompt(L('auth.pw_prompt',{u}));if(pw)authDo({action:'set',name:u,password:pw})}
+function authDel(u){if(confirm(L('auth.del_confirm',{u})))authDo({action:'delete',name:u})}
 // Qualität beim Abspielen – gilt nur für dieses Gerät (Handy z. B. „Mobil“, PC „Home“)
 async function renderQuality(){const q=await qualities();if(cur!='config'||!$('#qualitycfg'))return;
  if(q.length<2){$('#qualitycfg').innerHTML='';return}
