@@ -1,4 +1,6 @@
 /* ---------- Farben: hell, dunkel (System oder Umschalter oben rechts) ---------- */
+/* Scrollleisten in den Farben des Designs (sonst im Dunkelmodus je nach System hell) */
+html{scrollbar-color:color-mix(in srgb,var(--muted) 55%,transparent) transparent}
 :root{
  --bg:#eef1f8;--bg2:#e4e8f4;--card:rgba(255,255,255,.72);--solid:#fbfcff;--fg:#151a2d;--muted:#5d6782;--line:rgba(30,40,80,.11);
  --acc:#4f46e5;--acc2:#0ea5e9;--bad:#dc2645;--ok:#0f9d67;--hover:rgba(79,70,229,.07);

@@ -4,18 +4,48 @@ Web-Oberfläche für TVHeadend 4.3, um
 
 - das **Programm** wie eine Fernsehzeitschrift zu zeigen – ein ganzer Tag, Sender als Spalten, sechs Zeilen zu je 4 Stunden mit allen Sendungen, die darin beginnen; die Schnellauswahl springt zum Block – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
 - im Programm **über alle Tage zu suchen** (Titel, auf Wunsch auch Beschreibungen); laufende Sendungen sind markiert, vorbeigelaufene grau,
-- den **Status** zu sehen: Tuner mit Signal und Fehlern, laufende Aufnahmen und Streams, Temperatur, Last und Speicher des Raspberry,
+- den **Status** zu sehen: Tuner mit Signal und Fehlern, laufende Aufnahmen und Streams, Temperatur, Last und Speicher des Rechners,
 - **Konflikte** zu erkennen, wenn mehr Aufnahmen gleichzeitig auf verschiedenen Transpondern geplant sind, als es Tuner gibt,
 - **doppelte Aufnahmen** zu finden (Ansicht „Doppelte“ bei Aufnahmen: gleicher Titel und Untertitel, ohne Untertitel gleiche Beschreibung) – behalten wird die HD- bzw. längste Fassung, die übrigen sind zum Löschen vorausgewählt,
 - Aufnahmen **von Hand** zu planen (Sender, Titel, Datum, Beginn, Ende, Vor-/Nachlauf) – Knopf „＋ Neue Aufnahme“ im Kopf bei „Aufnahmen“ und „Geplante Aufnahmen“,
 - **Serienaufnahmen** zu verwalten (anlegen, bearbeiten, aktivieren/deaktivieren, löschen) und alle **geplanten Aufnahmen** einzeln zu sehen und zu löschen,
-- **Live-TV**: alle Sender mit Logo, der laufenden Sendung (mit Fortschrittsbalken) und den nächsten drei Sendungen anzuzeigen und einen Sender per Knopf in VLC abzuspielen,
-- **Aufnahmen** als Liste oder nach Ordnern gruppiert anzuzeigen, nach Name, Sender, Datum, Dauer oder Größe zu sortieren, zu durchsuchen, herunterzuladen, in VLC als Stream abzuspielen, Titel, Untertitel und Beschreibung zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen,
+- **Live-TV**: alle Sender mit Logo, der laufenden Sendung (mit Fortschrittsbalken) und den nächsten drei Sendungen anzuzeigen und einen Sender direkt im Browser abzuspielen (oder extern, z. B. in VLC),
+- den **Videotext** eines Senders anzusehen (mit Farben und Blockgrafik) und Videotext-**Untertitel** im Player einzublenden,
+- **Aufnahmen** als Liste oder nach Ordnern gruppiert anzuzeigen, nach Name, Sender, Datum, Dauer oder Größe zu sortieren, zu durchsuchen, herunterzuladen, in VLC als Stream abzuspielen, Titel, Untertitel und Beschreibung zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen; abgespielt wird ebenfalls direkt im Browser,
 - Videodateien aus dem Aufnahmeordner, die TVHeadend nicht (mehr) kennt, wieder als Aufnahme einzutragen – mit Titel, Untertitel, Sender, Zeit und Beschreibung,
 - alte Einträge, deren Datei nur in einen anderen Ordner gewandert ist, auf den neuen Pfad umzustellen,
 - Einträge zu löschen, deren Datei nicht mehr existiert. Videodateien werden dabei nie gelöscht,
 - einen **Sendersuchlauf** zu starten, neue unverschlüsselte deutschsprachige Fernsehsender anzulegen (fortlaufend nach der höchsten Nummer) und Sender zu löschen, die es nicht mehr gibt,
-- TVHeadend zu **sichern** – komplett oder gezielt Aufnahmen und Sender – und nach einer Neuinstallation wiederherzustellen.
+- vergangene Tage im Programm weiter zu sehen (dauerhaftes **EPG-Archiv**) und frühere Ausstrahlungen einer Sendung zu finden,
+- TVHeadend zu **sichern** – komplett oder gezielt Aufnahmen und Sender, auch automatisch jede Nacht – und nach einer Neuinstallation wiederherzustellen.
+
+## Bildschirmfotos
+
+**Programm** – ein Tag als Fernsehzeitschrift, jede Zeile eine Zeitachse über 4 Stunden; Bilder zu Filmen und Serien
+
+![Programm](docs/screenshots/programm.png)
+
+**Sendung** – alle Angaben, Bild, Aufnahme oder Serienaufnahme planen
+
+![Detailfenster einer Sendung](docs/screenshots/sendung.png)
+
+**Live-TV** – laufende und nächste Sendungen, Abspielen im Browser, Videotext
+
+![Live-TV](docs/screenshots/live-tv.png)
+
+![Videotext](docs/screenshots/videotext.png)
+
+**Aufnahmen** – mit Vorschaubild, Abspielen, Bearbeiten, Doppelte finden
+
+![Aufnahmen](docs/screenshots/aufnahmen.png)
+
+**Status** – Tuner, Rechner, Speicher, EPG-Archiv
+
+![Status](docs/screenshots/status.png)
+
+**Auf dem Handy**
+
+<img src="docs/screenshots/handy-programm.png" alt="Programm auf dem Handy" width="300"> <img src="docs/screenshots/handy-live-tv.png" alt="Live-TV auf dem Handy" width="300">
 
 Python 3.7+, keine zusätzlichen Pakete. Benutzer und Passwörter mit Umlauten funktionieren. Läuft auf demselben Gerät wie TVHeadend, damit die Dateipfade übereinstimmen.
 
@@ -77,7 +107,7 @@ install -Dm644 desktop/tvh-aufnahmen.svg ~/.local/share/icons/hicolor/scalable/a
 install -Dm755 desktop/tvh-aufnahmen.desktop ~/.local/share/applications/tvh-aufnahmen.desktop
 ```
 
-Danach lässt sie sich aus dem Startmenü oder direkt aus `desktop/` auf den Schreibtisch ziehen. Sie öffnet `http://raspi5:8099/` im Standardbrowser. Klappt der Name `raspi5` unterwegs per VPN nicht (der VPN-Zugang liefert die Namen aus dem Heimnetz nicht mit), in der Zeile `Exec=` die IP-Adresse eintragen.
+Danach lässt sie sich aus dem Startmenü oder direkt aus `desktop/` auf den Schreibtisch ziehen. Sie öffnet die Adresse aus der Zeile `Exec=` im Standardbrowser – dort vorher den Namen oder die IP-Adresse des TVHeadend-Rechners eintragen.
 
 ## Sicherung
 
@@ -109,7 +139,7 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/teletext.py` | Videotext: liest die Videotext-Pakete aus dem Senderstream und setzt die Seiten zusammen |
 | `tvh_aufnahmen/posters.py` | Bilder zu langen Sendungen aus der Wikipedia, von TVmaze (Serien) und Trakt, im Hintergrund gesucht und zwischengespeichert |
 | `tvh_aufnahmen/scan.py` | Sendersuchlauf, Auswertung, neue Sender anlegen, verschwundene löschen |
-| `tvh_aufnahmen/status.py` | Status-Seite: Tuner, laufende Aufnahmen und Streams, Raspberry |
+| `tvh_aufnahmen/status.py` | Status-Seite: Tuner, laufende Aufnahmen und Streams, Rechner |
 | `tvh_aufnahmen/thumbs.py` | Vorschaubilder der Aufnahmen per ffmpeg |
 | `tvh_aufnahmen/jobs.py` | Hintergrundaufgaben: nächtliche Sicherung, Benachrichtigungen per ntfy |
 | `tvh_aufnahmen/state.py` | Abgleich Einträge ↔ Dateien: Aufnahmen, nicht eingetragene Dateien, Einträge ohne Datei |
@@ -127,7 +157,7 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 - Start- und Endzeit werden aus dem Dateinamen (z. B. `Tatort-2023-05-14-20-15.ts`) und der Änderungszeit geraten. Ist `ffprobe` installiert (`sudo apt install ffmpeg`), wird die echte Laufzeit verwendet.
 - Ohne Sender legt TVHeadend keinen Eintrag an. Das Tool schlägt den Sender anderer Aufnahmen im selben Ordner vor, sonst „Unbekannt“.
 - Das Ende einer Aufnahme muss in der Vergangenheit liegen, sonst würde TVHeadend einen Aufnahme-Timer anlegen. Das Tool verhindert das.
-- Abspielen: Unter „Einstellungen“ wählt man je Gerät den **internen Player** (Standard) oder den externen. Der interne spielt Live-TV und Aufnahmen direkt im Browser ab (mpegts.js, mitgeliefert unter `static/vendor/`, Apache-2.0). Das Tool liefert dafür über ffmpeg MPEG-TS mit H.264-Bild und AAC-Ton: H.264 in Qualität „Home“ wird nur umverpackt (kaum Last), MPEG-2-Sender und kleinere Qualitäten werden umgerechnet (höchstens zwei gleichzeitig). Aufnahmen spulen über eine eigene Zeitleiste. Funktioniert in Chrome, Firefox, Edge und auf Android – nicht auf dem iPhone (dort automatisch der externe Player). Der externe Player lädt eine kleine `.m3u`-Datei. Mit VLC (oder einem anderen Player) geöffnet, streamt sie die Aufnahme vom Tool; Vor- und Zurückspulen funktioniert. Im Browser selbst lassen sich `.ts`-Aufnahmen nicht abspielen.
+- Abspielen: Unter „Einstellungen“ wählt man je Gerät den **internen Player** (Standard) oder den externen. Der interne spielt Live-TV und Aufnahmen direkt im Browser ab (mpegts.js, mitgeliefert unter `static/vendor/`, Apache-2.0). Das Tool liefert dafür über ffmpeg MPEG-TS mit H.264-Bild und AAC-Ton: H.264 in Qualität „Home“ wird nur umverpackt (kaum Last), MPEG-2-Sender und kleinere Qualitäten werden umgerechnet (höchstens zwei gleichzeitig; ein kleiner Rechner wie der Raspberry Pi schafft meist nur eine Umrechnung in Echtzeit). Aufnahmen spulen über eine eigene Zeitleiste. Funktioniert in Chrome, Firefox, Edge und auf Android – nicht auf dem iPhone (dort automatisch der externe Player). Der externe Player lädt eine kleine `.m3u`-Datei. Mit VLC (oder einem anderen Player) geöffnet, streamt sie die Aufnahme vom Tool; Vor- und Zurückspulen funktioniert. Im Browser selbst lassen sich `.ts`-Aufnahmen nicht abspielen.
 - Videotext: Im Live-Player und in den Sendungsdetails öffnet „Videotext“ die Videotext-Seiten des Senders mit Farben und Blockgrafik. Man blättert mit ◀/▶ (Pfeiltasten), tippt Seitenzahlen ein oder klickt eine Seitenzahl im Text an; „?“ zeigt verdeckten Text. Text lässt sich mit der Maus markieren und kopieren, „Kopieren“ übernimmt die ganze Seite. Das Auslesen belegt kurz einen Tuner und endet 45 Sekunden nach dem Schließen.
 - Untertitel: Der Knopf „Untertitel: an/aus“ im internen Player blendet die Videotext-Untertitel (Seite 150/777) ein, live und bei Aufnahmen, die den Videotext mit aufgezeichnet haben. ffmpeg liest sie dabei nebenher mit (`~/.cache/tvh-aufnahmen/subs`, wird nach der Wiedergabe gelöscht). Die Einstellung merkt sich das Gerät.
 - Datei ersetzen: Die hochgeladene Datei überschreibt die bisherige. Hat sie eine andere Endung (z. B. `.mkv` statt `.ts`), wird die Aufnahme auf die neue Datei umgestellt und die alte gelöscht. Start und Ende lassen sich bei fertigen Aufnahmen in TVHeadend 4.3 nicht ändern.
@@ -138,9 +168,9 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 - Suchlauf: Als neu gelten unverschlüsselte TV-Dienste ohne Sender, deren erste Tonspur deutsch ist. Testkanäle und Altlasten („Astra Demo“, „ALT_…“) werden ausgelassen; SD-, Regional- und Länderfassungen vorhandener Sender, Dienste ohne Sprachangabe und Erotikkanäle stehen getrennt und sind nicht vorausgewählt. Als verschwunden gilt ein Sender, dessen Dienste seit mindestens zwei Tagen vor dem Suchlauf nicht mehr gesehen wurden (TVHeadend aktualisiert „zuletzt gesehen“ nur grob).
 - Programm-Archiv: TVHeadend löscht Sendungen aus dem EPG, sobald sie vorbei sind. Das Tool legt deshalb alle 10 Minuten laufende und bald beginnende Sendungen in `~/.cache/tvh-aufnahmen/epg-archiv` ab (SQLite-Datenbank `epg.sqlite`, dauerhaft), damit das Programm auch vergangene Tage zeigt. Eine Sendung ist eindeutig durch Sender und Startzeit; die Angaben liegen gepackt in der Datenbank, und geschrieben wird nur, was sich geändert hat (schont die SD-Karte). Platzbedarf etwa 1–1,5 MB pro Tag bei rund 130 Sendern, also gut 500 MB im Jahr; Anzahl und Größe zeigt „Status“. „Wiederholungen suchen“ zeigt zusätzlich die früheren Ausstrahlungen aus dem Archiv. Tagesdateien aus älteren Versionen werden beim Start einmalig übernommen. Die nächtliche Sicherung legt eine Kopie des Archivs als `epg-archiv.sqlite` in den Sicherungsordner (nur eine, jede Nacht ersetzt); „Archiv aus der Kopie ergänzen“ im Reiter „Sicherung“ holt fehlende Sendungen daraus zurück, z. B. nach einem Wechsel der SD-Karte.
 - Speicher: Belegung, freier Platz und eine Warnung, wenn Aufnahmen wegen vollem Speicher gescheitert sind, stehen im Reiter „Status“. Jede Aufnahme bekommt ein Vorschaubild (Standbild 20 Minuten nach Beginn, bei kurzen Aufnahmen aus der Mitte, per ffmpeg, zwischengespeichert in `~/.cache/tvh-aufnahmen/thumbs`).
-- Automatische Sicherung: jede Nacht (Standard 03:30, im Reiter „Sicherung“ einstellbar) eine Komplettsicherung ohne Programmdaten und der JSON-Export, standardmäßig nach `<Platte>/Backup/tvheadend-sicherungen`; die letzten 14 bleiben. Fällt die Uhrzeit aus (Raspberry aus), wird nachgeholt. Die Sicherung enthält die TVHeadend-Passwörter – der Ordner sollte also nicht für andere freigegeben sein.
+- Automatische Sicherung: jede Nacht (Standard 03:30, im Reiter „Sicherung“ einstellbar) eine Komplettsicherung ohne Programmdaten und der JSON-Export, standardmäßig nach `<Platte>/Backup/tvheadend-sicherungen`; die letzten 14 bleiben. Fällt die Uhrzeit aus (Rechner aus), wird nachgeholt. Dazu kommt eine Kopie des EPG-Archivs (siehe oben). Die Sicherung enthält die TVHeadend-Passwörter – der Ordner sollte also nicht für andere freigegeben sein.
 - Benachrichtigungen (Einstellungen): über [ntfy](https://ntfy.sh) bei fertigen und fehlgeschlagenen Aufnahmen und wenn unter 10 % Speicher frei sind.
 - Als App: Die Oberfläche hat ein Web-App-Manifest. Auf dem iPhone über „Teilen → Zum Home-Bildschirm“ als eigene App ohne Browserleiste; auf Android legt „Zum Startbildschirm hinzufügen“ eine Verknüpfung an (als echte App mit eigenem Fenster nur über HTTPS).
-- Qualität beim Abspielen (einmal unter „Einstellungen“ wählen, gilt je Gerät für Live-TV und Programm): **Home** = Original, **WLAN extern** = 720p ≈ 3 Mbit/s, **Mobil** = 540p ≈ 1,6 Mbit/s, **Mobil sparsam** = 360p ≈ 0,6 Mbit/s. Die drei kleineren sind Transcode-Stream-Profile in TVHeadend (Codec-Profile `tvha-h264-*` mit libx264, Preset veryfast bzw. ultrafast für 720p, und `tvha-aac-*`). Ein Raspberry Pi 5 rechnet per Software höchstens **einen** solchen Stream gleichzeitig in Echtzeit um und wird dabei sehr warm (über 80 °C) – ein aktiver Lüfter ist empfehlenswert. Wichtig für TVHeadend 4.3 mit FFmpeg 5: Im Codec-Profil muss „Profil“ auf **auto** stehen; ein fest eingestelltes H.264-Profil (Main/High) lässt TVHeadend beim Umrechnen abstürzen.
+- Qualität beim Abspielen: wählbar unter „Einstellungen“, je Gerät. Neben „Home“ (Original) bietet die Oberfläche die kleineren Stufen aus `QUALITIES` in `live.py` an – aber nur, wenn es in TVHeadend ein Stream-Profil mit diesem Namen gibt (für den externen Player; der interne rechnet selbst mit ffmpeg um).
 - Downloads unterstützen HTTP-Range, Player können also spulen.
 - Vor dem ersten großen Import am besten den Ordner `~/.hts/tvheadend/dvr/log` sichern.
