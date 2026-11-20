@@ -1,5 +1,7 @@
-"""Status-Seite: Tuner mit Signal, laufende Aufnahmen und Streams, Zustand des Raspberry."""
+"""Status-Seite: Tuner mit Signal, laufende Aufnahmen und Streams, Zustand des Rechners."""
 import os
+import re
+import socket
 import time
 
 from .state import disk_info
@@ -35,6 +37,18 @@ def tuners(tvh):
     return out
 
 
+def model():
+    """Gerätemodell: auf ARM-Boards (Raspberry Pi u. a.) aus dem Device-Tree, auf PCs aus DMI –
+    Platzhalter der Hersteller („To Be Filled By O.E.M.“, „System Product Name“) zählen nicht."""
+    m = read('/proc/device-tree/model').strip('\x00\n ')
+    if m:
+        return m
+    vendor, product = read('/sys/class/dmi/id/sys_vendor').strip(), read('/sys/class/dmi/id/product_name').strip()
+    junk = re.compile(r'o\.?e\.?m|filled|system (product|manufacturer)|default string|not specified|^$', re.I)
+    parts = [p for p in (vendor, product) if not junk.search(p)]
+    return ' '.join(parts)
+
+
 def system():
     mem = {}
     for line in read('/proc/meminfo').splitlines():
@@ -44,7 +58,7 @@ def system():
     return {'temp': int(temp) / 1000 if temp.isdigit() else None, 'load': os.getloadavg(), 'cpus': os.cpu_count(),
             'mem_total': mem.get('MemTotal', 0), 'mem_avail': mem.get('MemAvailable', 0),
             'uptime': float((read('/proc/uptime') or '0').split()[0]), 'tool_uptime': time.time() - STARTED,
-            'model': read('/proc/device-tree/model').strip('\x00\n ')}
+            'model': model(), 'host': socket.gethostname()}
 
 
 def status(tvh, recdir):

@@ -15,7 +15,7 @@ async function renderStatus(){let s;try{s=await api('/api/status')}catch(e){$('#
   <div class="kv"><span>SNR</span><b>${t.snr?esc(t.snr.text):'–'}</b></div>${meter(snrPct(t.snr),snrPct(t.snr)<45?'bad':snrPct(t.snr)<65?'warn':'')}
   <div class="kv"><span>Datenrate</span><b>${t.kbps?(t.kbps/1000).toFixed(1)+' Mbit/s':'–'}</b></div>
   <div class="kv"><span>Fehler (BER/UNC/CC)</span><b class="${t.unc||t.cc?'bad-t':''}">${t.ber} / ${t.unc} / ${t.cc}</b></div>`:'<p class="muted small">Gerade nicht in Benutzung.</p>'}</div>`).join('')}
- <div class="card"><div class="card-h"><b>${esc(sy.model||'Raspberry')}</b></div>
+ <div class="card"><div class="card-h"><b>${esc(sy.model||sy.host||'Rechner')}</b>${sy.model&&sy.host?`<span class="muted small">${esc(sy.host)}</span>`:''}</div>
   ${temp!=null?`<div class="kv"><span>Temperatur</span><b class="${tl?tl+'-t':''}">${temp.toFixed(1)} °C</b></div>${meter((temp-30)/55*100,tl)}`:''}
   <div class="kv"><span>Last (1/5/15 min)</span><b>${sy.load.map(x=>x.toFixed(2)).join(' / ')}</b></div>${meter(sy.load[0]/sy.cpus*100,sy.load[0]>sy.cpus?'bad':'')}
   <div class="kv"><span>Arbeitsspeicher</span><b>${gb(sy.mem_total-sy.mem_avail)} von ${gb(sy.mem_total)}</b></div>${meter(memPct,memPct>90?'bad':memPct>80?'warn':'')}
