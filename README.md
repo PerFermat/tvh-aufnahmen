@@ -47,15 +47,15 @@ Web-Oberfläche für TVHeadend 4.3, um
 
 <img src="docs/screenshots/handy-programm.png" alt="Programm auf dem Handy" width="300"> <img src="docs/screenshots/handy-live-tv.png" alt="Live-TV auf dem Handy" width="300">
 
-Python 3.7+, keine zusätzlichen Pakete. Benutzer und Passwörter mit Umlauten funktionieren. Läuft auf demselben Gerät wie TVHeadend, damit die Dateipfade übereinstimmen.
+Läuft auf einem Linux-Rechner mit TVHeadend (x86 oder ARM). Python 3.7+, keine zusätzlichen Python-Pakete; für internen Player, Untertitel und Vorschaubilder wird `ffmpeg` gebraucht. Benutzer und Passwörter mit Umlauten funktionieren. Das Tool läuft auf demselben Rechner wie TVHeadend, damit die Dateipfade übereinstimmen – läuft TVHeadend in Docker, muss der Aufnahmeordner im Container unter demselben Pfad liegen wie auf dem Rechner.
 
 ## Installation
 
-Kopiert werden der Starter `tvh-aufnahmen.py` und der Ordner `tvh_aufnahmen` daneben:
+Das Tool läuft auf jedem Linux-Rechner, auf dem auch TVHeadend läuft. Kopiert werden der Starter `tvh-aufnahmen.py` und der Ordner `tvh_aufnahmen` daneben – am besten ins Home-Verzeichnis des Benutzers, unter dem TVHeadend läuft (`<benutzer>`), damit das Tool Aufnahmen und Konfiguration lesen und schreiben darf:
 
 ```bash
-rsync -a --exclude __pycache__ tvh-aufnahmen.py tvh_aufnahmen hts@<tvheadend-rechner>:~/tvh-aufnahmen/
-ssh hts@<tvheadend-rechner> python3 ~/tvh-aufnahmen/tvh-aufnahmen.py
+rsync -a --exclude __pycache__ tvh-aufnahmen.py tvh_aufnahmen <benutzer>@<tvheadend-rechner>:~/tvh-aufnahmen/
+ssh <benutzer>@<tvheadend-rechner> python3 ~/tvh-aufnahmen/tvh-aufnahmen.py
 ```
 
 Dann im Browser `http://<tvheadend-rechner>:8099/` öffnen. Unter **Einstellungen** stellst du ein:
@@ -86,8 +86,8 @@ Description=TVHeadend Aufnahmen-Verwaltung
 After=network.target tvheadend.service
 
 [Service]
-User=hts
-ExecStart=/usr/bin/python3 /home/hts/tvh-aufnahmen/tvh-aufnahmen.py
+User=<benutzer>
+ExecStart=/usr/bin/python3 /home/<benutzer>/tvh-aufnahmen/tvh-aufnahmen.py
 Restart=on-failure
 
 [Install]
@@ -157,7 +157,7 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 - Start- und Endzeit werden aus dem Dateinamen (z. B. `Tatort-2023-05-14-20-15.ts`) und der Änderungszeit geraten. Ist `ffprobe` installiert (`sudo apt install ffmpeg`), wird die echte Laufzeit verwendet.
 - Ohne Sender legt TVHeadend keinen Eintrag an. Das Tool schlägt den Sender anderer Aufnahmen im selben Ordner vor, sonst „Unbekannt“.
 - Das Ende einer Aufnahme muss in der Vergangenheit liegen, sonst würde TVHeadend einen Aufnahme-Timer anlegen. Das Tool verhindert das.
-- Abspielen: Unter „Einstellungen“ wählt man je Gerät den **internen Player** (Standard) oder den externen. Der interne spielt Live-TV und Aufnahmen direkt im Browser ab (mpegts.js, mitgeliefert unter `static/vendor/`, Apache-2.0). Das Tool liefert dafür über ffmpeg MPEG-TS mit H.264-Bild und AAC-Ton: H.264 in Qualität „Home“ wird nur umverpackt (kaum Last), MPEG-2-Sender und kleinere Qualitäten werden umgerechnet (höchstens zwei gleichzeitig; ein kleiner Rechner wie der Raspberry Pi schafft meist nur eine Umrechnung in Echtzeit). Aufnahmen spulen über eine eigene Zeitleiste. Funktioniert in Chrome, Firefox, Edge und auf Android – nicht auf dem iPhone (dort automatisch der externe Player). Der externe Player lädt eine kleine `.m3u`-Datei. Mit VLC (oder einem anderen Player) geöffnet, streamt sie die Aufnahme vom Tool; Vor- und Zurückspulen funktioniert. Im Browser selbst lassen sich `.ts`-Aufnahmen nicht abspielen.
+- Abspielen: Unter „Einstellungen“ wählt man je Gerät den **internen Player** (Standard) oder den externen. Der interne spielt Live-TV und Aufnahmen direkt im Browser ab (mpegts.js, mitgeliefert unter `static/vendor/`, Apache-2.0). Das Tool liefert dafür über ffmpeg MPEG-TS mit H.264-Bild und AAC-Ton: H.264 in Qualität „Home“ wird nur umverpackt (kaum Last), MPEG-2-Sender und kleinere Qualitäten werden umgerechnet (höchstens zwei gleichzeitig; ein kleiner Rechner schafft meist nur eine Umrechnung in Echtzeit). Aufnahmen spulen über eine eigene Zeitleiste. Funktioniert in Chrome, Firefox, Edge und auf Android – nicht auf dem iPhone (dort automatisch der externe Player). Der externe Player lädt eine kleine `.m3u`-Datei. Mit VLC (oder einem anderen Player) geöffnet, streamt sie die Aufnahme vom Tool; Vor- und Zurückspulen funktioniert. Im Browser selbst lassen sich `.ts`-Aufnahmen nicht abspielen.
 - Videotext: Im Live-Player und in den Sendungsdetails öffnet „Videotext“ die Videotext-Seiten des Senders mit Farben und Blockgrafik. Man blättert mit ◀/▶ (Pfeiltasten), tippt Seitenzahlen ein oder klickt eine Seitenzahl im Text an; „?“ zeigt verdeckten Text. Text lässt sich mit der Maus markieren und kopieren, „Kopieren“ übernimmt die ganze Seite. Das Auslesen belegt kurz einen Tuner und endet 45 Sekunden nach dem Schließen.
 - Untertitel: Der Knopf „Untertitel: an/aus“ im internen Player blendet die Videotext-Untertitel (Seite 150/777) ein, live und bei Aufnahmen, die den Videotext mit aufgezeichnet haben. ffmpeg liest sie dabei nebenher mit (`~/.cache/tvh-aufnahmen/subs`, wird nach der Wiedergabe gelöscht). Die Einstellung merkt sich das Gerät.
 - Datei ersetzen: Die hochgeladene Datei überschreibt die bisherige. Hat sie eine andere Endung (z. B. `.mkv` statt `.ts`), wird die Aufnahme auf die neue Datei umgestellt und die alte gelöscht. Start und Ende lassen sich bei fertigen Aufnahmen in TVHeadend 4.3 nicht ändern.
