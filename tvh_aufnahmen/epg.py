@@ -108,8 +108,8 @@ def _norm(s):
 
 
 def repeats(tvh, archive, event_id):
-    """Weitere Ausstrahlungen einer Sendung in den kommenden Tagen. Hat sie einen eigenen
-    Untertitel (Episode), müssen Titel und Untertitel passen, sonst genügt der gleiche Titel."""
+    """Weitere Ausstrahlungen einer Sendung in den kommenden Tagen und frühere aus dem Archiv. Hat sie
+    einen eigenen Untertitel (Episode), müssen Titel und Untertitel passen, sonst genügt der gleiche Titel."""
     res = tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or []
     ev = res[0] if res else archive.find(event_id)
     if not ev:
@@ -134,7 +134,14 @@ def repeats(tvh, archive, event_id):
                      'start': e['start'], 'stop': e['stop'], 'hd': e.get('hd'),
                      'planned': e['eventId'] in by_event or (e.get('channelUuid'), e.get('start')) in by_time})
     hits.sort(key=lambda e: e['start'])
-    return {'title': ev.get('title'), 'episode': bool(episode), 'repeats': hits}
+    past = []
+    for e in archive.by_title(ev.get('title') or '', now):
+        if (e.get('channelUuid'), e.get('start')) == (ev.get('channelUuid'), ev.get('start')):
+            continue
+        if episode and _norm((e.get('subtitle') or '').split('\n')[0]) != episode:
+            continue
+        past.append({k: e.get(k) for k in ('eventId', 'title', 'subtitle', 'channelName', 'channelUuid', 'start', 'stop', 'hd')})
+    return {'title': ev.get('title'), 'episode': bool(episode), 'repeats': hits, 'past': past}
 
 
 def poster_status(posters, keys, urgent=False):

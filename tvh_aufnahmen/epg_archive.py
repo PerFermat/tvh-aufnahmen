@@ -1,85 +1,111 @@
 """Archiv vergangener Sendungen. TVHeadend löscht Sendungen aus dem EPG, sobald sie vorbei sind;
-damit das Programm auch gestern und heute Vormittag noch zeigen kann, werden laufende und bald
-beginnende Sendungen vorher hier abgelegt – eine JSON-Datei pro Tag, 14 Tage lang."""
+damit das Programm auch vergangene Tage zeigen kann, werden laufende und bald beginnende Sendungen
+vorher hier abgelegt – dauerhaft, in einer SQLite-Datenbank.
+
+Eine Sendung ist eindeutig durch Sender und Startzeit (TVHeadend vergibt nach einem Neustart neue
+Kennungen). Die Angaben liegen gepackt (zlib) in der Datenbank; geschrieben wird nur, was sich
+geändert hat – die SD-Karte wird so geschont. Frühere Ausstrahlungen eines Titels findet die Suche
+über den normierten Titel (Spalte tnorm)."""
+import glob
+import gzip
 import json
 import os
+import re
+import sqlite3
 import threading
 import time
+import zlib
 
-ARCHIVE = os.path.expanduser('~/.cache/tvh-aufnahmen/epg-archiv')
-KEEP_DAYS = 14
+FOLDER = os.path.expanduser('~/.cache/tvh-aufnahmen/epg-archiv')
 FIELDS = ('eventId', 'channelUuid', 'channelName', 'title', 'subtitle', 'summary', 'description', 'start', 'stop',
           'hd', 'subtitled', 'widescreen', 'audiodesc', 'episodeOnscreen', 'genre', 'ageRating', 'starRating')
 
 
-def day_key(ts):
-    return time.strftime('%Y-%m-%d', time.localtime(ts))
+def norm_title(s):
+    return re.sub(r'\s+', ' ', re.sub(r'[^\w ]+', ' ', (s or '').lower())).strip()
 
 
 class EpgArchive:
-    def __init__(self, folder=ARCHIVE):
+    def __init__(self, folder=FOLDER):
         self.folder = folder
         self.lock = threading.Lock()
-        self.days = {}  # Tag -> {eventId: Sendung}
+        os.makedirs(folder, exist_ok=True)
+        self.db = sqlite3.connect(os.path.join(folder, 'epg.sqlite'), check_same_thread=False)
+        self.db.execute('PRAGMA journal_mode=WAL')
+        self.db.execute('PRAGMA synchronous=NORMAL')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS events (
+            channel TEXT NOT NULL, start INTEGER NOT NULL, stop INTEGER, event_id INTEGER,
+            tnorm TEXT, data BLOB NOT NULL, PRIMARY KEY (channel, start))''')
+        self.db.execute('CREATE INDEX IF NOT EXISTS ev_start ON events(start)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS ev_id ON events(event_id)')
+        self.db.execute('CREATE INDEX IF NOT EXISTS ev_title ON events(tnorm, start)')
+        self.db.commit()
+        self.migrate()
 
-    def path(self, key):
-        return os.path.join(self.folder, key + '.json')
-
-    def load(self, key):
-        if key not in self.days:
+    def migrate(self):
+        """Tagesdateien aus der Zeit vor der Datenbank übernehmen und danach löschen."""
+        for path in sorted(glob.glob(os.path.join(self.folder, '*.json')) + glob.glob(os.path.join(self.folder, '*.json.gz'))):
             try:
-                with open(self.path(key)) as f:
-                    self.days[key] = json.load(f)
+                with (gzip.open if path.endswith('.gz') else open)(path, 'rt', encoding='utf-8') as f:
+                    day = json.load(f)
             except (OSError, ValueError):
-                self.days[key] = {}
-        return self.days[key]
+                continue
+            # älteste Angaben zuerst, damit neuere (höhere Kennung) sie ersetzen
+            self.store(sorted(day.values(), key=lambda e: int(e.get('eventId') or 0)))
+            os.remove(path)
 
     def store(self, events):
-        """Übernimmt Sendungen ins Archiv (neuere Angaben ersetzen ältere)."""
-        changed = set()
+        """Übernimmt Sendungen ins Archiv (neuere Angaben ersetzen ältere). Gibt die Zahl der
+        tatsächlich geänderten Sendungen zurück."""
+        rows = []
+        for e in events:
+            if not e.get('eventId') or not e.get('start') or not e.get('channelUuid'):
+                continue
+            rec = {k: e[k] for k in FIELDS if e.get(k) not in (None, '', [])}
+            data = zlib.compress(json.dumps(rec, ensure_ascii=False, sort_keys=True).encode(), 6)
+            rows.append((e['channelUuid'], int(e['start']), int(e.get('stop') or 0), int(e['eventId']),
+                         norm_title(e.get('title')), data))
+        if not rows:
+            return 0
         with self.lock:
-            for e in events:
-                if not e.get('eventId') or not e.get('start'):
-                    continue
-                key = day_key(e['start'])
-                day = self.load(key)
-                rec = {k: e[k] for k in FIELDS if e.get(k) not in (None, '', [])}
-                if day.get(str(e['eventId'])) != rec:
-                    day[str(e['eventId'])] = rec
-                    changed.add(key)
-            os.makedirs(self.folder, exist_ok=True)
-            for key in changed:
-                tmp = self.path(key) + '.tmp'
-                with open(tmp, 'w') as f:
-                    json.dump(self.days[key], f, ensure_ascii=False)
-                os.replace(tmp, self.path(key))
-        return len(changed)
+            before = self.db.total_changes
+            # unveränderte Sendungen nicht neu schreiben (WHERE … IS NOT …)
+            self.db.executemany('''INSERT INTO events (channel, start, stop, event_id, tnorm, data) VALUES (?,?,?,?,?,?)
+                ON CONFLICT(channel, start) DO UPDATE SET stop=excluded.stop, event_id=excluded.event_id,
+                tnorm=excluded.tnorm, data=excluded.data WHERE events.data IS NOT excluded.data''', rows)
+            self.db.commit()
+            return self.db.total_changes - before
+
+    @staticmethod
+    def unpack(row):
+        return json.loads(zlib.decompress(row[0]))
 
     def day(self, start, end):
         """Archivierte Sendungen, die zwischen start und end beginnen."""
         with self.lock:
-            return [dict(e) for e in self.load(day_key(start)).values() if start <= e['start'] < end]
+            rows = self.db.execute('SELECT data FROM events WHERE start >= ? AND start < ?', (start, end)).fetchall()
+        return [self.unpack(r) for r in rows]
 
     def find(self, event_id):
-        """Eine archivierte Sendung (für das Detailfenster, wenn TVHeadend sie schon gelöscht hat)."""
+        """Eine archivierte Sendung (für das Detailfenster, wenn TVHeadend sie schon gelöscht hat).
+        Kennungen können sich nach einem Neustart von TVHeadend wiederholen – dann die jüngste."""
         with self.lock:
-            for d in range(KEEP_DAYS + 1):
-                e = self.load(day_key(time.time() - d * 86400)).get(str(event_id))
-                if e:
-                    return dict(e)
-        return None
+            row = self.db.execute('SELECT data FROM events WHERE event_id = ? ORDER BY start DESC LIMIT 1',
+                                  (int(event_id),)).fetchone()
+        return self.unpack(row) if row else None
 
-    def prune(self):
-        """Tage löschen, die älter als KEEP_DAYS sind."""
-        limit = day_key(time.time() - KEEP_DAYS * 86400)
+    def by_title(self, title, before, limit=300):
+        """Frühere Ausstrahlungen eines Titels (vor dem Zeitpunkt before), neueste zuerst."""
         with self.lock:
-            for name in os.listdir(self.folder) if os.path.isdir(self.folder) else []:
-                if name.endswith('.json') and name[:-5] < limit:
-                    os.remove(os.path.join(self.folder, name))
-                    self.days.pop(name[:-5], None)
-            # Tage, die gerade nicht gebraucht werden, nicht dauerhaft im Speicher halten
-            for key in [k for k in self.days if k < day_key(time.time() - 86400)]:
-                del self.days[key]
+            rows = self.db.execute('SELECT data FROM events WHERE tnorm = ? AND start < ? ORDER BY start DESC LIMIT ?',
+                                   (norm_title(title), before, limit)).fetchall()
+        return [self.unpack(r) for r in rows]
+
+    def stats(self):
+        with self.lock:
+            n, first = self.db.execute('SELECT COUNT(*), MIN(start) FROM events').fetchone()
+        size = sum(os.path.getsize(p) for p in glob.glob(os.path.join(self.folder, 'epg.sqlite*')))
+        return {'events': n, 'since': first, 'bytes': size}
 
 
 def archive_upcoming(tvh, archive, hours=3):

@@ -25,6 +25,7 @@ async function renderStatus(){let s;try{s=await api('/api/status')}catch(e){$('#
  <div class="card"><div class="card-h"><b>Speicher</b></div>
   <div class="kv"><span>Belegt</span><b>${gb(d.used)} von ${gb(d.total)}</b></div>${meter(dp,dp>=95?'bad':dp>=88?'warn':'')}
   <div class="kv"><span>Frei</span><b>${gb(d.free)}</b></div>
+  ${s.archive?`<div class="kv"><span>EPG-Archiv</span><b>${s.archive.events.toLocaleString('de-DE')} Sendungen${s.archive.since?' seit '+new Date(s.archive.since*1000).toLocaleDateString('de-DE'):''} · ${(s.archive.bytes/1048576).toFixed(0)} MB</b></div>`:''}
   ${d.failed_full?`<p class="warn-t">⚠ ${d.failed_full} Aufnahme(n) in den letzten 30 Tagen wegen vollem Speicher fehlgeschlagen.</p>`:''}</div></div>
  <h3>Läuft gerade</h3>
  ${s.recording.length||s.subscriptions.length?`<table>${s.recording.map(r=>`<tr><td><span class="tag" style="color:var(--bad)">● Aufnahme</span></td><td><b>${esc(r.title)}</b><br><span class="muted">${esc(r.channel)} · ${hm(r.start)}–${hm(r.stop)} · ${gb(r.size)}</span></td></tr>`).join('')}

@@ -188,7 +188,11 @@ async function findRepeats(id,btn){btn.disabled=true;$('#reps').innerHTML='<p cl
  <table class="reps">${r.repeats.map(e=>`<tr><td style="white-space:nowrap"><b>${esc(wday(e.start))}</b><br><span class="muted">${hm(e.start)}–${hm(e.stop)}</span></td>
   <td>${esc(e.channelName||'')}${e.hd?' <span class="tag">HD</span>':''}<br><a class="evl" onclick="showEvent(${e.eventId})">${esc(e.title)}</a>${e.subtitle&&e.subtitle!=e.title?' <span class="muted">– '+esc(e.subtitle.split('\n')[0])+'</span>':''}</td>
   <td style="white-space:nowrap">${e.planned?'<span class="tag keep">geplant</span>':`<button class="b" onclick="recordRepeat(${e.eventId},this)">Aufnehmen</button>`}</td></tr>`).join('')}</table>`
-  :`<p class="muted">Keine weitere Ausstrahlung${r.episode?' dieser Folge':''} in den Programmdaten gefunden (reichen etwa 4 Wochen voraus).</p>`}
+  :`<p class="muted">Keine weitere Ausstrahlung${r.episode?' dieser Folge':''} in den Programmdaten gefunden (reichen etwa 4 Wochen voraus).</p>`;
+ // frühere Ausstrahlungen aus dem EPG-Archiv
+ if(r.past&&r.past.length)$('#reps').insertAdjacentHTML('beforeend',`<details class="past"><summary class="muted">${r.past.length} frühere Ausstrahlung(en)${r.episode?' dieser Folge':''} im Archiv</summary>
+ <table class="reps">${r.past.map(e=>`<tr><td style="white-space:nowrap"><b>${esc(wday(e.start))} ${new Date(e.start*1000).getFullYear()}</b><br><span class="muted">${hm(e.start)}–${hm(e.stop)}</span></td>
+  <td>${esc(e.channelName||'')}${e.hd?' <span class="tag">HD</span>':''}<br><a class="evl" onclick="showEvent(${e.eventId})">${esc(e.title)}</a>${e.subtitle&&e.subtitle!=e.title?' <span class="muted">– '+esc(e.subtitle.split('\n')[0])+'</span>':''}</td></tr>`).join('')}</table></details>`)}
 async function recordRepeat(id,btn){btn.disabled=true;
  try{const r=await api('/api/record',{event:id,config:''});btn.outerHTML='<span class="tag keep">geplant</span>';
   if(r.conflict)msg(`Aufnahme geplant – aber ⚠ Konflikt: zu der Zeit sind schon ${r.conflict.titles.length-1} andere Aufnahme(n) auf anderen Transpondern geplant, es gibt nur ${r.tuners} Tuner:\n${r.conflict.titles.join(', ')}`);

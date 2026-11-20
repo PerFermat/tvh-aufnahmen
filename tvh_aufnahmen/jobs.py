@@ -185,7 +185,6 @@ class Jobs:
         """Alle 10 Minuten laufende und bald beginnende Sendungen archivieren (siehe epg_archive)."""
         if time.time() - getattr(self, 'archived_at', 0) >= 600:
             archive_upcoming(self.app.tvh, self.app.archive)
-            self.app.archive.prune()
             self.archived_at = time.time()
 
     def maybe_backup(self):

@@ -225,7 +225,7 @@ def make_handler(app):
             elif url.path == '/api/jobs':
                 self.run(app.jobs.settings)
             elif url.path == '/api/status':
-                self.run(lambda: status(app.tvh, app.recdir))
+                self.run(lambda: dict(status(app.tvh, app.recdir), archive=app.archive.stats()))
             elif url.path == '/api/vt':
                 self.run(lambda: app.teletext.page(q.get('ch'), int(q.get('p') or 100),
                                                    int(q['s']) if q.get('s') not in (None, '') else None))
