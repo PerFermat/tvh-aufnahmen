@@ -135,6 +135,8 @@ meintv.example.de {
 
 Der Proxy muss den ursprünglichen Host (`Host` oder `X-Forwarded-Host`), die Absenderadresse (`X-Forwarded-For`) und `X-Forwarded-Proto` weitergeben – Caddy tut das von selbst, bei nginx `proxy_set_header` für alle drei setzen. Läuft der Proxy auf demselben Rechner, gilt die Adresse aus `X-Forwarded-For` (sonst sähe jeder Zugriff wie einer aus dem Heimnetz aus); Startparameter `--bind 127.0.0.1` sorgt dann dafür, dass niemand am Proxy vorbei direkt auf Port 8099 zugreift.
 
+**Proxy auf einem anderen Server** (z. B. ein gemieteter Server mit nginx, der den Rechner zu Hause über einen WireGuard-Tunnel erreicht – das geht auch ohne Portfreigabe und bei DS-Lite): Dessen Tunneladresse ist privat und sähe wie das Heimnetz aus. Sie gehört deshalb in die Konfigurationsdatei als vertrauenswürdiger Proxy, z. B. `"trusted_proxies": ["10.77.0.1"]` – dann zählt der Absender aus `X-Forwarded-For`, und der Proxy selbst gilt nie als Heimnetz. Der nginx-Block dazu: `proxy_pass http://<tunneladresse>:8099;` mit `proxy_set_header` für `Host`, `X-Forwarded-Host`, `X-Forwarded-For $remote_addr` und `X-Forwarded-Proto https`, außerdem `proxy_buffering off`, `proxy_request_buffering off`, `client_max_body_size 0` und lange `proxy_read_timeout` für Streams und Uploads. Auf dem Rechner zu Hause sollte die Firewall durch den Tunnel nur Port 8099 durchlassen.
+
 ## Sicherung
 
 Der Reiter **Sicherung** bietet zwei Wege:

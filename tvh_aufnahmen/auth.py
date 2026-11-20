@@ -6,7 +6,10 @@ ohne Anmeldung rein) oder always. Ohne Benutzer kommt von außen niemand herein.
 
 Heimnetz: private IPv4-Adressen, IPv6 ULA (fc00::/7), Link-Local und die IPv6-Präfixe dieses Rechners.
 Läuft ein Proxy auf diesem Rechner (für HTTPS), sieht das Programm nur dessen Adresse 127.0.0.1 –
-dann zählt die letzte Adresse aus X-Forwarded-For, die der Proxy einträgt.
+dann zählt die letzte Adresse aus X-Forwarded-For, die der Proxy einträgt. Dasselbe gilt für Proxys auf
+anderen Rechnern, die in der Konfiguration unter „trusted_proxies“ stehen (z. B. ein Server, der über
+einen WireGuard-Tunnel hereinkommt); ein solcher Proxy selbst gilt nie als Heimnetz, auch wenn seine
+Adresse privat ist.
 
 Sitzungen: zufälliges Token im Cookie (HttpOnly, SameSite=Lax), gespeichert wird nur sein SHA-256 – so
 überstehen Sitzungen einen Neustart, ohne dass die Datei zum Anmelden taugt. Nach MAX_FAILS Fehlversuchen
@@ -66,19 +69,22 @@ def own_prefixes():
     return nets
 
 
-def client_ip(handler):
-    ip = ipaddress.ip_address(handler.client_address[0].split('%')[0])
-    if ip.version == 6 and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
-    fwd = handler.headers.get('X-Forwarded-For')
-    if fwd and ip.is_loopback:  # Proxy auf diesem Rechner: dessen letzter Eintrag ist der echte Absender
+def plain_ip(text):
+    ip = ipaddress.ip_address(text.strip().split('%')[0])
+    return ip.ipv4_mapped if ip.version == 6 and ip.ipv4_mapped else ip
+
+
+def client_ip(handler, proxies=()):
+    """Absender der Anfrage und ob sie über einen Proxy kam. Bei einem Proxy auf diesem Rechner oder einem
+    eingetragenen (proxies) ist der letzte Eintrag in X-Forwarded-For der echte Absender."""
+    ip = plain_ip(handler.client_address[0])
+    if ip.is_loopback or str(ip) in proxies:
+        fwd = handler.headers.get('X-Forwarded-For')
         try:
-            ip = ipaddress.ip_address(fwd.split(',')[-1].strip())
-            if ip.version == 6 and ip.ipv4_mapped:
-                ip = ip.ipv4_mapped
-        except ValueError:
-            pass  # unlesbar – dann als Zugriff des Proxys werten
-    return ip
+            return plain_ip(fwd.split(',')[-1]), True
+        except (AttributeError, ValueError):
+            return ip, True  # ohne lesbare Angabe: als Zugriff des Proxys werten
+    return ip, False
 
 
 class Auth:
@@ -110,8 +116,14 @@ class Auth:
         return bytes.fromhex(self.app.cfg['auth_secret'])
 
     # ---------- Wer fragt? ----------
+    @property
+    def proxies(self):
+        return set(self.app.cfg.get('trusted_proxies') or [])
+
     def is_local(self, handler):
-        ip = client_ip(handler)
+        ip = client_ip(handler, self.proxies)[0]
+        if str(ip) in self.proxies:
+            return False  # ein eingetragener Proxy selbst (ohne Absenderangabe) ist kein Heimnetz-Gerät
         return any(ip in n for n in self.nets if n.version == ip.version)
 
     def user(self, handler):
@@ -148,7 +160,7 @@ class Auth:
 
     def login(self, handler, name, password):
         """Prüft Name und Passwort; gibt das Cookie zurück (Set-Cookie)."""
-        ip = str(client_ip(handler))
+        ip = str(client_ip(handler, self.proxies)[0])
         with self.lock:
             if self.blocked(ip):
                 raise ValueError(_('srv.login_blocked', min=BLOCK // 60))
