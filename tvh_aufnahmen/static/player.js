@@ -38,10 +38,25 @@ let PQ=null;
 const pq=()=>PQ||quality();
 const qualSel=()=>(QUALS||[]).length<2?'':`<select id="pqsel" title="${L('pl.q_tip')}" onchange="PQ=this.value;if(PLAYER&&PLAYER._restart)PLAYER._restart()">
  ${QUALS.map(x=>`<option value="${esc(x.profile)}" ${x.profile==pq()?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`;
+// Vollbild und Zoom: Vollbild bekommt der ganze Bildbereich (.pwrap), nicht nur das Video – so bleiben die
+// eigenen Knöpfe sichtbar. „Füllen“ (object-fit: cover) schneidet das Bild auf die Bildschirmform zu: auf
+// breiten Bildschirmen fallen dann die mitgesendeten Balken oben/unten weg und die Seiten sind nicht mehr schwarz.
+let PZ=false,PZT=null;  // PZ: Füllen an (nur für diese Wiedergabe)
+function pZoom(){PZ=!PZ;pZoomState();pControls()}
+function pZoomState(){const w=$('#pwrap'),b=$('#pzb');if(!w)return;w.classList.toggle('zfill',PZ);
+ if(b){b.textContent=PZ?'⤡ '+L('pl.z_fit'):'⤢ '+L('pl.z_fill');b.title=L('pl.z_tip')}}
+function pFull(){const w=$('#pwrap');if(!w)return;if(fsEl())(document.exitFullscreen||document.webkitExitFullscreen).call(document);
+ else{const r=(w.requestFullscreen||w.webkitRequestFullscreen).call(w);if(r&&r.catch)r.catch(err=>msg(L('fs.failed',{err:err.message})))}}
+// Knöpfe im Vollbild nach kurzer Zeit ausblenden, bei Bewegung wieder zeigen
+function pControls(){const w=$('#pwrap');if(!w)return;w.classList.add('show');clearTimeout(PZT);PZT=setTimeout(()=>w.classList.remove('show'),2500)}
+document.addEventListener('keydown',e=>{if(!$('#pwrap')||!$('#dlg').open||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+ if(e.key=='z'||e.key=='Z'){pZoom();e.preventDefault()}else if(e.key=='f'||e.key=='F'){pFull();e.preventDefault()}});
+document.addEventListener('fullscreenchange',()=>{const w=$('#pwrap');if(w)w.classList.toggle('isfs',fsEl()===w)});
 function playerDialog(title,sub,extra){dialog(`<h2 style="margin:0 90px 2px 0">${esc(title)}</h2><div class="muted">${esc(sub)}</div>
- <div class="pwrap"><video id="pv" controls playsinline autoplay></video></div>${extra||''}
- <p class="muted small" id="pmsg">${L('pl.loading')}</p>`);
- $('#dlg').addEventListener('close',()=>{stopPlayer();PQ=null},{once:true})}
+ <div class="pwrap" id="pwrap" onmousemove="pControls()" ontouchstart="pControls()"><video id="pv" controls controlslist="nofullscreen" playsinline autoplay ondblclick="event.preventDefault();pFull()"></video>
+  <div class="pctl"><button class="b sec" id="pzb" onclick="pZoom()"></button><button class="b sec" onclick="pFull()" title="${L('pl.fs_tip')}">⛶</button></div></div>${extra||''}
+ <p class="muted small" id="pmsg">${L('pl.loading')}</p>`);pZoomState();
+ $('#dlg').addEventListener('close',()=>{stopPlayer();PQ=null;PZ=false},{once:true})}
 
 async function playLive(uuid){await qualities();const c=(LIVE&&LIVE.channels.find(x=>x.uuid==uuid))||(EPG&&EPG.channels.find(x=>x.uuid==uuid))||{name:L('common.channel')};
  playerDialog(c.name,'Live',`<div class="bar" style="margin:8px 0 0">${qualSel()}<button class="b sec" onclick="playLive('${uuid}')">${L('pl.reload')}</button>

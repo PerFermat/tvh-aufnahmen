@@ -534,5 +534,9 @@
   "cli.bind": "Adresse (Standard: %(default)s = IPv6 und IPv4)",
   "cli.warn_recdir": "Warnung: Aufnahmeverzeichnis nicht gefunden: {dir}",
   "cli.running": "Oberfläche läuft auf Port {port}, Adresse {bind} (Strg+C beendet)",
-  "pl.q_tip": "Qualität nur für diese Wiedergabe – die Einstellung für dieses Gerät bleibt"
+  "pl.q_tip": "Qualität nur für diese Wiedergabe – die Einstellung für dieses Gerät bleibt",
+  "pl.z_fill": "Füllen",
+  "pl.z_fit": "Einpassen",
+  "pl.z_tip": "Bild füllt den ganzen Bildschirm (schneidet Ränder ab, z. B. mitgesendete schwarze Balken) bzw. wieder ganz einpassen – Taste Z",
+  "pl.fs_tip": "Vollbild – Taste F oder Doppelklick"
 }

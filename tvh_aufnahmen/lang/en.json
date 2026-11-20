@@ -534,5 +534,9 @@
   "cli.bind": "address (default: %(default)s = IPv6 and IPv4)",
   "cli.warn_recdir": "Warning: recording folder not found: {dir}",
   "cli.running": "Interface running on port {port}, address {bind} (Ctrl+C to quit)",
-  "pl.q_tip": "Quality for this playback only – the setting for this device stays"
+  "pl.q_tip": "Quality for this playback only – the setting for this device stays",
+  "pl.z_fill": "Fill",
+  "pl.z_fit": "Fit",
+  "pl.z_tip": "Picture fills the whole screen (crops the edges, e.g. black bars sent along) or fits completely again – key Z",
+  "pl.fs_tip": "Full screen – key F or double-click"
 }
