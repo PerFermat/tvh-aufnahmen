@@ -1,5 +1,6 @@
-"""Sendersuchlauf: neu scannen, neue deutschsprachige unverschlüsselte TV-Sender finden und
-anlegen, Sender löschen, die es nicht mehr gibt."""
+"""Sendersuchlauf: neu scannen, neue TV-Sender finden und anlegen, Sender löschen, die es nicht mehr gibt.
+Ausgewertet werden alle freien und verschlüsselten Dienste; Sprache und Verschlüsselung filtert die
+Oberfläche. Das Ergebnis wird je Suchlauf zwischengespeichert (die Tonspuren abzufragen dauert)."""
 import json
 import os
 import re
@@ -8,7 +9,18 @@ import time
 TV_TYPES = {1, 17, 22, 25, 31, 32}  # SD, MPEG2-HD, AVC-SD, AVC-HD, HEVC, HEVC-UHD
 VIDEO = {'MPEG2VIDEO', 'H264', 'HEVC'}
 AUDIO = {'MPEG2AUDIO', 'AC3', 'EAC3', 'AAC', 'MP4A'}
-GERMAN = {'ger', 'deu'}
+# ISO 639-2: bibliografische Codes (z. B. „ger“) auf die terminologischen („deu“) abbilden, damit beide zusammenfallen
+B2T = {'ger': 'deu', 'fre': 'fra', 'dut': 'nld', 'chi': 'zho', 'cze': 'ces', 'gre': 'ell', 'per': 'fas', 'rum': 'ron',
+       'slo': 'slk', 'alb': 'sqi', 'arm': 'hye', 'baq': 'eus', 'bur': 'mya', 'geo': 'kat', 'ice': 'isl', 'mac': 'mkd',
+       'mao': 'mri', 'may': 'msa', 'tib': 'bod', 'wel': 'cym', 'scc': 'srp', 'scr': 'hrv'}
+CACHE = {}  # Zeitpunkt des Suchlaufs -> Auswertung der Dienste
+
+
+def lang_code(code):
+    code = (code or '').strip().lower()[:3]
+    if code in ('und', 'zxx', 'mis'):  # unbestimmt, kein Sprachinhalt – wie ohne Angabe
+        return ''
+    return B2T.get(code, code)
 # Testkanäle und Altlasten, die Betreiber parallel ausstrahlen
 JUNK = re.compile(r'sendersuchlauf|astra demo|^alt_|_alt$|^\.|\btest\b|^tmp|^dummy|^service \d+$|^\d+$', re.I)
 ADULT = re.compile(r'sex|erotik|babes|babestation|dates? tv|treff tv|girls tv', re.I)
@@ -56,10 +68,52 @@ def base_name(name):
     return re.sub(r'\s+(hd|uhd|sd)$', '', (name or '').lower().strip())
 
 
+def candidates(tvh, t0, chans, svcs):
+    """Alle TV-Dienste ohne Sender, die beim Suchlauf gesehen wurden, mit Sprache und Verschlüsselung.
+    Gruppe: new (neu), other (andere Fassung eines vorhandenen Senders), unknown (Tonspur ohne Sprache),
+    adult (Erotik/Kontakt)."""
+    if t0 in CACHE:
+        return CACHE[t0]
+    fresh = t0 - SEEN_SLACK
+    names = {(c.get('name') or '').lower() for c in chans} | {base_name(c.get('name')) for c in chans}
+    # Regional- oder Länderfassung eines vorhandenen Senders: gleiches erstes Wort („WDR HD Aachen“ zu
+    # „WDR HD Köln“, „SAT.1 Bayern“, „RTL Austria“)
+    first = lambda n: (n or '').lower().split(' ')[0]
+    firsts = {first(c.get('name')) for c in chans if len(first(c.get('name'))) >= 2}
+    items, seen = [], set()
+    for s in sorted(svcs.values(), key=lambda s: -(s.get('dvb_servicetype') or 0)):  # HD-Fassung zuerst
+        name = (s.get('svcname') or '').strip()
+        enc = bool(s.get('encrypted'))
+        if (s.get('channel') or s.get('dvb_servicetype') not in TV_TYPES or not name or JUNK.search(name)
+                or (s.get('last_seen') or 0) < fresh or (name.lower(), enc) in seen):
+            continue
+        streams = tvh.call('service/streams', uuid=s['uuid']).get('streams', [])
+        video = [x for x in streams if x.get('type') in VIDEO]
+        langs = [lang_code(x.get('language')) for x in streams if x.get('type') in AUDIO]
+        if not video or not langs:
+            continue  # gerade kein Bild oder Ton (z. B. Sendepause) – nicht sicher genug
+        main = next((l for l in langs if l), '')
+        if ADULT.search(name):
+            group = 'adult'
+        elif not main:
+            group = 'unknown'
+        elif name.lower() in names or base_name(name) in names or first(name) in firsts:
+            group = 'other'
+        else:
+            group = 'new'
+        items.append({'uuid': s['uuid'], 'name': name, 'provider': s.get('provider') or '', 'mux': s.get('multiplex'),
+                      'langs': langs[:4], 'lang': main, 'encrypted': enc, 'group': group,
+                      'hd': (video[0].get('height') or 0) >= 700 or s['dvb_servicetype'] in (17, 25, 31, 32)})
+        seen.add((name.lower(), enc))  # gleicher Name auf mehreren Transpondern: nur einmal
+    key = lambda x: (x['provider'].lower(), x['name'].lower())
+    CACHE.clear()
+    CACHE[t0] = sorted(items, key=key)
+    return CACHE[t0]
+
+
 def scan_result(tvh):
-    """Wertet den letzten Suchlauf aus. Neu: unverschlüsselter TV-Dienst, aktuell gesehen,
-    noch keinem Sender zugeordnet, erste Tonspur deutsch. Verschwunden: kein Dienst des Senders
-    wurde in den zwei Tagen vor dem Suchlauf oder danach gesehen."""
+    """Wertet den letzten Suchlauf aus: Kandidaten für neue Sender (siehe candidates) und Sender, von denen
+    kein Dienst in den zwei Tagen vor dem Suchlauf oder danach gesehen wurde."""
     t0 = scan_started()
     if not t0:
         raise ValueError('Noch kein Suchlauf über dieses Tool gestartet')
@@ -67,37 +121,11 @@ def scan_result(tvh):
     status = scan_status(tvh)
     chans = grid(tvh, 'channel/grid')
     svcs = {s['uuid']: s for s in grid(tvh, 'mpegts/service/grid')}
-    names = {(c.get('name') or '').lower() for c in chans} | {base_name(c.get('name')) for c in chans}
-    new, other, unknown, adult, seen = [], [], [], [], set()
-    # Regional- oder Länderfassung eines vorhandenen Senders: gleiches erstes Wort („WDR HD Aachen“ zu
-    # „WDR HD Köln“, „SAT.1 Bayern“, „RTL Austria“)
-    first = lambda n: (n or '').lower().split(' ')[0]
-    firsts = {first(c.get('name')) for c in chans if len(first(c.get('name'))) >= 2}
-    regional = lambda n: first(n) in firsts
-    for s in sorted(svcs.values(), key=lambda s: -(s.get('dvb_servicetype') or 0)):  # HD-Fassung zuerst
-        name = (s.get('svcname') or '').strip()
-        if (s.get('channel') or s.get('encrypted') or s.get('dvb_servicetype') not in TV_TYPES or not name
-                or JUNK.search(name) or (s.get('last_seen') or 0) < fresh or name.lower() in seen):
-            continue
-        streams = tvh.call('service/streams', uuid=s['uuid']).get('streams', [])
-        video = [x for x in streams if x.get('type') in VIDEO]
-        langs = [x.get('language') or '' for x in streams if x.get('type') in AUDIO]
-        if not video or not langs:
-            continue  # gerade kein Bild oder Ton (z. B. Sendepause) – nicht sicher genug
-        item = {'uuid': s['uuid'], 'name': name, 'provider': s.get('provider') or '', 'mux': s.get('multiplex'),
-                'langs': langs[:4], 'hd': (video[0].get('height') or 0) >= 700 or s['dvb_servicetype'] in (17, 25, 31, 32)}
-        if langs[0] in GERMAN or (not langs[0] and GERMAN & set(langs)):
-            if ADULT.search(name):
-                adult.append(item)
-            elif name.lower() in names or base_name(name) in names or regional(name):
-                other.append(item)
-            else:
-                new.append(item)
-        elif not langs[0]:
-            unknown.append(item)
-        else:
-            continue
-        seen.add(name.lower())  # gleicher Name auf mehreren Transpondern: nur einmal
+    items = [i for i in candidates(tvh, t0, chans, svcs) if not (svcs.get(i['uuid']) or {}).get('channel')]
+    languages = {}
+    for i in items:
+        if i['lang']:
+            languages[i['lang']] = languages.get(i['lang'], 0) + 1
     autorecs = grid(tvh, 'dvr/autorec/grid')
     dead = []
     for c in chans:
@@ -108,9 +136,7 @@ def scan_result(tvh):
                      'enabled': c.get('enabled'),
                      'last_seen': max([s.get('last_seen') or 0 for s in ss if s] or [0]),
                      'autorecs': [a.get('name') or a.get('title') for a in autorecs if a.get('channel') == c['uuid']]})
-    key = lambda x: (x['provider'].lower(), x['name'].lower())
-    return {'status': status, 'new': sorted(new, key=key), 'other': sorted(other, key=key),
-            'unknown': sorted(unknown, key=key), 'adult': sorted(adult, key=key),
+    return {'status': status, 'items': items, 'languages': languages,
             'dead': sorted(dead, key=lambda d: d['number']),
             'next_number': max([c.get('number') or 0 for c in chans] or [0]) + 1}
 

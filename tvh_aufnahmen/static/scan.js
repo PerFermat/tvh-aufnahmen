@@ -1,6 +1,11 @@
-// Reiter „Suchlauf“: Sendersuchlauf starten, neue deutschsprachige unverschlüsselte Sender anlegen,
+// Reiter „Suchlauf“: Sendersuchlauf starten, neue Sender anlegen (Sprache und Verschlüsselung wählbar),
 // Sender löschen, die es nicht mehr gibt
 let SCANR=null,scanTimer=null;
+// Filter: Verschlüsselung (free/enc/all) und Sprachen (leer = alle); je Gerät gemerkt
+const scanEnc=()=>store('scanenc')||'free';
+const scanLangs=()=>{try{return JSON.parse(store('scanlangs')||'["deu"]')}catch(e){return ['deu']}};
+// Sprachname aus dem ISO-639-Code (deu → Deutsch), über den Browser
+const langName=c=>{if(!c)return '?';if(c=='qaa')return 'Originalton';if(c=='mul')return 'mehrsprachig';try{return new Intl.DisplayNames([document.documentElement.lang||'de'],{type:'language'}).of(c)||c}catch(e){return c}};
 async function renderScan(){let st;try{st=await api('/api/scan-status')}catch(e){$('#main').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
  if(cur!='scan')return;
  const pct=st.muxes?Math.round(st.scanned/st.muxes*100):0;
@@ -8,7 +13,7 @@ async function renderScan(){let st;try{st=await api('/api/scan-status')}catch(e)
  <button class="b sec" onclick="scanEval()" ${!st.started||st.running?'disabled':''}>Ergebnis auswerten</button>
  <span class="muted">${st.started?`Letzter Suchlauf: ${fmt(st.started)} · ${st.scanned} von ${st.muxes} Transpondern empfangen${st.running?` · läuft (${st.queued} in der Warteschlange)`:st.failed.length?` · ${st.failed.length} ohne Empfang`:''}`:'Noch kein Suchlauf über dieses Tool.'}</span></div>
  ${st.running?`<div class="prog" style="max-width:none"><div style="width:${pct}%"></div></div>`:''}
- <p class="muted">Sucht auf allen Transpondern nach Sendern. Neue unverschlüsselte Fernsehsender mit deutscher Tonspur werden zum Anlegen vorgeschlagen und bekommen Nummern nach der höchsten vorhandenen. Sender, deren Dienste im Suchlauf nicht mehr gefunden wurden, können gelöscht werden.</p>
+ <p class="muted">Sucht auf allen Transpondern nach Sendern. Neue Fernsehsender werden zum Anlegen vorgeschlagen – welche Sprachen und ob verschlüsselte dabei sein sollen, lässt sich nach dem Auswerten wählen. Neue Sender bekommen Nummern nach der höchsten vorhandenen. Sender, deren Dienste im Suchlauf nicht mehr gefunden wurden, können gelöscht werden.</p>
  <div id="scanres"></div>`;
  if(SCANR)showScan();
  clearTimeout(scanTimer);if(st.running)scanTimer=setTimeout(()=>{if(cur=='scan')renderScan()},10000)}
@@ -16,14 +21,28 @@ async function scanStart(){if(!confirm('Sendersuchlauf starten?\nDas dauert je n
  try{await api('/api/scan-start',{});SCANR=null;msg('Suchlauf gestartet',true);renderScan()}catch(e){msg(e.message)}}
 async function scanEval(){$('#scanres').innerHTML='<p class="muted">Werte aus – prüfe Tonspuren der neuen Dienste …</p>';
  try{SCANR=await api('/api/scan-result');showScan()}catch(e){$('#scanres').innerHTML='';msg(e.message)}}
-const langs=l=>l.map(x=>x||'?').join(', ');
-function scanTable(list,cls,checked){return `<table><thead><tr><th><input type="checkbox" ${checked?'checked':''} onchange="document.querySelectorAll('.${cls}').forEach(c=>c.checked=this.checked);scanNumbers()"></th><th>Sender</th><th>Anbieter</th><th>Bild</th><th>Tonspuren</th><th>Transponder</th><th class="nr"></th></tr></thead><tbody>
- ${list.map(s=>`<tr><td><input type="checkbox" class="${cls} sadd" value="${s.uuid}" ${checked?'checked':''} onchange="scanNumbers()"></td><td><b>${esc(s.name)}</b></td><td>${esc(s.provider)}</td><td>${s.hd?'HD':'SD'}</td><td class="muted">${esc(langs(s.langs))}</td><td class="muted">${esc(s.mux)}</td><td class="nr muted" data-u="${s.uuid}"></td></tr>`).join('')}</tbody></table>`}
+const langs=l=>l.map(x=>x?langName(x):'?').join(', ');
+function scanTable(list,cls,checked){return `<table><thead><tr><th><input type="checkbox" ${checked?'checked':''} onchange="document.querySelectorAll('.${cls}').forEach(c=>c.checked=this.checked);scanNumbers()"></th><th>Sender</th><th>Anbieter</th><th>Bild</th><th>Tonspuren</th><th></th><th>Transponder</th><th class="nr"></th></tr></thead><tbody>
+ ${list.map(s=>`<tr><td><input type="checkbox" class="${cls} sadd" value="${s.uuid}" ${checked?'checked':''} onchange="scanNumbers()"></td><td><b>${esc(s.name)}</b></td><td>${esc(s.provider)}</td><td>${s.hd?'HD':'SD'}</td><td class="muted">${esc(langs(s.langs))}</td><td>${s.encrypted?'<span class="tag" title="verschlüsselt – braucht ein CI-Modul bzw. einen Kartenleser">🔒</span>':''}</td><td class="muted">${esc(s.mux)}</td><td class="nr muted" data-u="${s.uuid}"></td></tr>`).join('')}</tbody></table>`}
+// Filterleiste: Verschlüsselung und Sprachen (mit Anzahl der neuen Sender je Sprache)
+function scanFilter(){const r=SCANR,sel=scanLangs(),all=!sel.length,enc=scanEnc();
+ const codes=Object.entries(r.languages).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+ return `<div class="ed scanf"><label>Verschlüsselung<select onchange="store('scanenc',this.value);showScan()">
+  ${[['free','unverschlüsselt'],['enc','verschlüsselt'],['all','alle']].map(([v,n])=>`<option value="${v}" ${enc==v?'selected':''}>${n}</option>`).join('')}</select></label>
+  <div class="wide"><span class="muted">Sprache (erste Tonspur):</span>
+   <label class="chk"><input type="checkbox" ${all?'checked':''} onchange="store('scanlangs','[]');showScan()"> <b>Alle Sprachen</b></label>
+   ${codes.map(c=>`<label class="chk"><input type="checkbox" ${!all&&sel.includes(c)?'checked':''} onchange="scanLangToggle('${esc(c)}',this.checked)"> ${esc(langName(c))} <span class="muted">(${r.languages[c]})</span></label>`).join('')}</div></div>`}
+function scanLangToggle(c,on){let s=scanLangs().filter(x=>x!=c);if(on)s.push(c);store('scanlangs',JSON.stringify(s));showScan()}
 function showScan(){const r=SCANR;if(!$('#scanres'))return;
- $('#scanres').innerHTML=`<h3>Neue Sender (${r.new.length})</h3>${r.new.length?scanTable(r.new,'sn',true):'<p class="muted">Keine neuen deutschsprachigen unverschlüsselten Sender gefunden.</p>'}
- ${r.other.length?`<details><summary><b>Andere Fassung eines vorhandenen Senders (${r.other.length})</b> <span class="muted">– SD-, Regional- oder Länderfassung eines Senders, den du schon hast</span></summary>${scanTable(r.other,'so',false)}</details>`:''}
- ${r.unknown.length?`<details><summary><b>Sprache nicht angegeben (${r.unknown.length})</b> <span class="muted">– Tonspur ohne Sprachangabe</span></summary>${scanTable(r.unknown,'su',false)}</details>`:''}
- ${r.adult.length?`<details><summary><b>Erotik / Kontakt (${r.adult.length})</b></summary>${scanTable(r.adult,'sx',false)}</details>`:''}
+ const sel=scanLangs(),enc=scanEnc();
+ const ok=i=>(enc=='all'||(enc=='enc')==i.encrypted)&&(!sel.length||!i.lang||sel.includes(i.lang));
+ const g=k=>r.items.filter(i=>i.group==k&&ok(i));
+ const neu=g('new'),other=g('other'),unknown=g('unknown'),adult=g('adult');
+ $('#scanres').innerHTML=`${scanFilter()}
+ <h3>Neue Sender (${neu.length})</h3>${neu.length?scanTable(neu,'sn',true):'<p class="muted">Keine neuen Sender mit dieser Auswahl gefunden.</p>'}
+ ${other.length?`<details><summary><b>Andere Fassung eines vorhandenen Senders (${other.length})</b> <span class="muted">– SD-, Regional- oder Länderfassung eines Senders, den du schon hast</span></summary>${scanTable(other,'so',false)}</details>`:''}
+ ${unknown.length?`<details><summary><b>Sprache nicht angegeben (${unknown.length})</b> <span class="muted">– Tonspur ohne Sprachangabe</span></summary>${scanTable(unknown,'su',false)}</details>`:''}
+ ${adult.length?`<details><summary><b>Erotik / Kontakt (${adult.length})</b></summary>${scanTable(adult,'sx',false)}</details>`:''}
  <div class="bar" style="margin-top:10px"><button class="b" onclick="scanAdd()">Ausgewählte anlegen</button><span class="muted" id="scanhint"></span></div>
  <h3>Nicht mehr gefunden (${r.dead.length})</h3>
  ${r.dead.length?`<table><thead><tr><th><input type="checkbox" checked onchange="document.querySelectorAll('.sd').forEach(c=>c.checked=this.checked)"></th><th>Nr.</th><th>Sender</th><th>Zuletzt gesehen</th><th>Hinweis</th></tr></thead><tbody>
