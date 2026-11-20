@@ -15,6 +15,7 @@ from .state import disk_info
 from .transfer import export_all
 
 STATE = os.path.expanduser('~/.cache/tvh-aufnahmen/jobs.json')
+ARCHIVE_COPY = 'epg-archiv.sqlite'  # Kopie des EPG-Archivs im Sicherungsordner, jede Nacht ersetzt
 BACKUP_NAME = re.compile(r'^tvheadend-sicherung-\d{4}-\d{2}-\d{2}\.tar\.gz$|^tvh-export-\d{4}-\d{2}-\d{2}\.json$')
 LOW_DISK = 0.10  # Warnung unter 10 % frei
 
@@ -46,7 +47,17 @@ class Jobs:
         b = dict({'enabled': True, 'dir': default_backup_dir(cfg.get('recdir')), 'hour': 3, 'minute': 30, 'keep': 14},
                  **(cfg.get('autobackup') or {}))
         n = dict({'url': '', 'done': True, 'failed': True, 'disk': True}, **(cfg.get('notify') or {}))
-        return {'autobackup': b, 'notify': n, 'state': self.state, 'backups': self.backups(b['dir'])}
+        copy = os.path.join(b['dir'], ARCHIVE_COPY) if b['dir'] else ''
+        archive_copy = ({'size': os.path.getsize(copy), 'mtime': int(os.path.getmtime(copy))}
+                        if copy and os.path.isfile(copy) else None)
+        return {'autobackup': b, 'notify': n, 'state': self.state, 'backups': self.backups(b['dir']),
+                'archive_copy': archive_copy}
+
+    def restore_archive(self):
+        """Fehlende Sendungen aus der Kopie im Sicherungsordner ins EPG-Archiv übernehmen."""
+        b = self.settings()['autobackup']
+        added = self.app.archive.merge_from(os.path.join(b['dir'], ARCHIVE_COPY))
+        return {'added': added, 'archive': self.app.archive.stats()}
 
     def update(self, req):
         b, n = req.get('autobackup') or {}, req.get('notify') or {}
@@ -111,6 +122,8 @@ class Jobs:
                         os.remove(old)
             self.state['backup'] = {'ts': int(time.time()), 'ok': True, 'file': os.path.basename(tar),
                                     'size': os.path.getsize(tar)}
+            # EPG-Archiv: nur eine Kopie (wird mit der Zeit groß), jede Nacht ersetzt
+            self.state['backup']['archive'] = app.archive.backup_to(os.path.join(b['dir'], ARCHIVE_COPY))
             return self.state['backup']
         except Exception as e:
             self.state['backup'] = {'ts': int(time.time()), 'ok': False, 'error': str(e)}

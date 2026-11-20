@@ -290,6 +290,8 @@ def make_handler(app):
                 self.run(lambda: upcoming_cancel(app.tvh, req['uuid']))
             elif self.path == '/api/jobs':
                 self.run(lambda: app.jobs.update(req))
+            elif self.path == '/api/archive-restore':
+                self.run(app.jobs.restore_archive)
             elif self.path == '/api/backup-now':
                 self.run(app.jobs.run_backup)
             elif self.path == '/api/notify-test':

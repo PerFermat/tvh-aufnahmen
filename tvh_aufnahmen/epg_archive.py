@@ -30,7 +30,7 @@ class EpgArchive:
         self.folder = folder
         self.lock = threading.Lock()
         os.makedirs(folder, exist_ok=True)
-        self.db = sqlite3.connect(os.path.join(folder, 'epg.sqlite'), check_same_thread=False)
+        self.db = sqlite3.connect(os.path.join(folder, 'epg.sqlite'), check_same_thread=False, uri=True)  # uri: Sicherungskopie schreibgeschützt anhängen
         self.db.execute('PRAGMA journal_mode=WAL')
         self.db.execute('PRAGMA synchronous=NORMAL')
         self.db.execute('''CREATE TABLE IF NOT EXISTS events (
@@ -100,6 +100,38 @@ class EpgArchive:
             rows = self.db.execute('SELECT data FROM events WHERE tnorm = ? AND start < ? ORDER BY start DESC LIMIT ?',
                                    (norm_title(title), before, limit)).fetchall()
         return [self.unpack(r) for r in rows]
+
+    def backup_to(self, path):
+        """Stimmige Kopie der Datenbank (SQLite-Backup, auch während geschrieben wird) nach path."""
+        tmp = path + '.tmp'
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        dst = sqlite3.connect(tmp)
+        try:
+            with self.lock:
+                self.db.backup(dst)
+        finally:
+            dst.close()
+        os.replace(tmp, path)
+        return os.path.getsize(path)
+
+    def merge_from(self, path):
+        """Sendungen aus einer Sicherungskopie übernehmen, die hier fehlen (vorhandene bleiben).
+        Gibt die Zahl der übernommenen Sendungen zurück."""
+        if not os.path.isfile(path):
+            raise ValueError('Keine Sicherungskopie des Archivs gefunden: ' + path)
+        with self.lock:
+            self.db.execute('ATTACH DATABASE ? AS bak', ('file:%s?mode=ro' % path,))
+            try:
+                before = self.db.total_changes
+                self.db.execute('INSERT OR IGNORE INTO events (channel, start, stop, event_id, tnorm, data) '
+                                'SELECT channel, start, stop, event_id, tnorm, data FROM bak.events')
+                self.db.commit()
+                return self.db.total_changes - before
+            except sqlite3.DatabaseError as e:
+                raise ValueError('Sicherungskopie des Archivs ist nicht lesbar: %s' % e) from None
+            finally:
+                self.db.execute('DETACH DATABASE bak')
 
     def stats(self):
         with self.lock:
