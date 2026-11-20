@@ -174,3 +174,11 @@ Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul),
 - Qualität beim Abspielen: wählbar unter „Einstellungen“, je Gerät. Neben „Home“ (Original) bietet die Oberfläche die kleineren Stufen aus `QUALITIES` in `live.py` an – aber nur, wenn es in TVHeadend ein Stream-Profil mit diesem Namen gibt (für den externen Player; der interne rechnet selbst mit ffmpeg um).
 - Downloads unterstützen HTTP-Range, Player können also spulen.
 - Vor dem ersten großen Import am besten den Ordner `~/.hts/tvheadend/dvr/log` sichern.
+
+## Lizenz
+
+Copyright (C) 2026 PerFermat
+
+Dieses Programm ist freie Software: Es darf unter den Bedingungen der [GNU General Public License](LICENSE), Version 3 (GPL-3.0), weitergegeben und verändert werden – wie TVHeadend selbst. Wer eine veränderte Fassung weitergibt, muss sie ebenfalls unter der GPL-3.0 mit Quellcode weitergeben. Das Programm wird ohne jede Gewährleistung bereitgestellt.
+
+Mitgeliefert unter `tvh_aufnahmen/static/vendor/`: [mpegts.js](https://github.com/xqq/mpegts.js) (Apache-2.0).
