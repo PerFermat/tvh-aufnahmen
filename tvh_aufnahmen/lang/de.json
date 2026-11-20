@@ -537,6 +537,8 @@
   "pl.q_tip": "Qualität nur für diese Wiedergabe – die Einstellung für dieses Gerät bleibt",
   "pl.z_fill": "Füllen",
   "pl.z_fit": "Einpassen",
-  "pl.z_tip": "Bild füllt den ganzen Bildschirm (schneidet Ränder ab, z. B. mitgesendete schwarze Balken) bzw. wieder ganz einpassen – Taste Z",
-  "pl.fs_tip": "Vollbild – Taste F oder Doppelklick"
+  "pl.z_tip": "Einpassen → Füllen (schneidet Ränder ab, z. B. mitgesendete schwarze Balken) → stufenlos zoomen – Taste Z",
+  "pl.fs_tip": "Vollbild – Taste F oder Doppelklick",
+  "pl.z_more": "Zoom",
+  "pl.z_slider": "Zoom stufenlos – auch mit den Tasten + und −"
 }

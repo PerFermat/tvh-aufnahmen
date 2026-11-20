@@ -41,22 +41,47 @@ const qualSel=()=>(QUALS||[]).length<2?'':`<select id="pqsel" title="${L('pl.q_t
 // Vollbild und Zoom: Vollbild bekommt der ganze Bildbereich (.pwrap), nicht nur das Video – so bleiben die
 // eigenen Knöpfe sichtbar. „Füllen“ (object-fit: cover) schneidet das Bild auf die Bildschirmform zu: auf
 // breiten Bildschirmen fallen dann die mitgesendeten Balken oben/unten weg und die Seiten sind nicht mehr schwarz.
-let PZ=false,PZT=null;  // PZ: Füllen an (nur für diese Wiedergabe)
-function pZoom(){PZ=!PZ;pZoomState();pControls()}
-function pZoomState(){const w=$('#pwrap'),b=$('#pzb');if(!w)return;w.classList.toggle('zfill',PZ);
- if(b){b.textContent=PZ?'⤡ '+L('pl.z_fit'):'⤢ '+L('pl.z_fill');b.title=L('pl.z_tip')}}
+// Zoom: 'fit' (einpassen), 'fill' (füllen) oder eine Zahl – stufenlos über den Regler, Faktor bezogen auf
+// das eingepasste Bild (1 = einpassen). Ein Klick auf den Zoom-Knopf: einpassen → füllen → Regler → einpassen.
+// Bei einer Zahl wird das Video-Element selbst größer als der Bildbereich und mittig ausgerichtet (der Rest ist
+// abgeschnitten). Die Steuerleiste des Browsers würde dabei aus dem Bild rutschen – deshalb ist sie dann aus,
+// Pause und Ton gibt es oben rechts.
+let PZ='fit',PZS=false,PZT=null;  // PZS: Regler sichtbar
+// Faktor, um den das eingepasste Bild wachsen muss, bis es die ganze Fläche füllt
+function zFill(){const w=$('#pwrap'),v=$('#pv');if(!w||!v||!v.videoWidth)return 1.33;
+ const W=w.clientWidth,H=w.clientHeight,a=v.videoWidth/v.videoHeight,fw=Math.min(W,H*a),fh=fw/a;return Math.max(W/fw,H/fh)}
+function pZoom(){if(PZ=='fit'&&!PZS)PZ='fill';else if(!PZS){PZS=true;PZ=zFill()}else{PZ='fit';PZS=false}pZoomState();pControls()}
+function pZoomSet(z){z=Math.round(Math.max(1,Math.min(4,z))*100)/100;PZ=z<=1?'fit':z;pZoomState();pControls()}
+function pZoomState(){const w=$('#pwrap'),b=$('#pzb'),v=$('#pv');if(!w)return;const num=typeof PZ=='number';
+ w.classList.toggle('zfill',PZ=='fill');w.classList.toggle('zcustom',num);
+ if(v)v.controls=!num;pZoomApply();
+ const box=$('#pzs');if(box){box.hidden=!PZS;const z=num?PZ:PZ=='fill'?zFill():1;$('#pzr').value=z;$('#pzv').textContent=Math.round(z*100)+' %'}
+ if(b){b.textContent=PZS?'⤡ '+L('pl.z_fit'):PZ=='fill'?'🔍 '+L('pl.z_more'):'⤢ '+L('pl.z_fill');b.title=L('pl.z_tip')}
+ const pp=$('#ppp'),mu=$('#pmu');if(v&&pp){pp.textContent=v.paused?'▶':'⏸';mu.textContent=v.muted?'🔇':'🔊'}}
+function pZoomApply(){const w=$('#pwrap'),v=$('#pv');if(!w||!v)return;const fs=fsEl()===w;
+ if(typeof PZ!='number'){w.style.height='';Object.assign(v.style,{position:'',width:'',height:'',left:'',top:'',maxHeight:''});return}
+ const a=v.videoWidth?v.videoWidth/v.videoHeight:16/9,W=w.clientWidth,H=fs?w.clientHeight:Math.min(W/a,innerHeight*.7);
+ w.style.height=fs?'':H+'px';  // Bildbereich behält seine Größe, auch wenn das Video größer wird
+ Object.assign(v.style,{position:'absolute',maxHeight:'none',width:W*PZ+'px',height:H*PZ+'px',left:(W-W*PZ)/2+'px',top:(H-H*PZ)/2+'px'})}
+addEventListener('resize',()=>{if($('#pwrap'))pZoomApply()});
+function pPlay(){const v=$('#pv');if(v){v.paused?v.play():v.pause();setTimeout(pZoomState,50)}}
+function pMute(){const v=$('#pv');if(v){v.muted=!v.muted;pZoomState()}}
 function pFull(){const w=$('#pwrap');if(!w)return;if(fsEl())(document.exitFullscreen||document.webkitExitFullscreen).call(document);
  else{const r=(w.requestFullscreen||w.webkitRequestFullscreen).call(w);if(r&&r.catch)r.catch(err=>msg(L('fs.failed',{err:err.message})))}}
 // Knöpfe im Vollbild nach kurzer Zeit ausblenden, bei Bewegung wieder zeigen
 function pControls(){const w=$('#pwrap');if(!w)return;w.classList.add('show');clearTimeout(PZT);PZT=setTimeout(()=>w.classList.remove('show'),2500)}
 document.addEventListener('keydown',e=>{if(!$('#pwrap')||!$('#dlg').open||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
- if(e.key=='z'||e.key=='Z'){pZoom();e.preventDefault()}else if(e.key=='f'||e.key=='F'){pFull();e.preventDefault()}});
-document.addEventListener('fullscreenchange',()=>{const w=$('#pwrap');if(w)w.classList.toggle('isfs',fsEl()===w)});
+ if(e.key=='z'||e.key=='Z'){pZoom();e.preventDefault()}else if(e.key=='f'||e.key=='F'){pFull();e.preventDefault()}
+ else if(e.key=='+'||e.key=='-'){const z=typeof PZ=='number'?PZ:PZ=='fill'?zFill():1;PZS=true;pZoomSet(z+(e.key=='+'?.05:-.05));e.preventDefault()}});
+document.addEventListener('fullscreenchange',()=>{const w=$('#pwrap');if(w){w.classList.toggle('isfs',fsEl()===w);pZoomApply()}});
 function playerDialog(title,sub,extra){dialog(`<h2 style="margin:0 90px 2px 0">${esc(title)}</h2><div class="muted">${esc(sub)}</div>
  <div class="pwrap" id="pwrap" onmousemove="pControls()" ontouchstart="pControls()"><video id="pv" controls controlslist="nofullscreen" playsinline autoplay ondblclick="event.preventDefault();pFull()"></video>
-  <div class="pctl"><button class="b sec" id="pzb" onclick="pZoom()"></button><button class="b sec" onclick="pFull()" title="${L('pl.fs_tip')}">⛶</button></div></div>${extra||''}
+  <div class="pctl"><div class="pbtns"><button class="b sec zc" id="ppp" onclick="pPlay()">⏸</button><button class="b sec zc" id="pmu" onclick="pMute()">🔊</button>
+   <button class="b sec" id="pzb" onclick="pZoom()"></button><button class="b sec" onclick="pFull()" title="${L('pl.fs_tip')}">⛶</button></div>
+   <div class="pzs" id="pzs" hidden><input type="range" id="pzr" min="1" max="4" step="0.01" oninput="pZoomSet(+this.value)" title="${L('pl.z_slider')}"><span id="pzv"></span></div></div></div>${extra||''}
  <p class="muted small" id="pmsg">${L('pl.loading')}</p>`);pZoomState();
- $('#dlg').addEventListener('close',()=>{stopPlayer();PQ=null;PZ=false},{once:true})}
+ ['play','pause','volumechange'].forEach(ev=>$('#pv').addEventListener(ev,pZoomState));
+ $('#dlg').addEventListener('close',()=>{stopPlayer();PQ=null;PZ='fit';PZS=false},{once:true})}
 
 async function playLive(uuid){await qualities();const c=(LIVE&&LIVE.channels.find(x=>x.uuid==uuid))||(EPG&&EPG.channels.find(x=>x.uuid==uuid))||{name:L('common.channel')};
  playerDialog(c.name,'Live',`<div class="bar" style="margin:8px 0 0">${qualSel()}<button class="b sec" onclick="playLive('${uuid}')">${L('pl.reload')}</button>

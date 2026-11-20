@@ -271,7 +271,10 @@ dialog:has(.cmp){max-width:1180px}
 table.reps td{padding:7px 8px;vertical-align:middle}
 .pwrap{position:relative;margin:12px 0 0;background:#000;border-radius:12px;overflow:hidden}.pwrap video{display:block;width:100%;max-height:70vh;background:#000;object-fit:contain}
 .pwrap.zfill video{object-fit:cover}
-.pctl{position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:opacity .2s;z-index:2}
+.pctl{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;opacity:0;transition:opacity .2s;z-index:2}
+.pbtns{display:flex;gap:6px}.pctl .zc{display:none}.pwrap.zcustom .pctl .zc{display:inline-flex}
+.pzs{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;backdrop-filter:blur(4px)}
+.pzs[hidden]{display:none}.pzs input{width:min(260px,50vw);accent-color:var(--acc)}.pzs span{min-width:3.5em;text-align:right}
 .pctl .b{background:rgba(0,0,0,.55);color:#fff;border-color:rgba(255,255,255,.25);padding:5px 10px;font-size:13px;backdrop-filter:blur(4px)}
 .pwrap:hover .pctl,.pwrap.show .pctl{opacity:1}
 @media (hover:none){.pctl{opacity:1}}
