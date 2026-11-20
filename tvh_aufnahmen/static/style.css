@@ -189,7 +189,13 @@ table.epg thead th img{height:28px;max-width:80px;object-fit:contain;display:blo
 .chnr{font-size:22px;line-height:28px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 table.epg .tm{position:sticky;left:0;z-index:1;background:var(--solid);width:62px;min-width:62px;max-width:62px;font-size:14px;color:var(--fg)}
 table.epg thead .tm{z-index:3}
-table.epg tbody .tm{vertical-align:top}table.epg tbody .tm div{position:sticky;top:70px;font-weight:700}
+table.epg tbody .tm{vertical-align:top}table.epg tbody .tm div{position:sticky;top:calc(var(--eh,86px) + 8px);font-weight:700}
+/* Blockzeile „20–24 Uhr“ über den Sendungen – nur auf dem Handy, dort statt der Zeitspalte; bleibt unter den
+   Sendern stehen, bis die nächste sie überdeckt */
+table.epg tr.blkbar{display:none}
+table.epg tr.blkbar th{position:sticky;top:var(--eh,86px);z-index:2;padding:6px 10px;border-right:0;text-align:left;
+ background:color-mix(in srgb,var(--acc) 14%,var(--solid));font-size:14px;color:var(--fg);width:auto;max-width:none}
+table.epg tr.blkbar th div{position:sticky;left:10px;display:inline-block;font-weight:700}
 table.epg tbody tr+tr td,table.epg tbody tr+tr th{border-top:3px solid color-mix(in srgb,var(--acc) 25%,var(--line))}
 .ev{cursor:pointer;border-radius:8px;padding:5px;margin:-3px;font-size:13px;line-height:1.35;border-bottom:1px dashed var(--line);padding-bottom:7px;transition:background .12s}
 .ev:last-child{border-bottom:0}.ev:hover{background:var(--hover)}
@@ -222,6 +228,8 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
 
 /* ---------- Handy und schmale Fenster ---------- */
 @media (max-width:760px){
+ table.epg tr.blkbar{display:table-row}
+ table.epg .tm{display:none}
  header{padding:6px 10px;gap:8px}
  .logo-mark{display:none}
  .theme span{display:none}.theme{padding:0;width:36px;justify-content:center}

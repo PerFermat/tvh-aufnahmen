@@ -50,11 +50,16 @@ function placeEpgNav(){const nav=document.querySelector('.epgnav'),slot=$('#hdrs
  sizeEpg()}
 addEventListener('resize',()=>placeEpgNav());
 function epgDay(v){if(!v)return;const [y,m,d]=v.split('-').map(Number);renderEpg(new Date(y,m-1,d,12).getTime()/1000,0)}
+// Oberkante eines Blocks: auf dem Handy die Blockzeile darüber, sonst die Zeile selbst
+const blkTop=h=>{const b=$('#bb'+h);return b&&b.offsetHeight?b.offsetTop:$('#blk'+h).offsetTop};
 function epgJump(h){const w=$('#epgwrap'),r=$('#blk'+h);if(!r)return;
- w.scrollTop=r.offsetTop-w.querySelector('thead').offsetHeight;w.scrollIntoView({block:'nearest'});epgMark()}
+ w.scrollTop=blkTop(h)-w.querySelector('thead').offsetHeight;w.scrollIntoView({block:'nearest'});epgMark()}
 function epgMark(){const w=$('#epgwrap'),th=w&&w.querySelector('thead');if(!th)return;  // sichtbaren Block in der Schnellauswahl markieren
- const top=w.scrollTop+th.offsetHeight+5,h=BLOCKS.filter(b=>$('#blk'+b).offsetTop<=top).pop()??0;
+ const top=w.scrollTop+th.offsetHeight+5,h=BLOCKS.filter(b=>blkTop(b)<=top).pop()??0;
  BLOCKS.forEach(b=>$('#jb'+b)&&($('#jb'+b).className=b==h?'on':''))}
+// Höhe der Senderzeile als CSS-Variable: darunter bleiben Uhrzeit (breit) bzw. Blockzeile (Handy) stehen
+function epgHead(){const t=$('#epgwrap thead');if(t)$('#epgwrap').style.setProperty('--eh',t.offsetHeight+'px')}
+window.addEventListener('resize',()=>{if(cur=='epg')epgHead()});
 function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x}
 // Zellen füllen: Erst ohne Beschreibung zeichnen und messen. Die vollste Zelle der Zeile (mindestens ROW_MIN px)
 // bestimmt die Höhe. Innerhalb der Zelle steht jede Sendung möglichst an der Stelle ihrer Uhrzeit (die Zeile ist
@@ -68,7 +73,7 @@ function evHtml(e){
   <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)}${e.hd?' · HD':''}</div>
   ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}${e.description?`<div class="ds" hidden>${esc(e.description)}</div>`:''}</div>`}
 function layoutEpg(){
- for(const tr of document.querySelectorAll('table.epg tbody tr')){
+ for(const tr of document.querySelectorAll('table.epg tbody tr[id^="blk"]')){
   const h=+tr.id.slice(3),B=blockAt(h),E=blockAt(h+4);
   const cells=[...tr.querySelectorAll('td > .cell')],base=cells.map(c=>c.offsetHeight);
   const H=Math.max(ROW_MIN,...base);
@@ -106,9 +111,9 @@ function fillEpg(){if(EPGQ.trim().length>=2)return epgSearch(EPGFULL);  // Sucht
  if(!chans.length||!evs.length){$('#epgwrap').innerHTML='<p class="muted">Keine Sendungen an diesem Tag.</p>';return}
  const rows=BLOCKS.map(h=>{
   const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];const from=cellCut(all,k);return {k,all,from,list:EPGX.has(k)?all:all.slice(from,from+CELLMAX)}});
-  return `<tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${x.from} frühere</button>`:''}${x.list.map(evHtml).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${after} weitere</button>`:''}</div></td>`}).join('')}</tr>`});
+  return `<tr class="blkbar" id="bb${h}"><th colspan="${chans.length+1}"><div>${h}–${h+4} Uhr</div></th></tr><tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${x.from} frühere</button>`:''}${x.list.map(evHtml).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${after} weitere</button>`:''}</div></td>`}).join('')}</tr>`});
  $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th><div class="chh">${c.number?`<span class="chnr">${c.number}</span>`:''}${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}</div><div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
- EPGCUT=cutSig();epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
+ epgHead();EPGCUT=cutSig();epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
 // Fingerabdruck aller Ausschnitte – ändert er sich (die laufende Sendung ist aus dem Ausschnitt gewandert), neu zeichnen
 let EPGCUT='',EPGCELLS={};
 const cutSig=()=>Object.entries(EPGCELLS).map(([k,a])=>cellCut(a,EPGS+'|'+k)).join(',');
