@@ -6,6 +6,7 @@ import os
 import time
 
 from .files import file_exists
+from .i18n import _
 from .recordings import COPY_FIELDS, create_entry
 from .tvh import entry_info
 
@@ -97,7 +98,7 @@ def export_all(tvh, recdir):
 
 def load_export(data):
     if not isinstance(data, dict) or data.get('format') != FORMAT:
-        raise ValueError('Keine Export-Datei von tvh-aufnahmen')
+        raise ValueError(_('srv.not_export'))
     return data
 
 
@@ -124,11 +125,11 @@ def item(label, action, detail=''):
 
 def plan_tag(tvh, t, tag, recdir, data, autorec_map, apply):
     if lower(tag.get('name')) in t.tag_by_name:
-        return item(tag['name'], 'vorhanden')
+        return item(tag['name'], 'exists')
     if apply:
         tvh.call('channeltag/create', conf=json.dumps(tag))
-        return item(tag['name'], 'angelegt')
-    return item(tag['name'], 'neu')
+        return item(tag['name'], 'created')
+    return item(tag['name'], 'new')
 
 
 def plan_channel(tvh, t, ch, recdir, data, autorec_map, apply):
@@ -147,22 +148,22 @@ def plan_channel(tvh, t, ch, recdir, data, autorec_map, apply):
         if bool(cur.get('enabled')) != bool(ch.get('enabled')):
             changes['enabled'] = bool(ch.get('enabled'))
         if not changes:
-            return item(label, 'vorhanden')
+            return item(label, 'exists')
         detail = ', '.join({'number': 'Nummer', 'tags': 'Tags', 'enabled': 'aktiv'}[k] for k in changes)
         if apply:
             tvh.call('idnode/save', node=json.dumps(dict(changes, uuid=existing)))
-            return item(label, 'angepasst', detail)
-        return item(label, 'anpassen', detail)
+            return item(label, 'adjusted', detail)
+        return item(label, 'adjust', detail)
     if not services:
-        return item(label, 'Dienst nicht gefunden', 'erst den Suchlauf in TVHeadend machen')
+        return item(label, 'no_service', _('srv.imp_scan_first'))
     if apply:
         conf = {k: ch[k] for k in ('name', 'number', 'enabled', 'autoname', 'icon', 'epgauto', 'epglimit',
                                    'dvr_pre_time', 'dvr_pst_time', 'remote_timeshift') if ch.get(k) is not None}
         conf.update(services=services, tags=tags)
         if not tvh.call('channel/create', conf=json.dumps(conf)).get('uuid'):
-            return item(label, 'Fehler', 'TVHeadend hat den Sender nicht angelegt')
-        return item(label, 'angelegt')
-    return item(label, 'neu', '%d Dienst(e) gefunden' % len(services))
+            return item(label, 'error', _('srv.imp_channel_failed'))
+        return item(label, 'created')
+    return item(label, 'new', _('srv.imp_services', n=len(services)))
 
 
 def plan_autorec(tvh, t, a, recdir, data, autorec_map, apply):
@@ -172,11 +173,11 @@ def plan_autorec(tvh, t, a, recdir, data, autorec_map, apply):
         if (cur.get('title') or '') == (a.get('title') or '') and (cur.get('name') or '') == (a.get('name') or '') \
                 and (cur.get('channel') or '') == (channel or ''):
             autorec_map[a.get('old_uuid')] = cur['uuid']
-            return item(label, 'vorhanden')
+            return item(label, 'exists')
     if a.get('channelname') and not channel:
         if not apply and any(lower(c.get('name')) == lower(a['channelname']) for c in data.get('channels') or []):
-            return item(label, 'neu', a['channelname'] + ' (Sender kommt aus dem Import)')
-        return item(label, 'Sender fehlt', a['channelname'])
+            return item(label, 'new', _('srv.imp_channel_from_import', ch=a['channelname']))
+        return item(label, 'channel_missing', a['channelname'])
     if apply:
         conf = {k: v for k, v in a.items() if k not in ('channelname', 'tagname', 'old_uuid', 'uuid')}
         conf['channel'] = channel or ''
@@ -185,10 +186,10 @@ def plan_autorec(tvh, t, a, recdir, data, autorec_map, apply):
             conf.pop('config_name', None)  # Aufnahmeprofil der alten Installation → Standardprofil
         new = tvh.call('dvr/autorec/create', conf=json.dumps(conf)).get('uuid')
         if not new:
-            return item(label, 'Fehler', 'TVHeadend hat den Serien-Timer nicht angelegt')
+            return item(label, 'error', _('srv.imp_autorec_failed'))
         autorec_map[a.get('old_uuid')] = new
-        return item(label, 'angelegt')
-    return item(label, 'neu', a.get('channelname') or 'alle Sender')
+        return item(label, 'created')
+    return item(label, 'new', a.get('channelname') or _('srv.all_channels'))
 
 
 def new_path(fn, old_recdir, recdir):
@@ -204,11 +205,11 @@ def plan_recording(tvh, t, rec, recdir, data, autorec_map, apply):
     if not hasattr(t, 'known_files'):
         t.known_files = {os.path.realpath(e['filename']) for e in tvh.entries() if e.get('filename')}
     if os.path.realpath(fn) in t.known_files:
-        return item(label, 'vorhanden')
+        return item(label, 'exists')
     if not file_exists(fn):
-        return item(label, 'Datei fehlt', fn)
+        return item(label, 'file_missing', fn)
     if rec.get('stop', 0) >= time.time():
-        return item(label, 'Fehler', 'Ende liegt in der Zukunft')
+        return item(label, 'error', _('srv.imp_end_future'))
     if apply:
         conf = {k: v for k, v in rec.items() if k not in ('channel', 'autorec', 'filename')}
         conf.update(enabled=True, files=[{'filename': fn}])
@@ -220,10 +221,10 @@ def plan_recording(tvh, t, rec, recdir, data, autorec_map, apply):
         if autorec_map.get(rec.get('autorec')):
             conf['autorec'] = autorec_map[rec['autorec']]
         if not create_entry(tvh, conf):
-            return item(label, 'Fehler', 'TVHeadend hat den Eintrag nicht angelegt')
+            return item(label, 'error', _('srv.imp_entry_failed'))
         t.known_files.add(os.path.realpath(fn))
-        return item(label, 'angelegt')
-    return item(label, 'neu', fn if fn != rec.get('filename') else '')
+        return item(label, 'created')
+    return item(label, 'new', fn if fn != rec.get('filename') else '')
 
 
 PLANNERS = {'tags': plan_tag, 'channels': plan_channel, 'autorecs': plan_autorec,

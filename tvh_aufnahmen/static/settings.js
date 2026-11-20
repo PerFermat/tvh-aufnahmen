@@ -1,53 +1,57 @@
 // Reiter „Einstellungen“
 async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#main').textContent=e.message;return}
- $('#main').innerHTML=`<form class="ed" onsubmit="event.preventDefault();saveConfig(this)">
- <label class="wide">Aufnahmeverzeichnis (auf dem OSMC)<input name="recdir" required value="${esc(c.recdir)}" placeholder="/media/HDD/recordings"></label>
- <label class="wide">TVHeadend-Server<input name="tvh" required value="${esc(c.tvh)}" placeholder="http://localhost:9981"></label>
- <label>Benutzer<input name="user" value="${esc(c.user)}" autocomplete="off"></label>
- <label>Passwort<input type="password" name="password" autocomplete="new-password" placeholder="${c.has_password?'gespeichert – leer lassen = unverändert':''}"></label>
- <label>Sprachcode<input name="lang" value="${esc(c.lang)}" placeholder="ger"></label>
- <label class="wide">TVHeadend-Konfigurationsordner (für die Komplettsicherung)<input name="tvhconf" value="${esc(c.tvhconf)}" placeholder="/home/hts/.config/hts"></label>
- ${c.has_password?'<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="clear_password"> Passwort entfernen</label>':''}
- <div class="wide muted">Gespeichert in ${esc(c.config_file)}</div>
- <div class="wide"><button class="b">Verbindung prüfen und speichern</button></div></form>
+ $('#main').innerHTML=`<h3 style="margin-top:0">${L('cfg.ui_lang')}</h3>
+ <div class="ed" style="margin-bottom:12px"><label>${L('cfg.ui_lang_label')}<select onchange="setUiLang(this.value)">
+  <option value="" ${UILANG?'':'selected'}>${L('cfg.ui_lang_browser')}</option>
+  ${(window.LANGS||[]).map(l=>`<option value="${esc(l.code)}" ${UILANG==l.code?'selected':''}>${esc(l.name)}</option>`).join('')}</select></label>
+  <p class="muted wide" style="margin:0">${L('cfg.ui_lang_hint')}</p></div>
+ <h3>${L('cfg.connection')}</h3>
+ <form class="ed" onsubmit="event.preventDefault();saveConfig(this)">
+ <label class="wide">${L('cfg.recdir')}<input name="recdir" required value="${esc(c.recdir)}" placeholder="/media/HDD/recordings"></label>
+ <label class="wide">${L('cfg.server')}<input name="tvh" required value="${esc(c.tvh)}" placeholder="http://localhost:9981"></label>
+ <label>${L('cfg.user')}<input name="user" value="${esc(c.user)}" autocomplete="off"></label>
+ <label>${L('cfg.password')}<input type="password" name="password" autocomplete="new-password" placeholder="${c.has_password?L('cfg.stored'):''}"></label>
+ <label>${L('cfg.epg_lang')}<input name="lang" value="${esc(c.lang)}" placeholder="ger"></label>
+ <label class="wide">${L('cfg.tvhconf')}<input name="tvhconf" value="${esc(c.tvhconf)}" placeholder="~/.config/hts"></label>
+ ${c.has_password?`<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="clear_password"> ${L('cfg.clear_password')}</label>`:''}
+ <div class="wide muted">${L('cfg.stored_in',{f:esc(c.config_file)})}</div>
+ <div class="wide"><button class="b">${L('cfg.save')}</button></div></form>
  <div id="qualitycfg"></div>
  <div id="notifycfg"></div>
  <div id="traktcfg"></div>`;renderQuality();renderNotify();renderTrakt(c)}
 // Qualität beim Abspielen – gilt nur für dieses Gerät (Handy z. B. „Mobil“, PC „Home“)
 async function renderQuality(){const q=await qualities();if(cur!='config'||!$('#qualitycfg'))return;
  if(q.length<2){$('#qualitycfg').innerHTML='';return}
- $('#qualitycfg').innerHTML=`<h3>Abspielen (dieses Gerät)</h3>
+ $('#qualitycfg').innerHTML=`<h3>${L('cfg.player')}</h3>
  <div class="ed" style="margin-bottom:12px">
-  <label class="chk wide"><input type="radio" name="player" value="intern" ${playerMode()=='intern'?'checked':''} onchange="store('player','intern');msg('Abspielen im internen Player',true)"> <b>Interner Player</b>&nbsp;<span class="muted">– direkt hier im Browser, auf Handy und PC</span></label>
-  <label class="chk wide"><input type="radio" name="player" value="extern" ${playerMode()=='extern'?'checked':''} onchange="store('player','extern');msg('Abspielen mit externem Player (m3u-Datei, z. B. VLC)',true)"> <b>Externer Player</b>&nbsp;<span class="muted">– lädt eine m3u-Datei für VLC o. Ä. (wie bisher)</span></label>
-  ${canPlayInline()?'':'<p class="muted wide" style="margin:0">⚠ Dieser Browser kann den internen Player nicht nutzen (z. B. iPhone) – hier wird immer der externe verwendet.</p>'}</div>
- <h3>Qualität beim Abspielen (dieses Gerät)</h3>
- <p class="muted">Gilt für „Abspielen“ in Live-TV, im Programm und – im internen Player – auch für Aufnahmen. Jedes Gerät merkt sich seine eigene Einstellung. Die kleineren Stufen rechnet der Raspberry um – das schafft er nur für einen Stream gleichzeitig. „Home“ kostet bei HD-Sendern kaum Rechenleistung.</p>
- <div class="ed">${q.map(x=>`<label class="chk wide"><input type="radio" name="quality" value="${esc(x.profile)}" ${x.profile==quality()?'checked':''} onchange="store('quality',this.value);msg('Qualität auf diesem Gerät: ${esc(x.name)}',true)"> <b>${esc(x.name)}</b>&nbsp;<span class="muted">– ${esc(x.info)}</span></label>`).join('')}</div>`}
+  <label class="chk wide"><input type="radio" name="player" value="intern" ${playerMode()=='intern'?'checked':''} onchange="store('player','intern');msg(L('cfg.player_int_msg'),true)"> <b>${L('cfg.player_int')}</b>&nbsp;<span class="muted">– ${L('cfg.player_int_hint')}</span></label>
+  <label class="chk wide"><input type="radio" name="player" value="extern" ${playerMode()=='extern'?'checked':''} onchange="store('player','extern');msg(L('cfg.player_ext_msg'),true)"> <b>${L('cfg.player_ext')}</b>&nbsp;<span class="muted">– ${L('cfg.player_ext_hint')}</span></label>
+  ${canPlayInline()?'':`<p class="muted wide" style="margin:0">⚠ ${L('cfg.no_inline')}</p>`}</div>
+ <h3>${L('cfg.quality')}</h3>
+ <p class="muted">${L('cfg.quality_hint')}</p>
+ <div class="ed">${q.map(x=>`<label class="chk wide"><input type="radio" name="quality" value="${esc(x.profile)}" ${x.profile==quality()?'checked':''} onchange="store('quality',this.value);msg(L('cfg.quality_msg',{q:this.dataset.n}),true)" data-n="${esc(x.name)}"> <b>${esc(x.name)}</b>&nbsp;<span class="muted">– ${esc(x.info)}</span></label>`).join('')}</div>`}
 // Benachrichtigungen aufs Handy über ntfy (App „ntfy“, kostenlos, ohne Konto)
 async function renderNotify(){let j;try{j=await api('/api/jobs')}catch(e){return}if(cur!='config'||!$('#notifycfg'))return;const n=j.notify;
- $('#notifycfg').innerHTML=`<h3>Benachrichtigungen aufs Handy</h3>
- <p class="muted">Über <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a>: App „ntfy“ installieren, ein Thema mit einem schwer zu erratenden Namen abonnieren (z. B. <code>tvh-${Math.random().toString(36).slice(2,10)}</code>) und hier die vollständige Adresse eintragen. Jeder, der den Namen kennt, kann mitlesen.</p>
+ $('#notifycfg').innerHTML=`<h3>${L('cfg.notify')}</h3>
+ <p class="muted">${L('cfg.notify_hint',{link:'<a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a>',ex:'<code>tvh-'+Math.random().toString(36).slice(2,10)+'</code>'})}</p>
  <form class="ed" onsubmit="event.preventDefault();saveNotify(this)">
-  <label class="wide">ntfy-Adresse<input name="url" value="${esc(n.url)}" placeholder="https://ntfy.sh/mein-geheimes-thema"></label>
-  <label class="chk"><input type="checkbox" name="done" ${n.done?'checked':''}> Aufnahme fertig</label>
-  <label class="chk"><input type="checkbox" name="failed" ${n.failed?'checked':''}> Aufnahme fehlgeschlagen</label>
-  <label class="chk"><input type="checkbox" name="disk" ${n.disk?'checked':''}> Speicher fast voll (unter 10 % frei)</label>
-  <div class="wide bar" style="margin:0"><button class="b">Speichern</button><button type="button" class="b sec" onclick="testNotify(this.form)">Testnachricht senden</button></div></form>`}
+  <label class="wide">${L('cfg.ntfy_url')}<input name="url" value="${esc(n.url)}" placeholder="https://ntfy.sh/${L('cfg.ntfy_ph')}"></label>
+  <label class="chk"><input type="checkbox" name="done" ${n.done?'checked':''}> ${L('cfg.n_done')}</label>
+  <label class="chk"><input type="checkbox" name="failed" ${n.failed?'checked':''}> ${L('cfg.n_failed')}</label>
+  <label class="chk"><input type="checkbox" name="disk" ${n.disk?'checked':''}> ${L('cfg.n_disk')}</label>
+  <div class="wide bar" style="margin:0"><button class="b">${L('common.save')}</button><button type="button" class="b sec" onclick="testNotify(this.form)">${L('cfg.n_test')}</button></div></form>`}
 async function saveNotify(f){const j=await api('/api/jobs').catch(()=>null);
- try{await api('/api/jobs',{autobackup:j?j.autobackup:{},notify:{url:f.url.value,done:f.done.checked,failed:f.failed.checked,disk:f.disk.checked}});msg('Benachrichtigungen gespeichert',true)}catch(e){msg(e.message)}}
-async function testNotify(f){if(!f.url.value.trim())return msg('Bitte zuerst die ntfy-Adresse eintragen');
- try{const r=await api('/api/notify-test',{url:f.url.value});msg(r.sent?'Testnachricht gesendet – sie sollte gleich auf dem Handy erscheinen':'Nicht gesendet',r.sent)}catch(e){msg(e.message)}}
+ try{await api('/api/jobs',{autobackup:j?j.autobackup:{},notify:{url:f.url.value,done:f.done.checked,failed:f.failed.checked,disk:f.disk.checked}});msg(L('cfg.n_saved'),true)}catch(e){msg(e.message)}}
+async function testNotify(f){if(!f.url.value.trim())return msg(L('cfg.n_need_url'));
+ try{const r=await api('/api/notify-test',{url:f.url.value});msg(r.sent?L('cfg.n_sent'):L('cfg.n_not_sent'),r.sent)}catch(e){msg(e.message)}}
 // Bilder von Trakt: Filme und Serien, die Wikipedia und TVmaze nicht kennen
-function renderTrakt(c){$('#traktcfg').innerHTML=`<h3>Bilder von Trakt</h3>
- <p class="muted">Für Filme (und Serien), zu denen Wikipedia und TVmaze kein Bild haben. Dafür braucht es eine kostenlose „Client ID“:
- bei <a href="https://trakt.tv" target="_blank" rel="noopener">trakt.tv</a> anmelden, unter
- <a href="https://trakt.tv/oauth/applications/new" target="_blank" rel="noopener">Applications → New Application</a> als Name z. B. <code>tvh-aufnahmen</code>
- und als Redirect URI <code>urn:ietf:wg:oauth:2.0:oob</code> eintragen, speichern – dann die angezeigte <b>Client ID</b> hier einfügen (das „Client Secret“ wird nicht gebraucht).</p>
+function renderTrakt(c){$('#traktcfg').innerHTML=`<h3>${L('cfg.trakt')}</h3>
+ <p class="muted">${L('cfg.trakt_hint',{site:'<a href="https://trakt.tv" target="_blank" rel="noopener">trakt.tv</a>',
+  apps:'<a href="https://trakt.tv/oauth/applications/new" target="_blank" rel="noopener">Applications → New Application</a>',name:'<code>tvh-aufnahmen</code>',uri:'<code>urn:ietf:wg:oauth:2.0:oob</code>'})}</p>
  <form class="ed" onsubmit="event.preventDefault();saveTrakt(this)">
-  <label class="wide">Client ID<input name="id" autocomplete="off" spellcheck="false" placeholder="${c.has_trakt?'gespeichert – leer lassen = unverändert':''}"></label>
-  <div class="wide bar" style="margin:0"><button class="b">Prüfen und speichern</button>${c.has_trakt?'<button type="button" class="b sec" onclick="saveTrakt(null)">Entfernen</button>':''}</div></form>`}
-async function saveTrakt(f){if(f&&!f.id.value.trim())return msg('Bitte die Client ID einfügen');
- try{const c=await api('/api/trakt',f?{id:f.id.value}:{clear:true});renderTrakt(c);msg(f?'Trakt-Client-ID gespeichert – Bilder werden nach und nach nachgeladen':'Trakt-Client-ID entfernt',true)}catch(e){msg(e.message)}}
+  <label class="wide">Client ID<input name="id" autocomplete="off" spellcheck="false" placeholder="${c.has_trakt?L('cfg.stored'):''}"></label>
+  <div class="wide bar" style="margin:0"><button class="b">${L('cfg.check_save')}</button>${c.has_trakt?`<button type="button" class="b sec" onclick="saveTrakt(null)">${L('cfg.remove')}</button>`:''}</div></form>`}
+async function saveTrakt(f){if(f&&!f.id.value.trim())return msg(L('cfg.trakt_need'));
+ try{const c=await api('/api/trakt',f?{id:f.id.value}:{clear:true});renderTrakt(c);msg(f?L('cfg.trakt_saved'):L('cfg.trakt_removed'),true)}catch(e){msg(e.message)}}
 async function saveConfig(form){const f=Object.fromEntries(new FormData(form));f.clear_password=!!f.clear_password;
- try{await api('/api/config',f);msg('Einstellungen gespeichert',true);await load();if(S)tab('live')}catch(e){msg(e.message)}}
+ try{await api('/api/config',f);msg(L('cfg.saved'),true);await load();if(S)tab('live')}catch(e){msg(e.message)}}

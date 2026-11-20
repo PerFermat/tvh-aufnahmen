@@ -4,6 +4,7 @@ import re
 import time
 from datetime import datetime
 
+from .i18n import _
 from .posters import attach
 
 EVENT_FIELDS = ('eventId', 'channelUuid', 'title', 'subtitle', 'description', 'start', 'stop',
@@ -70,7 +71,7 @@ def epg_search(tvh, query, fulltext=False):
     """Sucht im ganzen EPG (alle Tage) nach Titel – mit fulltext auch in Untertitel und Beschreibung."""
     query = (query or '').strip()
     if len(query) < 2:
-        raise ValueError('Bitte mindestens 2 Zeichen eingeben')
+        raise ValueError(_('srv.min2'))
     params = {'title': query, 'limit': 500}
     if fulltext:
         params['fulltext'] = 1
@@ -97,7 +98,7 @@ def event_detail(tvh, posters, archive, event_id):
     if not res:  # schon vorbei und von TVHeadend gelöscht – aus dem Archiv
         old = archive.find(event_id)
         if not old:
-            raise ValueError('Sendung nicht mehr im Programm')
+            raise ValueError(_('srv.event_gone'))
         res = [dict(old, archived=True)]
     attach(posters, res, min_duration=0, urgent=True)  # beim Öffnen für jede Sendung, sofort
     return res[0]
@@ -113,7 +114,7 @@ def repeats(tvh, archive, event_id):
     res = tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or []
     ev = res[0] if res else archive.find(event_id)
     if not ev:
-        raise ValueError('Sendung nicht gefunden')
+        raise ValueError(_('srv.event_not_found'))
     title, sub = _norm(ev.get('title')), _norm((ev.get('subtitle') or '').split('\n')[0])
     first = (ev.get('subtitle') or '').split('\n')[0]
     # „Komödie, USA 1962“ ist kein Episodenname, sondern Genre/Land/Jahr – dann zählt nur der Titel
@@ -152,7 +153,7 @@ def record_event(tvh, event_id, config_uuid=''):
     res = tvh.call('dvr/entry/create_by_event', event_id=int(event_id), config_uuid=config_uuid or '')
     uuids = res.get('uuid') or []
     if not uuids:
-        raise ValueError('TVHeadend hat keine Aufnahme angelegt (schon geplant oder Sendung vorbei?)')
+        raise ValueError(_('srv.rec_not_created'))
     uuid = uuids[0] if isinstance(uuids, list) else uuids
     c = conflicts(tvh)
     return {'uuid': uuid, 'conflict': next((g for g in c['groups'] if uuid in g['uuids']), None), 'tuners': c['tuners']}
@@ -163,15 +164,15 @@ def record_manual(tvh, lang, req):
     title = (req.get('title') or '').strip()
     start, stop = int(req.get('start') or 0), int(req.get('stop') or 0)
     if not title:
-        raise ValueError('Bitte einen Titel angeben')
+        raise ValueError(_('srv.need_title'))
     if not req.get('channel'):
-        raise ValueError('Bitte einen Sender wählen')
+        raise ValueError(_('srv.need_channel'))
     if stop <= start:
-        raise ValueError('Das Ende muss nach dem Beginn liegen')
+        raise ValueError(_('srv.end_after_start'))
     if stop <= time.time():
-        raise ValueError('Das Ende liegt in der Vergangenheit')
+        raise ValueError(_('srv.end_in_past'))
     if stop - start > 12 * 3600:
-        raise ValueError('Länger als 12 Stunden – bitte Zeiten prüfen')
+        raise ValueError(_('srv.too_long'))
     conf = {'enabled': True, 'channel': req['channel'], 'start': start, 'stop': stop, 'title': {lang: title},
             'comment': 'von Hand angelegt', 'start_extra': max(0, int(req.get('start_extra') or 0)),
             'stop_extra': max(0, int(req.get('stop_extra') or 0))}
@@ -181,7 +182,7 @@ def record_manual(tvh, lang, req):
         conf['config_name'] = req['config']
     uuid = tvh.call('dvr/entry/create', conf=json.dumps(conf)).get('uuid')
     if not uuid:
-        raise ValueError('TVHeadend hat die Aufnahme nicht angelegt')
+        raise ValueError(_('srv.manual_not_created'))
     c = conflicts(tvh)
     return {'uuid': uuid, 'conflict': next((g for g in c['groups'] if uuid in g['uuids']), None), 'tuners': c['tuners']}
 
@@ -219,7 +220,7 @@ def resolve_enum(tvh, enum):
 def class_form(tvh, name):
     """Formularbeschreibung einer TVHeadend-Klasse (z. B. dvrautorec) mit allen Auswahllisten."""
     if not re.fullmatch(r'\w+', name or ''):
-        raise ValueError('Ungültige Klasse')
+        raise ValueError(_('srv.bad_class'))
     props = []
     for p in tvh.call('idnode/class', name=name).get('props', []):
         if p.get('rdonly') or p.get('noui'):
@@ -253,14 +254,14 @@ def autorecs(tvh):
 
 def check_uuid(uuid):
     if not re.fullmatch(r'[0-9a-f]{32}', uuid or ''):
-        raise ValueError('Ungültige ID')
+        raise ValueError(_('srv.bad_id'))
     return uuid
 
 
 def autorec_load(tvh, uuid):
     res = tvh.call('idnode/load', uuid=check_uuid(uuid)).get('entries') or []
     if not res:
-        raise ValueError('Serienaufnahme nicht gefunden')
+        raise ValueError(_('srv.autorec_not_found'))
     return {p['id']: p.get('value') for p in res[0]['params']}
 
 
@@ -271,10 +272,10 @@ def autorec_save(tvh, conf):
         tvh.call('idnode/save', node=json.dumps(dict(conf, uuid=check_uuid(uuid))))
         return {'uuid': uuid}
     if not (conf.get('title') or conf.get('channel') or conf.get('tag') or conf.get('content_type')):
-        raise ValueError('Bitte mindestens Titel, Sender, Tag oder Inhaltsart angeben – sonst würde alles aufgenommen')
+        raise ValueError(_('srv.autorec_too_wide'))
     res = tvh.call('dvr/autorec/create', conf=json.dumps(conf))
     if not res.get('uuid'):
-        raise ValueError('TVHeadend hat die Serienaufnahme nicht angelegt')
+        raise ValueError(_('srv.autorec_not_created'))
     return {'uuid': res['uuid']}
 
 
@@ -301,7 +302,7 @@ def upcoming_cancel(tvh, uuid):
     uuid = check_uuid(uuid)
     entry = next((e for e in upcoming_entries(tvh) if e['uuid'] == uuid), None)
     if not entry:
-        raise ValueError('Termin nicht (mehr) geplant')
+        raise ValueError(_('srv.not_scheduled'))
     if entry.get('sched_status') == 'recording':
         tvh.call('dvr/entry/stop', uuid=uuid)
         return {'stopped': uuid}

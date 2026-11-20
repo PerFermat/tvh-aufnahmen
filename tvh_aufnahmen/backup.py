@@ -11,6 +11,8 @@ import tarfile
 import time
 import urllib.error
 
+from .i18n import _
+
 INFO_NAME = 'tvh-aufnahmen-info.json'
 EPG_NAME = 'epgdb.v3'
 SKIP = {'.lock', INFO_NAME}
@@ -20,7 +22,7 @@ def check_password(cfg, password):
     """Die Sicherung enthält die Benutzer und Passwörter von TVHeadend – deshalb nur
     mit dem Passwort aus den Einstellungen herausgeben."""
     if cfg.get('password') and not hmac.compare_digest((password or '').encode(), cfg['password'].encode()):
-        raise ValueError('Passwort stimmt nicht')
+        raise ValueError(_('srv.wrong_password'))
 
 
 def write_backup(conf, out, info, with_epg=True):
@@ -46,13 +48,13 @@ def check_archive(path):
             for m in members:
                 parts = m.name.split('/')
                 if m.name.startswith('/') or '..' in parts or not (m.isfile() or m.isdir()):
-                    raise ValueError('Unzulässiger Eintrag im Archiv: ' + m.name)
+                    raise ValueError(_('srv.bad_tar_entry', name=m.name))
                 if m.name == INFO_NAME:
                     info = json.load(tar.extractfile(m))
     except (tarfile.TarError, EOFError, json.JSONDecodeError) as e:
-        raise ValueError('Keine gültige Sicherung (.tar.gz): %s' % e)
+        raise ValueError(_('srv.bad_backup', err=e))
     if not any(m.name == 'config' and m.isfile() for m in members):
-        raise ValueError('Das Archiv ist keine TVHeadend-Sicherung (Datei „config“ fehlt)')
+        raise ValueError(_('srv.not_tvh_backup'))
     return info
 
 
@@ -60,8 +62,8 @@ def systemctl(action, service):
     r = subprocess.run(['sudo', '-n', 'systemctl', action, service],
                        capture_output=True, text=True, timeout=120)
     if r.returncode:
-        raise ValueError('„sudo systemctl %s %s“ ging nicht: %s'
-                         % (action, service, (r.stderr or r.stdout).strip()))
+        raise ValueError(_('srv.systemctl_failed', cmd='sudo systemctl %s %s' % (action, service),
+                           err=(r.stderr or r.stdout).strip()))
 
 
 def wait_for_tvh(tvh, seconds=60):
@@ -73,7 +75,7 @@ def wait_for_tvh(tvh, seconds=60):
             return {}  # läuft, nur die Anmeldedaten passen nicht mehr (Benutzer aus der Sicherung)
         except OSError:
             if time.time() > end:
-                raise ValueError('TVHeadend antwortet nach dem Neustart nicht')
+                raise ValueError(_('srv.tvh_no_restart'))
             time.sleep(2)
 
 
@@ -83,10 +85,10 @@ def restore(app, length, body, force=False):
     conf = app.tvhconf.rstrip('/')
     service = app.service
     if length <= 0:
-        raise ValueError('Leere Datei')
+        raise ValueError(_('srv.empty_file'))
     parent = os.path.dirname(conf)
     if length > shutil.disk_usage(parent).free - 50 * 1024 * 1024:
-        raise ValueError('Nicht genug freier Speicher für die Sicherung')
+        raise ValueError(_('srv.no_space_backup'))
     tmp = conf + '.upload.tar.gz'
     try:
         with open(tmp, 'wb') as f:
@@ -94,22 +96,21 @@ def restore(app, length, body, force=False):
             while left:
                 chunk = body.read(min(left, 1024 * 1024))
                 if not chunk:
-                    raise ValueError('Upload abgebrochen')
+                    raise ValueError(_('srv.upload_aborted'))
                 f.write(chunk)
                 left -= len(chunk)
         info = check_archive(tmp)
         running = app.tvh.call('serverinfo').get('sw_version')
         if not force and info.get('tvh_version') and info['tvh_version'] != running:
-            return {'confirm': 'Die Sicherung stammt von TVHeadend %s, installiert ist %s. Trotzdem einspielen?'
-                               % (info['tvh_version'], running)}
+            return {'confirm': _('srv.version_differs', old=info['tvh_version'], new=running)}
         if service:
             try:
                 systemctl('stop', service)
             except ValueError as e:  # noch nichts verändert – Weg von Hand zeigen
-                raise ValueError('%s\n\nNichts verändert. Von Hand geht es so (Sicherung nach /tmp kopieren):\n'
+                raise ValueError('%s\n\n%s\n' % (e, _('srv.restore_manual')) +
                                  'sudo systemctl stop %s\nmv %s %s.alt\nmkdir %s\n'
-                                 'tar xzf /tmp/<sicherung>.tar.gz -C %s\nsudo systemctl start %s'
-                                 % (e, service, conf, conf, conf, conf, service))
+                                 'tar xzf /tmp/<backup>.tar.gz -C %s\nsudo systemctl start %s'
+                                 % (service, conf, conf, conf, conf, service))
         old = '%s.vor-wiederherstellung-%s' % (conf, time.strftime('%Y%m%d-%H%M%S'))
         os.rename(conf, old)
         try:

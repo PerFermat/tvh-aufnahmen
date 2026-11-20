@@ -11,6 +11,7 @@ import urllib.request
 from .backup import write_backup
 from .config import save_config
 from .epg_archive import archive_upcoming
+from .i18n import _
 from .state import disk_info
 from .transfer import export_all
 
@@ -65,13 +66,13 @@ class Jobs:
                  'hour': int(b.get('hour', 3)) % 24, 'minute': int(b.get('minute', 30)) % 60,
                  'keep': max(1, min(365, int(b.get('keep', 14))))}
         if new_b['enabled'] and not new_b['dir']:
-            raise ValueError('Bitte einen Ordner für die Sicherungen angeben')
+            raise ValueError(_('srv.need_backup_dir'))
         if new_b['dir']:
             new_b['dir'] = os.path.abspath(os.path.expanduser(new_b['dir']))
             os.makedirs(new_b['dir'], exist_ok=True)
         url = (n.get('url') or '').strip()
         if url and not re.match(r'https?://[^/\s]+/\S+$', url):
-            raise ValueError('ntfy-Adresse bitte vollständig angeben, z. B. https://ntfy.sh/mein-geheimes-thema')
+            raise ValueError(_('srv.ntfy_url'))
         self.app.cfg['autobackup'] = new_b
         self.app.cfg['notify'] = {'url': url, 'done': bool(n.get('done')), 'failed': bool(n.get('failed')),
                                   'disk': bool(n.get('disk'))}
@@ -99,9 +100,9 @@ class Jobs:
         """Komplettsicherung und JSON-Export in den Sicherungsordner, alte darüber hinaus löschen."""
         b = self.settings()['autobackup']
         if not b['dir']:
-            raise ValueError('Kein Ordner für die Sicherungen eingestellt')
+            raise ValueError(_('srv.no_backup_dir'))
         if not self.lock.acquire(blocking=False):
-            raise ValueError('Eine Sicherung läuft gerade')
+            raise ValueError(_('srv.backup_running'))
         try:
             os.makedirs(b['dir'], exist_ok=True)
             day = time.strftime('%Y-%m-%d')
@@ -127,7 +128,7 @@ class Jobs:
             return self.state['backup']
         except Exception as e:
             self.state['backup'] = {'ts': int(time.time()), 'ok': False, 'error': str(e)}
-            self.notify('Sicherung fehlgeschlagen', str(e), 'warning', 4)
+            self.notify(_('srv.n_backup_failed'), str(e), 'warning', 4)
             raise
         finally:
             self.save_state()
@@ -165,10 +166,10 @@ class Jobs:
                 if not first and ((ok_real and n['done']) or (not ok_real and n['failed'])):
                     fresh.append((e, ok_real))
         for e, ok in fresh:
-            title = ('Aufnahme fertig: ' if ok else 'Aufnahme fehlgeschlagen: ') + (e.get('disp_title') or '')
-            text = '%s · %s' % (e.get('channelname') or '', time.strftime('%d.%m. %H:%M', time.localtime(e.get('start') or 0)))
+            title = _('srv.n_done' if ok else 'srv.n_failed', t=e.get('disp_title') or '')
+            text = '%s · %s' % (e.get('channelname') or '', time.strftime(_('srv.n_date'), time.localtime(e.get('start') or 0)))
             if not ok:
-                text += '\n' + (e.get('status') or 'Fehler')
+                text += '\n' + (e.get('status') or _('srv.n_error'))
             self.notify(title, text, 'white_check_mark' if ok else 'warning', 3 if ok else 4)
         self.state['notified'] = sorted(seen)[-2000:]
         self.save_state()
@@ -179,8 +180,8 @@ class Jobs:
             return
         d = disk_info(self.app.recdir)
         if d['free'] < d['total'] * LOW_DISK:
-            self.notify('Speicher fast voll', 'Nur noch %.0f GB frei (%.0f %%). Neue Aufnahmen können fehlschlagen.'
-                        % (d['free'] / 1e9, d['free'] / d['total'] * 100), 'floppy_disk', 4)
+            self.notify(_('srv.n_disk'), _('srv.n_disk_text', gb='%.0f' % (d['free'] / 1e9), pct='%.0f' % (d['free'] / d['total'] * 100)),
+                        'floppy_disk', 4)
             self.state['disk_warned'] = time.strftime('%Y-%m-%d')
             self.save_state()
 

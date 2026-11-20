@@ -3,7 +3,7 @@
 let EPG=null,EPGS=0,EPGQ='',EPGT=store('epgtag')||'',EPGSEQ=0,EPGPT=null;  // EPGPT: Sprungziel, das noch aussteht
 const BLOCKS=[0,4,8,12,16,20],CELLMAX=10,EPGX=new Set();  // EPGX: aufgeklappte Zellen
 const dkey=t=>{const d=new Date(t*1000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
-const wday=t=>new Date(t*1000).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
+const wday=t=>new Date(t*1000).toLocaleDateString(LOCALE,{weekday:'long',day:'numeric',month:'long'});
 const blockOf=t=>Math.floor(new Date(t*1000).getHours()/4)*4;
 async function renderEpg(start,jump){
  if(start!==undefined)EPGS=start;
@@ -11,21 +11,21 @@ async function renderEpg(start,jump){
  // Sprungziel: angegeben; „Jetzt“ → aktueller Block; Reiter neu geöffnet → aktueller Block (heute) bzw. Tagesanfang
  EPGPT=jump??(start!==undefined?(start?0:blockOf(now)):fresh?(EPGS&&dkey(EPGS)!=dkey(now)?0:blockOf(now)):EPGPT);
  const seq=++EPGSEQ;let day;
- if(fresh)$('#main').innerHTML=`<div id="epgbar" class="epgbar"></div><div id="epgwrap" class="epgwrap"><p class="muted">Lade Programm …</p></div>`;
+ if(fresh)$('#main').innerHTML=`<div id="epgbar" class="epgbar"></div><div id="epgwrap" class="epgwrap"><p class="muted">${L('epg.loading')}</p></div>`;
  try{day=await api('/api/epg'+(EPGS?'?start='+EPGS:''))}catch(e){if(seq===EPGSEQ)$('#epgwrap').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
  if(seq!==EPGSEQ||cur!='epg')return;  // inzwischen neuer angefordert oder Reiter gewechselt – verwerfen
  EPG=day;EPGS=EPG.start;const target=EPGPT;EPGPT=null;
  const tags=[...new Set(EPG.channels.flatMap(c=>c.tags))].sort();
  // Zeile 1 immer sichtbar und kompakt (bei genug Breite oben im Kopf); Zeile 2 (Filter, Suche) über 🔍 aufklappbar
  $('#hdrslot').innerHTML='';
- $('#epgbar').innerHTML=`<div class="epgnav"><button class="b sec sq" onclick="renderEpg(EPG.prev,0)" title="Voriger Tag">‹</button>
+ $('#epgbar').innerHTML=`<div class="epgnav"><button class="b sec sq" onclick="renderEpg(EPG.prev,0)" title="${L('epg.prev_day')}">‹</button>
  <input type="date" value="${dkey(EPG.start)}" onchange="epgDay(this.value)" title="${esc(wday(EPG.start))}">
- <button class="b sec sq" onclick="renderEpg(EPG.next,0)" title="Nächster Tag">›</button>
- <span class="seg blocks">${BLOCKS.map(h=>`<button id="jb${h}" onclick="epgJump(${h})" title="${h}–${h+4} Uhr">${h}<span class="to">–${h+4}</span></button>`).join('')}</span>
- <button class="b sec" onclick="renderEpg(0)">Jetzt</button></div>
- <div class="bar tools" style="margin:8px 0 0"><select onchange="EPGT=this.value;store('epgtag',EPGT);fillEpg();toolsState()"><option value="">Alle Sender</option>${tags.map(t=>`<option ${t==EPGT?'selected':''}>${esc(t)}</option>`).join('')}</select>
- <input type="search" id="epgq" placeholder="Im ganzen Programm suchen …" value="${esc(EPGQ)}" oninput="epgTyped(this.value)" onkeydown="if(event.key=='Enter'){clearTimeout(EPGQT);epgSearch(EPGFULL)}" style="flex:1;min-width:160px">
- <label class="chk" title="Suchbegriff auch in Untertitel und Beschreibung der Sendungen suchen, nicht nur im Titel"><input type="checkbox" ${EPGFULL?'checked':''} onchange="EPGFULL=this.checked;store('epgfull',EPGFULL?'1':'');if(EPGQ.trim().length>=2)epgSearch(EPGFULL)"> Auch in Beschreibungen</label></div>`;
+ <button class="b sec sq" onclick="renderEpg(EPG.next,0)" title="${L('epg.next_day')}">›</button>
+ <span class="seg blocks">${BLOCKS.map(h=>`<button id="jb${h}" onclick="epgJump(${h})" title="${L('epg.block',{a:h,b:h+4})}">${h}<span class="to">–${h+4}</span></button>`).join('')}</span>
+ <button class="b sec" onclick="renderEpg(0)">${L('epg.now')}</button></div>
+ <div class="bar tools" style="margin:8px 0 0"><select onchange="EPGT=this.value;store('epgtag',EPGT);fillEpg();toolsState()"><option value="">${L('epg.all_channels')}</option>${tags.map(t=>`<option ${t==EPGT?'selected':''}>${esc(t)}</option>`).join('')}</select>
+ <input type="search" id="epgq" placeholder="${L('epg.search')}" value="${esc(EPGQ)}" oninput="epgTyped(this.value)" onkeydown="if(event.key=='Enter'){clearTimeout(EPGQT);epgSearch(EPGFULL)}" style="flex:1;min-width:160px">
+ <label class="chk" title="${L('epg.full_tip')}"><input type="checkbox" ${EPGFULL?'checked':''} onchange="EPGFULL=this.checked;store('epgfull',EPGFULL?'1':'');if(EPGQ.trim().length>=2)epgSearch(EPGFULL)"> ${L('epg.full')}</label></div>`;
  const keep=$('#epgwrap').scrollTop,keepX=$('#epgwrap').scrollLeft;fillEpg();
  placeEpgNav();toolsState();
  if(target!==null)epgJump(target);else{$('#epgwrap').scrollTop=keep;epgMark()}
@@ -108,10 +108,10 @@ function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=D
 function fillEpg(){if(EPGQ.trim().length>=2)return epgSearch(EPGFULL);  // Suchtext da: Ergebnisliste statt Zeitschrift
  const chans=EPG.channels.filter(c=>c.epg&&(!EPGT||c.tags.includes(EPGT)));
  const evs=EPG.events,cell={};evs.forEach(e=>{(cell[blockOf(e.start)+'|'+e.channelUuid]??=[]).push(e)});EPGCELLS=cell;
- if(!chans.length||!evs.length){$('#epgwrap').innerHTML='<p class="muted">Keine Sendungen an diesem Tag.</p>';return}
+ if(!chans.length||!evs.length){$('#epgwrap').innerHTML=`<p class="muted">${L('epg.empty')}</p>`;return}
  const rows=BLOCKS.map(h=>{
   const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];const from=cellCut(all,k);return {k,all,from,list:EPGX.has(k)?all:all.slice(from,from+CELLMAX)}});
-  return `<tr class="blkbar" id="bb${h}"><th colspan="${chans.length+1}"><div>${h}–${h+4} Uhr</div></th></tr><tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">Uhr</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${x.from} frühere</button>`:''}${x.list.map(evHtml).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${after} weitere</button>`:''}</div></td>`}).join('')}</tr>`});
+  return `<tr class="blkbar" id="bb${h}"><th colspan="${chans.length+1}"><div>${L('epg.block',{a:h,b:h+4})}</div></th></tr><tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">${L('epg.oclock')}</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${L('epg.earlier',{n:x.from})}</button>`:''}${x.list.map(evHtml).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${L('epg.more',{n:after})}</button>`:''}</div></td>`}).join('')}</tr>`});
  $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th><div class="chh">${c.number?`<span class="chnr">${c.number}</span>`:''}${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}</div><div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
  epgHead();EPGCUT=cutSig();epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
 // Fingerabdruck aller Ausschnitte – ändert er sich (die laufende Sendung ist aus dem Ausschnitt gewandert), neu zeichnen
@@ -126,27 +126,27 @@ setInterval(()=>{if(cur!='epg'||!$('table.epg'))return;
  if(cutSig()!==EPGCUT){const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLeft;fillEpg();w.scrollTop=y;w.scrollLeft=x}else epgNow()},60000);
 async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catch(err){return msg(err.message)}
  const schema=await formSchema('dvrautorec'),cfg=(schema.props.find(p=>p.id=='config_name')||{enum:[]}).enum;
- const flags=['hd','widescreen','subtitled','audiodesc','deafsigned','new','repeat'].filter(k=>e[k]).map(k=>({hd:'HD',widescreen:'16:9',subtitled:'Untertitel',audiodesc:'Audiodeskription',deafsigned:'Gebärdensprache',new:'Neu',repeat:'Wiederholung'})[k]);
- const extra=[['Folge',e.episodeOnscreen],['Staffel/Folge',e.seasonNumber?`S${e.seasonNumber} E${e.episodeNumber||'?'}`:''],['Jahr',e.copyright_year],['Altersfreigabe',e.ageRating],['Bewertung',e.starRating],['Kategorie',(e.category||[]).join(', ')],['Stichwörter',(e.keyword||[]).join(', ')],['Erstausstrahlung',e.first_aired?fmt(e.first_aired):'']].filter(x=>x[1]);
+ const flags=['hd','widescreen','subtitled','audiodesc','deafsigned','new','repeat'].filter(k=>e[k]).map(k=>({hd:'HD',widescreen:'16:9',subtitled:L('ev.subtitled'),audiodesc:L('ev.audiodesc'),deafsigned:L('ev.signed'),new:L('ev.new'),repeat:L('ev.repeat')})[k]);
+ const extra=[[L('ev.episode'),e.episodeOnscreen],[L('ev.season'),e.seasonNumber?`S${e.seasonNumber} E${e.episodeNumber||'?'}`:''],[L('ev.year'),e.copyright_year],[L('ev.age'),e.ageRating],[L('ev.rating'),e.starRating],[L('ev.category'),(e.category||[]).join(', ')],[L('ev.keywords'),(e.keyword||[]).join(', ')],[L('ev.first_aired'),e.first_aired?fmt(e.first_aired):'']].filter(x=>x[1]);
  const wdv=(new Date(e.start*1000).getDay()+6)%7+1;
  EVENT=e;if(e.poster_pending)setTimeout(()=>eventPoster(e),1500);dialog(`<h2 style="margin:0 40px 4px 0">${esc(e.title)}</h2>${e.subtitle?`<div class="muted">${esc(e.subtitle)}</div>`:''}
  <p><b>${esc(e.channelName)}</b> · ${esc(wday(e.start))}, ${hm(e.start)}–${hm(e.stop)} (${Math.round((e.stop-e.start)/60)} min)${flags.length?' · '+flags.join(' · '):''}</p>
  ${e.image?`<img src="${esc(e.image)}" alt="" style="max-width:100%;max-height:220px;border-radius:6px">`:''}
- <div id="evposter">${e.poster?posterFig(e.poster):e.poster_pending?'<figure class="wp muted" style="font-size:12px">Bild wird gesucht …</figure>':''}</div>
- ${e.summary&&e.summary!=e.description?`<p><i>${esc(e.summary)}</i></p>`:''}<p style="white-space:pre-line">${esc(e.description||'Keine Beschreibung.')}</p>
+ <div id="evposter">${e.poster?posterFig(e.poster):e.poster_pending?`<figure class="wp muted" style="font-size:12px">${L('ev.searching_image')}</figure>`:''}</div>
+ ${e.summary&&e.summary!=e.description?`<p><i>${esc(e.summary)}</i></p>`:''}<p style="white-space:pre-line">${esc(e.description||L('rec.no_desc'))}</p>
  ${extra.length?`<table>${extra.map(x=>`<tr><td class="muted">${x[0]}</td><td>${esc(x[1])}</td></tr>`).join('')}</table>`:''}
- ${e.dvrUuid?`<p class="tag">Aufnahme ist geplant</p>`:''}
- ${e.stop<=Date.now()/1000?`<p class="muted" style="margin-top:14px">Diese Sendung ist vorbei${e.archived?' (aus dem Archiv dieses Tools)':''}.</p>`:`<div class="bar" style="margin-top:14px"><select id="evcfg">${cfg.map(o=>`<option value="${esc(o.key)}">${esc(o.val)}</option>`).join('')}</select>
-  ${e.start<=Date.now()/1000&&e.channelUuid?`<a class="b" style="text-decoration:none" href="${playHref(e.channelUuid)}" data-play="${e.channelUuid}" title="Öffnet den Sender als Stream in VLC">▶ Abspielen</a>
-  <button class="b sec" data-ch="${e.channelUuid}" data-n="${esc(e.channelName||'')}" onclick="openTeletext(this.dataset.ch,this.dataset.n)">Videotext</button>`:''}
-  <button class="b" onclick="recordEvent(${e.eventId})">Aufnehmen</button>
-  <button class="b sec" onclick="$('#serform').hidden=!$('#serform').hidden">Serienaufnahme …</button></div>`}
- ${e.start<=Date.now()/1000?`<div class="bar" style="margin-top:10px"><button class="b sec" onclick="findRepeats(${e.eventId},this)">🔁 Wiederholungen suchen</button></div><div id="reps"></div>`:''}
- <form id="serform" hidden onsubmit="event.preventDefault();saveSeries(this)"><h3>Serienaufnahme</h3>
+ ${e.dvrUuid?`<p class="tag">${L('ev.planned')}</p>`:''}
+ ${e.stop<=Date.now()/1000?`<p class="muted" style="margin-top:14px">${e.archived?L('ev.over_archived'):L('ev.over')}</p>`:`<div class="bar" style="margin-top:14px"><select id="evcfg">${cfg.map(o=>`<option value="${esc(o.key)}">${esc(o.val)}</option>`).join('')}</select>
+  ${e.start<=Date.now()/1000&&e.channelUuid?`<a class="b" style="text-decoration:none" href="${playHref(e.channelUuid)}" data-play="${e.channelUuid}" title="${L('live.play_tip')}">▶ ${L('common.play')}</a>
+  <button class="b sec" data-ch="${e.channelUuid}" data-n="${esc(e.channelName||'')}" onclick="openTeletext(this.dataset.ch,this.dataset.n)">${L('common.teletext')}</button>`:''}
+  <button class="b" onclick="recordEvent(${e.eventId})">${L('ev.record')}</button>
+  <button class="b sec" onclick="$('#serform').hidden=!$('#serform').hidden">${L('ev.series')} …</button></div>`}
+ ${e.start<=Date.now()/1000?`<div class="bar" style="margin-top:10px"><button class="b sec" onclick="findRepeats(${e.eventId},this)">🔁 ${L('ev.find_repeats')}</button></div><div id="reps"></div>`:''}
+ <form id="serform" hidden onsubmit="event.preventDefault();saveSeries(this)"><h3>${L('ev.series')}</h3>
   ${idnodeForm(schema,{name:e.title,title:'^'+e.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$',channel:e.channelUuid,weekdays:[wdv]})}
-  <div class="bar" style="margin-top:12px"><button class="b">Serienaufnahme anlegen</button></div></form>`)}
+  <div class="bar" style="margin-top:12px"><button class="b">${L('ev.series_create')}</button></div></form>`)}
 let EVENT=null;
-const posterFig=p=>`<figure class="wp"><a href="${esc(p.page)}" target="_blank" rel="noopener"><img src="${esc(p.thumb)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">Bild: <a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.caption)}</a> (${p.src=='tvmaze'?'TVmaze':p.src=='trakt'?'Trakt':p.src=='wikidata'||String(p.thumb).includes('Special:FilePath')?'Wikidata':'Wikipedia'})</figcaption></figure>`;
+const posterFig=p=>`<figure class="wp"><a href="${esc(p.page)}" target="_blank" rel="noopener"><img src="${esc(p.thumb)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">${L('ev.image')}: <a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.caption)}${p.kind?' – '+L('ev.kind_'+p.kind):''}</a> (${p.src=='tvmaze'?'TVmaze':p.src=='trakt'?'Trakt':p.src=='wikidata'||String(p.thumb).includes('Special:FilePath')?'Wikidata':'Wikipedia'})</figcaption></figure>`;
 // Bild für die geöffnete Sendung: Der Server sucht es vorrangig, hier nachfragen, bis es da ist (max. 1 Minute)
 async function eventPoster(e,tries=0){if(EVENT!==e||!$('#dlg').open)return;
  let res;try{res=await api('/api/posters',{keys:[e.poster_key],urgent:true})}catch(err){return}
@@ -154,10 +154,10 @@ async function eventPoster(e,tries=0){if(EVENT!==e||!$('#dlg').open)return;
  if(p==='pending'){if(tries<30)setTimeout(()=>eventPoster(e,tries+1),2000);else box.innerHTML='';return}
  box.innerHTML=p?posterFig(p):''}
 async function recordEvent(id){try{const r=await api('/api/record',{event:id,config:$('#evcfg').value});$('#dlg').close();
- if(r.conflict)msg(`Aufnahme geplant: ${EVENT.title}\n\n⚠ Konflikt: Zu dieser Zeit sind schon ${r.conflict.titles.length-1} andere Aufnahme(n) auf anderen Transpondern geplant – es gibt aber nur ${r.tuners} Tuner. Eine davon wird nicht aufgenommen:\n${r.conflict.titles.join(', ')}`);
- else msg('Aufnahme geplant: '+EVENT.title,true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
+ if(r.conflict)msg(L('up.planned',{t:EVENT.title})+'\n\n⚠ '+L('up.conflict_msg',{n:r.conflict.titles.length-1,tuners:r.tuners})+'\n'+r.conflict.titles.join(', '));
+ else msg(L('up.planned',{t:EVENT.title}),true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
 async function saveSeries(form){const schema=await formSchema('dvrautorec'),conf=readIdnodeForm(form,schema);
- try{await api('/api/autorec-save',conf);$('#dlg').close();msg('Serienaufnahme angelegt: '+(conf.name||conf.title),true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
+ try{await api('/api/autorec-save',conf);$('#dlg').close();msg(L('ev.series_created',{t:conf.name||conf.title}),true);if(cur=='epg')renderEpg()}catch(e){msg(e.message)}}
 
 // Suche über das ganze Programm (alle Tage). Sie startet beim Tippen nach einer kurzen Pause (EPG_DELAY ms),
 // Ergebnisse ersetzen die Zeitschrift; Feld leeren oder „Zurück“ zeigt wieder die Zeitschrift.
@@ -166,34 +166,34 @@ function epgTyped(v){EPGQ=v;clearTimeout(EPGQT);
  if(!v.trim()){EPGR=null;EPGRSEQ++;fillEpg();epgNow();return}
  if(v.trim().length>=2)EPGQT=setTimeout(()=>epgSearch(EPGFULL),EPG_DELAY)}
 function epgBack(){EPGQ='';EPGR=null;EPGRSEQ++;const i=$('#epgq');if(i)i.value='';fillEpg();epgNow();toolsState()}
-async function epgSearch(full){const q=EPGQ.trim();if(q.length<2)return msg('Bitte mindestens 2 Zeichen eingeben');
+async function epgSearch(full){const q=EPGQ.trim();if(q.length<2)return msg(L('epg.min2'));
  EPGFULL=!!full;const seq=++EPGRSEQ;
- if(!$('#epgwrap .srch'))$('#epgwrap').innerHTML='<p class="muted" style="padding:12px">Suche im ganzen Programm …</p>';  // alte Treffer bis zu den neuen stehen lassen
+ if(!$('#epgwrap .srch'))$('#epgwrap').innerHTML=`<p class="muted" style="padding:12px">${L('epg.searching')}</p>`;  // alte Treffer bis zu den neuen stehen lassen
  let r;try{r=await api('/api/epg-search?q='+encodeURIComponent(q)+(full?'&full=1':''))}catch(e){if(seq===EPGRSEQ)msg(e.message);return}
  if(cur!='epg'||seq!==EPGRSEQ)return;EPGR=r;  // inzwischen weitergetippt – veraltetes Ergebnis verwerfen
  const days={};r.events.forEach(e=>(days[dkey(e.start)]??=[]).push(e));
- $('#epgwrap').innerHTML=`<div class="srch"><div class="bar"><button class="b sec" onclick="epgBack()">‹ Zurück zum Programm</button>
-  <span class="muted">${r.events.length} Sendungen mit „${esc(q)}“${full?' (auch in Beschreibungen)':''}</span>
+ $('#epgwrap').innerHTML=`<div class="srch"><div class="bar"><button class="b sec" onclick="epgBack()">‹ ${L('epg.back')}</button>
+  <span class="muted">${L('epg.hits',{n:r.events.length,q:esc(q)})}${full?' ('+L('epg.hits_full')+')':''}</span>
 </div>
   ${r.events.length?Object.entries(days).map(([d,evs])=>`<h3>${esc(wday(evs[0].start))}</h3><table>${evs.map(e=>`<tr class="hit" onclick="showEvent(${e.eventId})">
    <td style="white-space:nowrap;width:110px"><b>${hm(e.start)}</b>–${hm(e.stop)}</td><td style="width:180px">${esc(e.channelName||'')}</td>
-   <td><b>${e.planned?'<span class="dot"></span>':''}${esc(e.title)}</b>${e.subtitle&&e.subtitle!=e.title?`<div class="muted">${esc(e.subtitle.split('\n')[0])}</div>`:''}${e.description?`<div class="muted ds2">${esc(e.description)}</div>`:''}</td></tr>`).join('')}</table>`).join(''):'<p class="muted">Nichts gefunden.</p>'}</div>`}
+   <td><b>${e.planned?'<span class="dot"></span>':''}${esc(e.title)}</b>${e.subtitle&&e.subtitle!=e.title?`<div class="muted">${esc(e.subtitle.split('\n')[0])}</div>`:''}${e.description?`<div class="muted ds2">${esc(e.description)}</div>`:''}</td></tr>`).join('')}</table>`).join(''):`<p class="muted">${L('epg.nothing')}</p>`}</div>`}
 let EPGR=null;
 
 // Wiederholungen einer laufenden oder vergangenen Sendung in den kommenden Tagen
-async function findRepeats(id,btn){btn.disabled=true;$('#reps').innerHTML='<p class="muted">Suche …</p>';
+async function findRepeats(id,btn){btn.disabled=true;$('#reps').innerHTML=`<p class="muted">${L('ev.searching')}</p>`;
  let r;try{r=await api('/api/repeats?id='+id)}catch(e){$('#reps').innerHTML='';btn.disabled=false;return msg(e.message)}
  btn.disabled=false;
- $('#reps').innerHTML=r.repeats.length?`<p class="muted" style="margin:6px 0">${r.repeats.length} weitere Ausstrahlung(en)${r.episode?' dieser Folge':''}:</p>
+ $('#reps').innerHTML=r.repeats.length?`<p class="muted" style="margin:6px 0">${L(r.episode?'ev.repeats_ep':'ev.repeats',{n:r.repeats.length})}:</p>
  <table class="reps">${r.repeats.map(e=>`<tr><td style="white-space:nowrap"><b>${esc(wday(e.start))}</b><br><span class="muted">${hm(e.start)}–${hm(e.stop)}</span></td>
   <td>${esc(e.channelName||'')}${e.hd?' <span class="tag">HD</span>':''}<br><a class="evl" onclick="showEvent(${e.eventId})">${esc(e.title)}</a>${e.subtitle&&e.subtitle!=e.title?' <span class="muted">– '+esc(e.subtitle.split('\n')[0])+'</span>':''}</td>
-  <td style="white-space:nowrap">${e.planned?'<span class="tag keep">geplant</span>':`<button class="b" onclick="recordRepeat(${e.eventId},this)">Aufnehmen</button>`}</td></tr>`).join('')}</table>`
-  :`<p class="muted">Keine weitere Ausstrahlung${r.episode?' dieser Folge':''} in den Programmdaten gefunden (reichen etwa 4 Wochen voraus).</p>`;
+  <td style="white-space:nowrap">${e.planned?`<span class="tag keep">${L('ev.planned_tag')}</span>`:`<button class="b" onclick="recordRepeat(${e.eventId},this)">${L('ev.record')}</button>`}</td></tr>`).join('')}</table>`
+  :`<p class="muted">${L(r.episode?'ev.no_repeats_ep':'ev.no_repeats')}</p>`;
  // frühere Ausstrahlungen aus dem EPG-Archiv
- if(r.past&&r.past.length)$('#reps').insertAdjacentHTML('beforeend',`<details class="past"><summary class="muted">${r.past.length} frühere Ausstrahlung(en)${r.episode?' dieser Folge':''} im Archiv</summary>
+ if(r.past&&r.past.length)$('#reps').insertAdjacentHTML('beforeend',`<details class="past"><summary class="muted">${L(r.episode?'ev.past_ep':'ev.past',{n:r.past.length})}</summary>
  <table class="reps">${r.past.map(e=>`<tr><td style="white-space:nowrap"><b>${esc(wday(e.start))} ${new Date(e.start*1000).getFullYear()}</b><br><span class="muted">${hm(e.start)}–${hm(e.stop)}</span></td>
   <td>${esc(e.channelName||'')}${e.hd?' <span class="tag">HD</span>':''}<br><a class="evl" onclick="showEvent(${e.eventId})">${esc(e.title)}</a>${e.subtitle&&e.subtitle!=e.title?' <span class="muted">– '+esc(e.subtitle.split('\n')[0])+'</span>':''}</td></tr>`).join('')}</table></details>`)}
 async function recordRepeat(id,btn){btn.disabled=true;
- try{const r=await api('/api/record',{event:id,config:''});btn.outerHTML='<span class="tag keep">geplant</span>';
-  if(r.conflict)msg(`Aufnahme geplant – aber ⚠ Konflikt: zu der Zeit sind schon ${r.conflict.titles.length-1} andere Aufnahme(n) auf anderen Transpondern geplant, es gibt nur ${r.tuners} Tuner:\n${r.conflict.titles.join(', ')}`);
-  else msg('Aufnahme geplant',true)}catch(e){btn.disabled=false;msg(e.message)}}
+ try{const r=await api('/api/record',{event:id,config:''});btn.outerHTML=`<span class="tag keep">${L('ev.planned_tag')}</span>`;
+  if(r.conflict)msg(L('ev.planned_simple')+' – ⚠ '+L('up.conflict_msg',{n:r.conflict.titles.length-1,tuners:r.tuners})+'\n'+r.conflict.titles.join(', '));
+  else msg(L('ev.planned_simple'),true)}catch(e){btn.disabled=false;msg(e.message)}}

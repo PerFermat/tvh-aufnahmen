@@ -1,6 +1,6 @@
 # tvh-aufnahmen
 
-Web-Oberfläche für TVHeadend 4.3, um
+Web-Oberfläche für TVHeadend 4.3 (deutsch und englisch, weitere Sprachen als JSON-Datei), um
 
 - das **Programm** wie eine Fernsehzeitschrift zu zeigen – ein ganzer Tag, Sender als Spalten, sechs Zeilen zu je 4 Stunden mit allen Sendungen, die darin beginnen; die Schnellauswahl springt zum Block – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
 - im Programm **über alle Tage zu suchen** (Titel, auf Wunsch auch Beschreibungen); laufende Sendungen sind markiert, vorbeigelaufene grau,
@@ -109,6 +109,12 @@ install -Dm755 desktop/tvh-aufnahmen.desktop ~/.local/share/applications/tvh-auf
 
 Danach lässt sie sich aus dem Startmenü oder direkt aus `desktop/` auf den Schreibtisch ziehen. Sie öffnet die Adresse aus der Zeile `Exec=` im Standardbrowser – dort vorher den Namen oder die IP-Adresse des TVHeadend-Rechners eintragen.
 
+## Sprachen
+
+Oberfläche und Meldungen gibt es auf **Deutsch** und **Englisch**. Die Sprache wählt man je Gerät unter „Einstellungen“ → „Sprache“; ohne Wahl gilt die Sprache des Browsers. Benachrichtigungen aufs Handy kommen in der zuletzt gewählten Sprache, die Hilfe auf der Konsole (`--help`) in der Sprache der Umgebung (`LANG`).
+
+Die Texte liegen je Sprache in einer JSON-Datei unter `tvh_aufnahmen/lang/` (`de.json`, `en.json`) – Schlüssel und Text, Platzhalter in geschweiften Klammern (`"rec.count": "{n} von {total} Aufnahmen"`). `_name` ist der Name der Sprache, `_locale` das Format für Datum und Zahlen. Für eine weitere Sprache `de.json` kopieren, z. B. als `fr.json`, und die Texte übersetzen; nach einem Neustart steht sie zur Auswahl. Fehlt ein Text, gilt der deutsche.
+
 ## Sicherung
 
 Der Reiter **Sicherung** bietet zwei Wege:
@@ -147,9 +153,11 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/backup.py` | Komplettsicherung des TVHeadend-Ordners und Wiederherstellung |
 | `tvh_aufnahmen/transfer.py` | JSON-Export/-Import von Tags, Sendern, Serien-Timern und Aufnahmen |
 | `tvh_aufnahmen/server.py` | HTTP-Routen, Download, Playlist, Auslieferung der Oberfläche |
+| `tvh_aufnahmen/i18n.py` | Sprachen: Texte aus `lang/*.json`, Sprache je Anfrage (Cookie bzw. Browser) |
+| `tvh_aufnahmen/lang/` | Sprachdateien `de.json`, `en.json` |
 | `tvh_aufnahmen/static/` | Oberfläche: `index.html`, `style.css` und ein JavaScript pro Reiter (`common.js` für Gemeinsames) |
 
-Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul), eine Route in `server.py` und die Bedienung im passenden Skript unter `static/`.
+Neue Funktionen bekommen ihre Logik in `recordings.py` (oder ein eigenes Modul), eine Route in `server.py` und die Bedienung im passenden Skript unter `static/`. Sichtbare Texte nie fest in den Code schreiben, sondern als Schlüssel in `lang/de.json` und `lang/en.json` – im Browser `L('schluessel', {n: 3})`, im Server `_('schluessel', n=3)`.
 
 ## Hinweise
 

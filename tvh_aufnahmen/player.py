@@ -14,6 +14,7 @@ import threading
 import time
 
 from .files import file_exists
+from .i18n import _
 from .tvh import entry_info
 
 # Qualität → (Bildhöhe, Video-Bitrate, x264-Preset); None = Original (H.264 nur umverpacken)
@@ -64,11 +65,11 @@ def probe_video(src):
 def live_source(tvh, channel_uuid):
     """Stream-Adresse (mit Einmal-Ticket, unverändert), Video-Codec und Videotext-Auswahl eines Senders."""
     if not re.fullmatch(r'[0-9a-f]{32}', channel_uuid or ''):
-        raise ValueError('Ungültiger Sender')
+        raise ValueError(_('srv.bad_channel'))
     body, _ = tvh.get('/playlist/ticket/channel/' + channel_uuid)
     m = re.search(r'^(http\S+)', body.decode('utf-8', 'replace'), re.M)
     if not m:
-        raise ValueError('TVHeadend liefert keine Stream-Adresse')
+        raise ValueError(_('srv.no_stream_url'))
     url = re.sub(r'([?&]profile=)[^&\s]*', r'\1pass', m.group(1))
     video, teletext = '', None
     chan = next((c for c in tvh.call('channel/grid', limit=100000).get('entries', []) if c['uuid'] == channel_uuid), None)
@@ -86,7 +87,7 @@ def live_source(tvh, channel_uuid):
 def recording_source(tvh, uuid):
     fn = entry_info(tvh, uuid).get('filename')
     if not file_exists(fn):
-        raise ValueError('Datei nicht gefunden')
+        raise ValueError(_('srv.file_not_found'))
     out = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=index,codec_name', '-of', 'csv=p=0', fn],
                          capture_output=True, text=True, timeout=20).stdout.split()
     teletext = next(('0:' + x.split(',')[0] for x in out if x.endswith(',dvb_teletext')), None)
@@ -99,22 +100,21 @@ def stream(handler, src, video, teletext, quality, start=0, sid=None):
     subs = None
     if sid and teletext:
         if not re.fullmatch(r'[a-z0-9]{8,32}', sid):
-            raise ValueError('Ungültige Kennung')
+            raise ValueError(_('srv.bad_id'))
         os.makedirs(SUBS, exist_ok=True)
         subs = (teletext, os.path.join(SUBS, sid + '.vtt'))
     if quality not in QUALITY:
         quality = 'pass'
     encode = needs_encoding(video, quality)
     if encode and not ENCODES.acquire(blocking=False):
-        raise ValueError('Es laufen schon zwei umgerechnete Streams – der Raspberry schafft nicht mehr. '
-                         'Bitte einen beenden oder Qualität „Home“ bei HD-Sendern wählen.')
+        raise ValueError(_('srv.too_many_encodes'))
     proc = None
     try:
         proc = subprocess.Popen(ffmpeg_args(src, video, quality, start, subs), stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL)
         first = proc.stdout.read(188 * 64)
         if not first:
-            raise ValueError('Stream lässt sich nicht starten (Sender nicht empfangbar oder Datei defekt?)')
+            raise ValueError(_('srv.stream_failed'))
         handler.send_response(200)
         handler.send_header('Content-Type', 'video/mp2t')
         handler.send_header('Cache-Control', 'no-store')
@@ -142,7 +142,7 @@ def stream(handler, src, video, teletext, quality, start=0, sid=None):
 def subtitles(sid):
     """Bisher erkannte Untertitel einer laufenden Wiedergabe: [{start, end, text}] in Sekunden."""
     if not re.fullmatch(r'[a-z0-9]{8,32}', sid or ''):
-        raise ValueError('Ungültige Kennung')
+        raise ValueError(_('srv.bad_id'))
     path = os.path.join(SUBS, sid + '.vtt')
     try:
         with open(path, encoding='utf-8', errors='replace') as f:

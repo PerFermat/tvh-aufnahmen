@@ -16,6 +16,8 @@ import threading
 import time
 import zlib
 
+from .i18n import _
+
 FOLDER = os.path.expanduser('~/.cache/tvh-aufnahmen/epg-archiv')
 FIELDS = ('eventId', 'channelUuid', 'channelName', 'title', 'subtitle', 'summary', 'description', 'start', 'stop',
           'hd', 'subtitled', 'widescreen', 'audiodesc', 'episodeOnscreen', 'genre', 'ageRating', 'starRating')
@@ -119,7 +121,7 @@ class EpgArchive:
         """Sendungen aus einer Sicherungskopie übernehmen, die hier fehlen (vorhandene bleiben).
         Gibt die Zahl der übernommenen Sendungen zurück."""
         if not os.path.isfile(path):
-            raise ValueError('Keine Sicherungskopie des Archivs gefunden: ' + path)
+            raise ValueError(_('srv.arch_no_copy', path=path))
         with self.lock:
             self.db.execute('ATTACH DATABASE ? AS bak', ('file:%s?mode=ro' % path,))
             try:
@@ -129,7 +131,7 @@ class EpgArchive:
                 self.db.commit()
                 return self.db.total_changes - before
             except sqlite3.DatabaseError as e:
-                raise ValueError('Sicherungskopie des Archivs ist nicht lesbar: %s' % e) from None
+                raise ValueError(_('srv.arch_unreadable', err=e)) from None
             finally:
                 self.db.execute('DETACH DATABASE bak')
 

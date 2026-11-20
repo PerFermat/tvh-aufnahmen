@@ -4,6 +4,8 @@ import re
 import time
 import urllib.parse
 
+from .i18n import _
+
 EPG_HOURS = 8  # so weit voraus werden Sendungen geladen
 LOCAL_HOSTS = ('localhost', '127.0.0.1', '::1')
 
@@ -33,16 +35,15 @@ def live_channels(tvh, upcoming=3):
 
 # Qualitätsstufen beim Abspielen: Name in der Oberfläche → Stream-Profil in TVHeadend.
 # „Home“ ist das unveränderte Original; die anderen rechnet TVHeadend herunter (Transcode-Profile).
-QUALITIES = [('pass', 'Home', 'Original, keine Umrechnung'),
-             ('WLAN-Extern', 'WLAN extern', '720p, ca. 3 Mbit/s'),
-             ('Mobil', 'Mobil', '540p, ca. 1,6 Mbit/s'),
-             ('Mobil-sparsam', 'Mobil sparsam', '360p, ca. 0,6 Mbit/s')]
+# Name und Beschreibung stehen in den Sprachdateien (quality.<profil>, quality.<profil>.info).
+QUALITIES = ['pass', 'WLAN-Extern', 'Mobil', 'Mobil-sparsam']
 
 
 def qualities(tvh):
     """Die Qualitätsstufen, für die es in TVHeadend ein Stream-Profil gibt."""
     have = {p.get('val') for p in tvh.call('profile/list').get('entries', [])}
-    return {'qualities': [{'profile': p, 'name': n, 'info': i} for p, n, i in QUALITIES if p in have]}
+    return {'qualities': [{'profile': p, 'name': _('quality.' + p), 'info': _('quality.%s.info' % p)}
+                          for p in QUALITIES if p in have]}
 
 
 def channel_playlist(tvh, uuid, client_host, profile=None):
@@ -50,12 +51,12 @@ def channel_playlist(tvh, uuid, client_host, profile=None):
     werden die Adressen auf den Rechner umgeschrieben, über den der Browser zugreift.
     profile wählt die Qualität (Stream-Profil von TVHeadend)."""
     if not re.fullmatch(r'[0-9a-f]{32}', uuid or ''):
-        raise ValueError('Ungültiger Sender')
+        raise ValueError(_('srv.bad_channel'))
     body, _ctype = tvh.get('/playlist/ticket/channel/' + uuid)
     text = body.decode('utf-8', 'replace')
     if profile and profile != 'pass':
         if profile not in {p.get('val') for p in tvh.call('profile/list').get('entries', [])}:
-            raise ValueError('Unbekannte Qualität: ' + profile)
+            raise ValueError(_('srv.unknown_quality', q=profile))
         text = re.sub(r'([?&]profile=)[^&\s]*', lambda m: m.group(1) + urllib.parse.quote(profile), text)
     base = urllib.parse.urlsplit(tvh.url)
     client = urllib.parse.urlsplit('//' + (client_host or '')).hostname
@@ -68,7 +69,7 @@ def channel_playlist(tvh, uuid, client_host, profile=None):
 
 def channel_icon(tvh, icon_id):
     if not re.fullmatch(r'\d+', icon_id or ''):
-        raise ValueError('Ungültiges Logo')
+        raise ValueError(_('srv.bad_logo'))
     data, ctype = tvh.get('/imagecache/' + icon_id)
     if not ctype or not ctype.startswith('image/'):
         ctype = ('image/png' if data[:8] == b'\x89PNG\r\n\x1a\n' else

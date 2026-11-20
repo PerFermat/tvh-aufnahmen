@@ -135,7 +135,7 @@ def tvmaze_lookup(title, year=None):
             show = shows[0]['show']
             start = (show.get('premiered') or '')[:4]
             return {'thumb': show['image']['medium'], 'image': show['image'].get('original') or show['image']['medium'],
-                    'page': show['url'], 'caption': show['name'] + (' (%s)' % start if start else '') + ' – Serie',
+                    'page': show['url'], 'caption': show['name'] + (' (%s)' % start if start else ''), 'kind': 'show',
                     'src': 'tvmaze'}
     return None
 
@@ -181,8 +181,8 @@ def trakt_lookup(client_id, title, year=None):
             # media.trakt.tv/…/medium/poster.webp – Größen: thumb (klein), medium (600×900), full (1000×1500)
             return {'thumb': img.replace('/medium/', '/thumb/'), 'image': img.replace('/medium/', '/full/'),
                     'page': 'https://trakt.tv/%s/%s' % (kind + 's', slug),
-                    'caption': item.get('title', q) + (' (%s)' % item['year'] if item.get('year') else '')
-                    + (' – Film' if kind == 'movie' else ' – Serie'), 'src': 'trakt'}
+                    'caption': item.get('title', q) + (' (%s)' % item['year'] if item.get('year') else ''),
+                    'kind': kind, 'src': 'trakt'}  # Art (Film/Serie) setzt die Oberfläche in ihrer Sprache dazu
     return None
 
 

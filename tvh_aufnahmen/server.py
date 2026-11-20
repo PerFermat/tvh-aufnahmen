@@ -7,11 +7,13 @@ import urllib.error
 import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
+from . import i18n
 from .backup import check_password, restore, write_backup
 from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day, epg_search,
                   event_detail, poster_status, record_event, record_manual, repeats, upcoming,
                   upcoming_cancel)
 from .files import file_exists
+from .i18n import _
 from .live import channel_icon, channel_playlist, live_channels, qualities
 from .player import live_source, recording_source, stream as player_stream, subtitles
 from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
@@ -41,15 +43,22 @@ def make_handler(app):
             self.end_headers()
             self.wfile.write(data)
 
+        def lang(self):
+            """Sprache dieser Anfrage (Cookie „lang“, sonst Browser) für Meldungen setzen."""
+            m = re.search(r'(?:^|;\s*)lang=([\w-]+)', self.headers.get('Cookie') or '')
+            code = i18n.pick(m.group(1) if m else '', self.headers.get('Accept-Language') or '')
+            i18n.set_lang(code)
+            return code
+
         def run(self, fn):
             try:
                 result = fn()
                 if result is not None:
                     self.send(200, result)
             except urllib.error.HTTPError as e:
-                self.send(502, {'error': 'TVHeadend antwortet mit HTTP %d (%s)' % (e.code, e.reason)})
+                self.send(502, {'error': _('srv.tvh_http', code=e.code, reason=e.reason)})
             except urllib.error.URLError as e:
-                self.send(502, {'error': 'TVHeadend nicht erreichbar: %s' % e.reason})
+                self.send(502, {'error': _('srv.tvh_unreachable', reason=e.reason)})
             except (ValueError, KeyError, OSError) as e:
                 self.close_connection = True  # evtl. ungelesener Upload
                 self.send(400, {'error': str(e)})
@@ -59,14 +68,14 @@ def make_handler(app):
             ctype = STATIC_TYPES.get(os.path.splitext(name)[1])
             # nur Dateien direkt in static/ oder static/vendor/ (Bibliotheken), kein „..“
             if not re.fullmatch(r'(vendor/)?[\w.-]+', name) or '..' in name or not ctype or not os.path.isfile(path):
-                return self.send(404, {'error': 'nicht gefunden'})
+                return self.send(404, {'error': _('srv.not_found')})
             with open(path, 'rb') as f:
                 self.send(200, f.read(), ctype)
 
         def download(self, uuid):
             fn = entry_info(app.tvh, uuid).get('filename')
             if not file_exists(fn):
-                raise ValueError('Datei nicht gefunden')
+                raise ValueError(_('srv.file_not_found'))
             size = os.path.getsize(fn)
             start, end = 0, size - 1
             rng = re.match(r'bytes=(\d*)-(\d*)$', self.headers.get('Range') or '')
@@ -110,7 +119,7 @@ def make_handler(app):
             """M3U-Datei, mit der VLC die Aufnahme über /api/download streamt."""
             info = entry_info(app.tvh, uuid)
             if not file_exists(info.get('filename')):
-                raise ValueError('Datei nicht gefunden')
+                raise ValueError(_('srv.file_not_found'))
             title = ' '.join((info.get('disp_title') or 'Aufnahme').split())
             dur = max(0, (info.get('stop') or 0) - (info.get('start') or 0))
             host = self.headers.get('Host') or '%s:%d' % self.server.server_address[:2]
@@ -124,7 +133,7 @@ def make_handler(app):
         def thumb(self, uuid, size='small'):
             path = thumbnail(entry_info(app.tvh, uuid).get('filename'), size)
             if not path:
-                return self.send(404, {'error': 'kein Vorschaubild'})
+                return self.send(404, {'error': _('srv.no_thumb')})
             with open(path, 'rb') as f:
                 data = f.read()
             self.send_response(200)
@@ -182,9 +191,18 @@ def make_handler(app):
         def do_GET(self):
             url = urllib.parse.urlsplit(self.path)
             q = dict(urllib.parse.parse_qsl(url.query))
+            code = self.lang()
             if url.path == '/':
                 url = url._replace(path='/static/index.html')
-            if url.path.startswith('/static/'):
+            if url.path == '/lang.js':  # Texte der Oberfläche, vor allen anderen Skripten geladen
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/javascript; charset=utf-8')
+                self.send_header('Cache-Control', 'no-store')
+                data = i18n.script(code)
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            elif url.path.startswith('/static/'):
                 self.static(url.path[len('/static/'):])
             elif url.path == '/api/state':
                 self.run(lambda: build_state(app.tvh, app.recdir))
@@ -242,9 +260,10 @@ def make_handler(app):
             elif url.path == '/api/scan-result':
                 self.run(lambda: scan_result(app.tvh))
             else:
-                self.send(404, {'error': 'nicht gefunden'})
+                self.send(404, {'error': _('srv.not_found')})
 
         def do_POST(self):
+            self.lang()
             length = int(self.headers.get('Content-Length') or 0)
             url = urllib.parse.urlsplit(self.path)
             if url.path == '/api/upload':  # Rohdaten der Datei, kein JSON
@@ -268,6 +287,8 @@ def make_handler(app):
                 self.run(lambda: do_move(app.tvh, req['moves']))
             elif self.path == '/api/config':
                 self.run(lambda: app.update(req))
+            elif self.path == '/api/ui-lang':
+                self.run(lambda: app.set_ui_lang(req.get('lang')))
             elif self.path == '/api/trakt':
                 self.run(lambda: app.set_trakt(req.get('id'), bool(req.get('clear'))))
             elif self.path == '/api/posters':
@@ -295,7 +316,7 @@ def make_handler(app):
             elif self.path == '/api/backup-now':
                 self.run(app.jobs.run_backup)
             elif self.path == '/api/notify-test':
-                self.run(lambda: {'sent': app.jobs.notify('Test von tvh-aufnahmen', 'Benachrichtigungen funktionieren.',
+                self.run(lambda: {'sent': app.jobs.notify(_('srv.n_test'), _('srv.n_test_text'),
                                                            'tada', 3, url=(req.get('url') or '').strip() or None)})
             elif self.path == '/api/backup':
                 self.run(lambda: self.backup(req))
@@ -303,5 +324,5 @@ def make_handler(app):
                 self.run(lambda: plan_import(app.tvh, app.recdir, req.get('data'),
                                              req.get('sections') or (), self.path == '/api/import-apply'))
             else:
-                self.send(404, {'error': 'nicht gefunden'})
+                self.send(404, {'error': _('srv.not_found')})
     return Handler

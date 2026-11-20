@@ -10,6 +10,8 @@ import threading
 import time
 import urllib.request
 
+from .i18n import _
+
 IDLE = 45  # Sekunden ohne Abfrage → Lesen beenden
 REV = bytes(int('{:08b}'.format(i)[::-1], 2) for i in range(256))  # Bits sind gespiegelt übertragen
 
@@ -142,7 +144,7 @@ class TeletextService:
         tvh = self.tvh()
         chan = next((c for c in tvh.call('channel/grid', limit=100000).get('entries', []) if c['uuid'] == channel), None)
         if not chan:
-            raise ValueError('Sender nicht gefunden')
+            raise ValueError(_('srv.channel_not_found'))
         pid = None
         for svc in chan.get('services', []):
             pid = next((s.get('pid') for s in tvh.call('service/streams', uuid=svc).get('streams', [])
@@ -150,16 +152,16 @@ class TeletextService:
             if pid:
                 break
         if not pid:
-            raise ValueError('Dieser Sender sendet keinen Videotext')
+            raise ValueError(_('srv.no_teletext'))
         body, _ = tvh.get('/playlist/ticket/channel/' + channel)
         m = re.search(r'^(http\S+)', body.decode('utf-8', 'replace'), re.M)
         if not m:
-            raise ValueError('TVHeadend liefert keine Stream-Adresse')
+            raise ValueError(_('srv.no_stream_url'))
         return re.sub(r'([?&]profile=)[^&\s]*', r'\1pass', m.group(1)), pid
 
     def capture(self, channel):
         if not re.fullmatch(r'[0-9a-f]{32}', channel or ''):
-            raise ValueError('Ungültiger Sender')
+            raise ValueError(_('srv.bad_channel'))
         with self.lock:
             cap = self.captures.get(channel)
             if not cap or not cap.alive:

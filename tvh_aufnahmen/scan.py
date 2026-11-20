@@ -6,6 +6,8 @@ import os
 import re
 import time
 
+from .i18n import _
+
 TV_TYPES = {1, 17, 22, 25, 31, 32}  # SD, MPEG2-HD, AVC-SD, AVC-HD, HEVC, HEVC-UHD
 VIDEO = {'MPEG2VIDEO', 'H264', 'HEVC'}
 AUDIO = {'MPEG2AUDIO', 'AC3', 'EAC3', 'AAC', 'MP4A'}
@@ -44,7 +46,7 @@ def scan_started():
 def scan_start(tvh):
     nets = [n['uuid'] for n in grid(tvh, 'mpegts/network/grid')]
     if not nets:
-        raise ValueError('Kein Netzwerk in TVHeadend eingerichtet')
+        raise ValueError(_('srv.no_network'))
     os.makedirs(os.path.dirname(STAMP), exist_ok=True)
     with open(STAMP, 'w') as f:
         f.write(str(int(time.time())))
@@ -116,7 +118,7 @@ def scan_result(tvh):
     kein Dienst in den zwei Tagen vor dem Suchlauf oder danach gesehen wurde."""
     t0 = scan_started()
     if not t0:
-        raise ValueError('Noch kein Suchlauf über dieses Tool gestartet')
+        raise ValueError(_('srv.no_scan'))
     fresh = t0 - SEEN_SLACK
     status = scan_status(tvh)
     chans = grid(tvh, 'channel/grid')

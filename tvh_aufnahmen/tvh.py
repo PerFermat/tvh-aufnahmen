@@ -5,6 +5,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from .i18n import _
+
 
 class Utf8DigestAuthHandler(urllib.request.HTTPDigestAuthHandler):
     """Wie HTTPDigestAuthHandler, aber mit UTF-8 statt ASCII – sonst scheitern
@@ -14,7 +16,7 @@ class Utf8DigestAuthHandler(urllib.request.HTTPDigestAuthHandler):
     def get_algorithm_impls(self, algorithm):
         algo = self.ALGOS.get(algorithm.upper())
         if algo is None:
-            raise ValueError('Nicht unterstütztes Digest-Verfahren: %r' % algorithm)
+            raise ValueError(_('srv.digest', algo=algorithm))
         H = lambda x: algo(x.encode('utf-8')).hexdigest()
         KD = lambda s, d: H('%s:%s' % (s, d))
         return H, KD
@@ -61,7 +63,7 @@ class Tvh:
 def entry_info(tvh, uuid):
     res = tvh.call('idnode/load', uuid=uuid)
     if not res.get('entries'):
-        raise ValueError('Aufnahme nicht gefunden')
+        raise ValueError(_('srv.rec_not_found'))
     return {p['id']: p.get('value') for p in res['entries'][0]['params']}
 
 

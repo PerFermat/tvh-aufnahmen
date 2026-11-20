@@ -8,15 +8,15 @@ const TTPOS=[0x23,0x24,0x40,0x5B,0x5C,0x5D,0x5E,0x5F,0x60,0x7B,0x7C,0x7D,0x7E];
 const ttNat=nos=>((nos&1)<<2)|(nos&2)|((nos&4)>>2);  // C12–C14 in Sende-Reihenfolge
 
 async function openTeletext(ch,name){TT.ch=ch;TT.page=+store('ttpage-'+ch)||100;TT.sub=null;TT.data=null;TT.typed='';
- dialog(`<h2 style="margin:0 90px 8px 0">Videotext · ${esc(name||'')}</h2>
- <div class="ttwrap"><canvas id="ttc" width="${40*TT.W}" height="${25*TT.H}"></canvas><div id="tttext" class="tttext"></div><div id="ttinfo" class="ttinfo">Lese Videotext …</div></div>
- <div class="bar ttbar"><button class="b sec" onclick="ttStep(-1)" title="Vorige Seite">◀</button>
+ dialog(`<h2 style="margin:0 90px 8px 0">${L('common.teletext')} · ${esc(name||'')}</h2>
+ <div class="ttwrap"><canvas id="ttc" width="${40*TT.W}" height="${25*TT.H}"></canvas><div id="tttext" class="tttext"></div><div id="ttinfo" class="ttinfo">${L('tt.reading')}</div></div>
+ <div class="bar ttbar"><button class="b sec" onclick="ttStep(-1)" title="${L('tt.prev')}">◀</button>
   <input id="ttnum" inputmode="numeric" maxlength="3" value="${TT.page}" onkeydown="if(event.key=='Enter')ttGo(+this.value)" onfocus="this.select()">
-  <button class="b sec" onclick="ttStep(1)" title="Nächste Seite">▶</button>
-  <span class="ttsub"><button class="b sec" onclick="ttSub(-1)" title="Vorige Unterseite">‹</button><span id="ttsubl">–</span><button class="b sec" onclick="ttSub(1)" title="Nächste Unterseite">›</button></span>
-  <button class="b sec" onclick="ttGo(100)">100</button><button class="b sec" onclick="TT.reveal=!TT.reveal;ttDraw();ttTextLayer()" title="Verdeckten Text zeigen (z. B. Rätsellösungen)">?</button>
-  <button class="b sec" id="ttcopy" onclick="ttCopy()" title="Text der ganzen Seite in die Zwischenablage">Kopieren</button></div>
- <p class="muted small" style="margin:6px 0 0">Seitenzahlen im Text sind anklickbar, Text lässt sich mit der Maus markieren und kopieren. Ziffern tippen springt direkt zur Seite.</p>`);
+  <button class="b sec" onclick="ttStep(1)" title="${L('tt.next')}">▶</button>
+  <span class="ttsub"><button class="b sec" onclick="ttSub(-1)" title="${L('tt.prev_sub')}">‹</button><span id="ttsubl">–</span><button class="b sec" onclick="ttSub(1)" title="${L('tt.next_sub')}">›</button></span>
+  <button class="b sec" onclick="ttGo(100)">100</button><button class="b sec" onclick="TT.reveal=!TT.reveal;ttDraw();ttTextLayer()" title="${L('tt.reveal')}">?</button>
+  <button class="b sec" id="ttcopy" onclick="ttCopy()" title="${L('tt.copy_tip')}">${L('tt.copy')}</button></div>
+ <p class="muted small" style="margin:6px 0 0">${L('tt.hint')}</p>`);
  $('#tttext').addEventListener('click',ttClick);$('#tttext').addEventListener('copy',ttCopyEvent);ttSize();const ro=new ResizeObserver(()=>ttSize()&&ttDraw());ro.observe($('#ttc'));
  $('#dlg').addEventListener('close',()=>{clearTimeout(TT.timer);TT.ch=null;ro.disconnect();document.removeEventListener('keydown',ttKey)},{once:true});
  document.addEventListener('keydown',ttKey);ttLoad()}
@@ -31,8 +31,8 @@ async function ttLoad(){clearTimeout(TT.timer);if(!TT.ch||!$('#ttc'))return;
  TT.timer=setTimeout(ttLoad,1500)}
 function ttInfo(){const d=TT.data,i=$('#ttinfo');$('#ttnum')!==document.activeElement&&($('#ttnum').value=TT.page);
  $('#ttsubl').textContent=d.subpages.length>1?`${d.subpages.indexOf(d.sub)+1}/${d.subpages.length}`:'–';
- if(d.error){i.textContent='Videotext nicht verfügbar: '+d.error;i.hidden=false}
- else if(!d.rows){i.textContent=d.pages.length?`Seite ${TT.page} ist ${d.since<30?'noch nicht angekommen – kommt gleich …':'nicht vorhanden.'}`:'Lese Videotext …';i.hidden=false}
+ if(d.error){i.textContent=L('tt.unavailable',{err:d.error});i.hidden=false}
+ else if(!d.rows){i.textContent=d.pages.length?(d.since<30?L('tt.page_pending',{p:TT.page}):L('tt.page_missing',{p:TT.page})):L('tt.reading');i.hidden=false}
  else i.hidden=true}
 function ttGo(p){if(!(p>=100&&p<=899))return;TT.page=p;TT.sub=null;TT.typed='';store('ttpage-'+TT.ch,p);TT.data=null;ttDraw();ttTextLayer();ttLoad()}
 function ttStep(d){const ps=(TT.data&&TT.data.pages)||[];const n=d>0?ps.find(p=>p>TT.page):[...ps].reverse().find(p=>p<TT.page);ttGo(n||TT.page+d)}
@@ -66,7 +66,7 @@ function ttCopyEvent(e){const t=String(getSelection());if(!t)return;e.clipboardD
 async function ttCopy(){const t=ttClean(ttLines().join('\n')),b=$('#ttcopy');if(!t)return;
  try{await navigator.clipboard.writeText(t)}  // ohne HTTPS gibt es die Zwischenablage-API nicht: alter Weg
  catch(e){const a=document.createElement('textarea');a.value=t;$('#dlg').append(a);a.select();document.execCommand('copy');a.remove()}
- b.textContent='Kopiert ✓';setTimeout(()=>b.textContent='Kopieren',1500)}
+ b.textContent=L('tt.copied');setTimeout(()=>b.textContent=L('tt.copy'),1500)}
 
 // ---------- Zeichnen (Level 1) ----------
 function ttDraw(){const c=$('#ttc');if(!c)return;const g=c.getContext('2d'),W=TT.W,H=TT.H,d=TT.data;

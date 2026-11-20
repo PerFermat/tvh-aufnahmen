@@ -5,6 +5,7 @@ import shutil
 import time
 
 from .files import VIDEO_EXT, file_exists
+from .i18n import _
 from .tvh import entry_info, file_moved
 
 UNKNOWN_CHANNEL = 'Unbekannt'
@@ -22,17 +23,17 @@ def do_import(tvh, recdir, lang, req):
     path = req['path']
     real = os.path.realpath(path)
     if not real.startswith(os.path.realpath(recdir) + os.sep) or not os.path.isfile(real):
-        raise ValueError('Datei nicht gefunden oder außerhalb des Aufnahmeverzeichnisses')
+        raise ValueError(_('srv.file_outside'))
     start, stop = int(req['start']), int(req['stop'])
     if stop <= start:
-        raise ValueError('Ende muss nach dem Start liegen')
+        raise ValueError(_('srv.end_after_start'))
     if stop >= time.time():
-        raise ValueError('Ende muss in der Vergangenheit liegen, sonst entsteht ein Aufnahme-Timer')
+        raise ValueError(_('srv.import_end_past'))
     title = (req.get('title') or '').strip()
     if not title:
-        raise ValueError('Titel fehlt')
+        raise ValueError(_('srv.need_title'))
     conf = {'enabled': True, 'start': start, 'stop': stop, 'title': {lang: title},
-            'comment': (req.get('comment') or 'nachträglich importiert').strip(),
+            'comment': (req.get('comment') or _('srv.imported')).strip(),
             'files': [{'filename': path}]}
     for key in ('subtitle', 'description'):
         val = (req.get(key) or '').strip()
@@ -43,7 +44,7 @@ def do_import(tvh, recdir, lang, req):
     conf['channelname'] = (req.get('channelname') or '').strip()
     uuid = create_entry(tvh, conf)
     if not uuid:
-        raise ValueError('TVHeadend hat den Eintrag nicht angelegt: ' + os.path.basename(path))
+        raise ValueError(_('srv.entry_not_created', f=os.path.basename(path)))
     return {'uuid': uuid}
 
 
@@ -83,7 +84,7 @@ def do_edit(tvh, lang, req):
     title = norm(req.get('title'))
     subtitle = norm(req.get('subtitle'))
     if not title:
-        raise ValueError('Titel fehlt')
+        raise ValueError(_('srv.need_title'))
     info = entry_info(tvh, req['uuid'])
     desc = req.get('description')
     if desc is None or norm(desc) == norm(info.get('disp_description')):
@@ -100,7 +101,7 @@ def recreate_entry(tvh, uuid, info, lang, title, subtitle, desc):
     leeren Platzhalter, und nur der wird mitgelöscht."""
     fn = info.get('filename')
     if not file_exists(fn):
-        raise ValueError('Videodatei fehlt, Beschreibung kann nicht geändert werden')
+        raise ValueError(_('srv.edit_no_file'))
     conf = {k: info[k] for k in COPY_FIELDS if info.get(k) not in (None, '', [], {})}
     conf.update(enabled=True, title={lang: title}, files=[{'filename': fn}])
     if subtitle:
@@ -113,10 +114,10 @@ def recreate_entry(tvh, uuid, info, lang, title, subtitle, desc):
     try:
         file_moved(tvh, fn, placeholder)
         if entry_info(tvh, uuid).get('filename') != placeholder:
-            raise ValueError('TVHeadend hat den alten Eintrag nicht umgestellt; nichts geändert')
+            raise ValueError(_('srv.edit_old_failed'))
         new = create_entry(tvh, conf)
         if not new:
-            raise ValueError('TVHeadend hat den neuen Eintrag nicht angelegt; nichts geändert')
+            raise ValueError(_('srv.edit_new_failed'))
         tvh.call('idnode/delete', uuid=json.dumps([uuid]))
     except Exception:
         if not new:
@@ -139,17 +140,17 @@ def replace_file(tvh, uuid, name, length, body):
     """Ersetzt die Datei einer Aufnahme durch den hochgeladenen Inhalt."""
     old = entry_info(tvh, uuid).get('filename')
     if not file_exists(old):
-        raise ValueError('Die bisherige Datei fehlt, Ersetzen nicht möglich')
+        raise ValueError(_('srv.replace_no_old'))
     ext = os.path.splitext(name)[1].lower()
     if ext not in VIDEO_EXT:
-        raise ValueError('Keine Videodatei: ' + name)
+        raise ValueError(_('srv.not_video', f=name))
     if length <= 0:
-        raise ValueError('Leere Datei')
+        raise ValueError(_('srv.empty_file'))
     if length > shutil.disk_usage(os.path.dirname(old)).free - 100 * 1024 * 1024:
-        raise ValueError('Nicht genug freier Speicher für die neue Datei')
+        raise ValueError(_('srv.no_space_file'))
     new = os.path.splitext(old)[0] + ext
     if new != old and os.path.exists(new):
-        raise ValueError('Datei existiert bereits: ' + new)
+        raise ValueError(_('srv.file_exists', f=new))
     tmp = new + '.upload'  # keine Video-Endung: taucht nicht als „nicht eingetragen“ auf
     try:
         with open(tmp, 'wb') as f:
@@ -157,7 +158,7 @@ def replace_file(tvh, uuid, name, length, body):
             while left:
                 chunk = body.read(min(left, 1024 * 1024))
                 if not chunk:
-                    raise ValueError('Upload abgebrochen')
+                    raise ValueError(_('srv.upload_aborted'))
                 f.write(chunk)
                 left -= len(chunk)
         os.replace(tmp, new)
@@ -167,6 +168,6 @@ def replace_file(tvh, uuid, name, length, body):
     if new != old:
         file_moved(tvh, old, new)
         if entry_info(tvh, uuid).get('filename') != new:
-            raise ValueError('TVHeadend hat den neuen Pfad nicht übernommen; alte Datei bleibt erhalten')
+            raise ValueError(_('srv.replace_path_failed'))
         os.remove(old)
     return {'filename': new, 'size': length}
