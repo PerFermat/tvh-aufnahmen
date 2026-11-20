@@ -314,10 +314,8 @@
   "pl.tap": "Tap ▶ to start.",
   "pl.loading": "Loading … (tuning the channel or preparing the recording takes a few seconds)",
   "pl.home": "Home",
-  "pl.live_sub": "Live · quality: {q}",
   "pl.reload": "Reload",
   "pl.vlc": "Open in VLC",
-  "pl.quality": "Quality: {q}",
   "pl.loading_from": "Loading from {t} …",
   "tt.reading": "Reading teletext …",
   "tt.prev": "Previous page",
@@ -535,5 +533,6 @@
   "cli.port": "port of the interface (default: %(default)s)",
   "cli.bind": "address (default: %(default)s = IPv6 and IPv4)",
   "cli.warn_recdir": "Warning: recording folder not found: {dir}",
-  "cli.running": "Interface running on port {port}, address {bind} (Ctrl+C to quit)"
+  "cli.running": "Interface running on port {port}, address {bind} (Ctrl+C to quit)",
+  "pl.q_tip": "Quality for this playback only – the setting for this device stays"
 }

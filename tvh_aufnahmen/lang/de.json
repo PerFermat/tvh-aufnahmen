@@ -314,10 +314,8 @@
   "pl.tap": "Zum Starten auf ▶ tippen.",
   "pl.loading": "Lade … (Sender einstimmen bzw. Aufnahme vorbereiten dauert einige Sekunden)",
   "pl.home": "Home",
-  "pl.live_sub": "Live · Qualität: {q}",
   "pl.reload": "Neu laden",
   "pl.vlc": "In VLC öffnen",
-  "pl.quality": "Qualität: {q}",
   "pl.loading_from": "Lade ab {t} …",
   "tt.reading": "Lese Videotext …",
   "tt.prev": "Vorige Seite",
@@ -535,5 +533,6 @@
   "cli.port": "Port der Oberfläche (Standard: %(default)s)",
   "cli.bind": "Adresse (Standard: %(default)s = IPv6 und IPv4)",
   "cli.warn_recdir": "Warnung: Aufnahmeverzeichnis nicht gefunden: {dir}",
-  "cli.running": "Oberfläche läuft auf Port {port}, Adresse {bind} (Strg+C beendet)"
+  "cli.running": "Oberfläche läuft auf Port {port}, Adresse {bind} (Strg+C beendet)",
+  "pl.q_tip": "Qualität nur für diese Wiedergabe – die Einstellung für dieses Gerät bleibt"
 }

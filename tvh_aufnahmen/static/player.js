@@ -33,29 +33,33 @@ function startPlayer(url,restart){stopPlayer();const v=$('#pv');let sid=null;
  PLAYER.on(mpegts.Events.ERROR,(t,d)=>{$('#pmsg').textContent=L('pl.aborted',{err:t+(d?': '+d:'')})});
  v.play().catch(()=>{$('#pmsg').textContent=L('pl.tap')});
  PLAYER._restart=restart;if(sid)PSUBT=setTimeout(()=>pollSubs(sid),3000)}
+// Qualität nur für diese Wiedergabe (PQ); beim Schließen gilt wieder die gemerkte aus den Einstellungen
+let PQ=null;
+const pq=()=>PQ||quality();
+const qualSel=()=>(QUALS||[]).length<2?'':`<select id="pqsel" title="${L('pl.q_tip')}" onchange="PQ=this.value;if(PLAYER&&PLAYER._restart)PLAYER._restart()">
+ ${QUALS.map(x=>`<option value="${esc(x.profile)}" ${x.profile==pq()?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`;
 function playerDialog(title,sub,extra){dialog(`<h2 style="margin:0 90px 2px 0">${esc(title)}</h2><div class="muted">${esc(sub)}</div>
  <div class="pwrap"><video id="pv" controls playsinline autoplay></video></div>${extra||''}
  <p class="muted small" id="pmsg">${L('pl.loading')}</p>`);
- $('#dlg').addEventListener('close',stopPlayer,{once:true})}
-const qualityName=()=>{const q=(QUALS||[]).find(x=>x.profile==quality());return q?q.name:L('pl.home')};
+ $('#dlg').addEventListener('close',()=>{stopPlayer();PQ=null},{once:true})}
 
 async function playLive(uuid){await qualities();const c=(LIVE&&LIVE.channels.find(x=>x.uuid==uuid))||(EPG&&EPG.channels.find(x=>x.uuid==uuid))||{name:L('common.channel')};
- playerDialog(c.name,L('pl.live_sub',{q:qualityName()}),`<div class="bar" style="margin:8px 0 0"><button class="b sec" onclick="playLive('${uuid}')">${L('pl.reload')}</button>
+ playerDialog(c.name,'Live',`<div class="bar" style="margin:8px 0 0">${qualSel()}<button class="b sec" onclick="playLive('${uuid}')">${L('pl.reload')}</button>
   <a class="b sec" style="text-decoration:none" href="${playHref(uuid)}" onclick="event.stopPropagation()">${L('pl.vlc')}</a>
   <button class="b sec" onclick="openTeletext('${uuid}','${esc(c.name).replace(/'/g,'')}')">${L('common.teletext')}</button>${subsBtn()}</div>`);
- startPlayer(`/api/play-live?uuid=${uuid}&q=${encodeURIComponent(quality())}`,()=>playLive(uuid));
+ startPlayer(`/api/play-live?uuid=${uuid}&q=${encodeURIComponent(pq())}`,()=>playLive(uuid));
  $('#pv').addEventListener('playing',()=>$('#pmsg').textContent='',{once:true})}
 
 async function playRec(uuid,from){await qualities();const r=R(uuid),dur=Math.max(60,r.stop-r.start);POFF=from||0;
- if(!($('#dlg').open&&$('#pseek')&&$('#pseek').dataset.uuid==uuid)){playerDialog(r.title,(r.subtitle?r.subtitle.split('\n')[0]+' · ':'')+r.channel+' · '+fmt(r.start)+' · '+L('pl.quality',{q:qualityName()}),
+ if(!($('#dlg').open&&$('#pseek')&&$('#pseek').dataset.uuid==uuid)){playerDialog(r.title,(r.subtitle?r.subtitle.split('\n')[0]+' · ':'')+r.channel+' · '+fmt(r.start),
   `<div class="pbar"><span id="ptime">0:00</span><input type="range" id="pseek" data-uuid="${uuid}" min="0" max="${dur}" step="1" value="${POFF}"><span>${hms(dur)}</span></div>
-  <div class="bar" style="margin:6px 0 0"><button class="b sec" onclick="recJump('${uuid}',-300)">−5 min</button><button class="b sec" onclick="recJump('${uuid}',-30)">−30 s</button>
+  <div class="bar" style="margin:6px 0 0">${qualSel()}<button class="b sec" onclick="recJump('${uuid}',-300)">−5 min</button><button class="b sec" onclick="recJump('${uuid}',-30)">−30 s</button>
   <button class="b sec" onclick="recJump('${uuid}',30)">+30 s</button><button class="b sec" onclick="recJump('${uuid}',300)">+5 min</button>
   <a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${uuid}" onclick="event.stopPropagation()">${L('pl.vlc')}</a>${subsBtn()}</div>`);
   $('#pseek').addEventListener('change',e=>playRec(uuid,+e.target.value));
   $('#pseek').addEventListener('input',e=>$('#ptime').textContent=hms(+e.target.value))}
  $('#pmsg').textContent=L('pl.loading_from',{t:hms(POFF)});
- startPlayer(`/api/play-rec?uuid=${uuid}&q=${encodeURIComponent(quality())}&t=${Math.floor(POFF)}`,()=>{const v=$('#pv');playRec(uuid,POFF+(v?v.currentTime:0))});
+ startPlayer(`/api/play-rec?uuid=${uuid}&q=${encodeURIComponent(pq())}&t=${Math.floor(POFF)}`,()=>{const v=$('#pv');playRec(uuid,POFF+(v?v.currentTime:0))});
  $('#pv').addEventListener('playing',()=>$('#pmsg').textContent='',{once:true});
  PTIMER=setInterval(()=>{const v=$('#pv');if(!v)return clearInterval(PTIMER);const t=POFF+v.currentTime,s=$('#pseek');
   if(document.activeElement!==s){s.value=t;$('#ptime').textContent=hms(t)}},500)}
