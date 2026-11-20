@@ -104,6 +104,7 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/files.py` | Videodateien finden, Titel und Zeiten aus dem Dateinamen raten |
 | `tvh_aufnahmen/live.py` | Live-TV: Sender mit Programmdaten, Stream-Playlist, Senderlogos |
 | `tvh_aufnahmen/epg.py` | Programmzeitschrift, Aufnahmen planen, Serienaufnahmen, geplante Aufnahmen, Formulare aus den TVHeadend-Klassen |
+| `tvh_aufnahmen/epg_archive.py` | Dauerhaftes Archiv vergangener Sendungen (SQLite, gepackt) |
 | `tvh_aufnahmen/player.py` | Interner Player: Live-TV und Aufnahmen per ffmpeg als H.264/AAC-MPEG-TS für den Browser |
 | `tvh_aufnahmen/teletext.py` | Videotext: liest die Videotext-Pakete aus dem Senderstream und setzt die Seiten zusammen |
 | `tvh_aufnahmen/posters.py` | Bilder zu langen Sendungen aus der Wikipedia, von TVmaze (Serien) und Trakt, im Hintergrund gesucht und zwischengespeichert |
