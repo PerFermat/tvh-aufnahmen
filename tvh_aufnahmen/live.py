@@ -27,6 +27,7 @@ def live_channels(tvh, upcoming=3):
         current = evs[0] if evs and evs[0]['start'] <= now else None
         icon = re.fullmatch(r'imagecache/(\d+)', c.get('icon_public_url') or '')
         chans.append({'uuid': c['uuid'], 'name': c.get('name') or '', 'number': c.get('number') or 0,
+                      'tagids': c.get('tags') or [],
                       'icon': '/api/icon?id=' + icon.group(1) if icon else '',
                       'now': current, 'next': evs[1 if current else 0:][:upcoming]})
     chans.sort(key=lambda c: (c['number'] or 1 << 30, c['name'].lower()))

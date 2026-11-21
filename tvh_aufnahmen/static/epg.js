@@ -1,6 +1,6 @@
 // Reiter „Programm“: Fernsehzeitschrift für einen ganzen Tag – Sender als Spalten, sechs Zeilen zu je 4 Stunden.
 // In einer Zeile stehen alle Sendungen, die in diesem Zeitraum beginnen; die Schnellauswahl springt nur dorthin.
-let EPG=null,EPGS=0,EPGQ='',EPGT=store('epgtag')||'',EPGSEQ=0,EPGPT=null;  // EPGPT: Sprungziel, das noch aussteht
+let EPG=null,EPGS=0,EPGQ='',EPGSEQ=0,EPGPT=null;  // EPGPT: Sprungziel, das noch aussteht
 const BLOCKS=[0,4,8,12,16,20],CELLMAX=10,EPGX=new Set();  // EPGX: aufgeklappte Zellen
 const dkey=t=>{const d=new Date(t*1000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 const wday=t=>new Date(t*1000).toLocaleDateString(LOCALE,{weekday:'long',day:'numeric',month:'long'});
@@ -15,7 +15,6 @@ async function renderEpg(start,jump){
  try{day=await api('/api/epg'+(EPGS?'?start='+EPGS:''))}catch(e){if(seq===EPGSEQ)$('#epgwrap').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
  if(seq!==EPGSEQ||cur!='epg')return;  // inzwischen neuer angefordert oder Reiter gewechselt – verwerfen
  EPG=day;EPGS=EPG.start;const target=EPGPT;EPGPT=null;
- const tags=[...new Set(EPG.channels.flatMap(c=>c.tags))].sort();
  // Zeile 1 immer sichtbar und kompakt (bei genug Breite oben im Kopf); Zeile 2 (Filter, Suche) über 🔍 aufklappbar
  $('#hdrslot').innerHTML='';
  $('#epgbar').innerHTML=`<div class="epgnav"><button class="b sec sq" onclick="renderEpg(EPG.prev,0)" title="${L('epg.prev_day')}">‹</button>
@@ -23,7 +22,7 @@ async function renderEpg(start,jump){
  <button class="b sec sq" onclick="renderEpg(EPG.next,0)" title="${L('epg.next_day')}">›</button>
  <span class="seg blocks">${BLOCKS.map(h=>`<button id="jb${h}" onclick="epgJump(${h})" title="${L('epg.block',{a:h,b:h+4})}">${h}<span class="to">–${h+4}</span></button>`).join('')}</span>
  <button class="b sec" onclick="renderEpg(0)">${L('epg.now')}</button></div>
- <div class="bar tools" style="margin:8px 0 0"><select onchange="EPGT=this.value;store('epgtag',EPGT);fillEpg();toolsState()"><option value="">${L('epg.all_channels')}</option>${tags.map(t=>`<option ${t==EPGT?'selected':''}>${esc(t)}</option>`).join('')}</select>
+ <div class="bar tools" style="margin:8px 0 0">${listSel('fillEpg()')}
  <input type="search" id="epgq" placeholder="${L('epg.search')}" value="${esc(EPGQ)}" oninput="epgTyped(this.value)" onkeydown="if(event.key=='Enter'){clearTimeout(EPGQT);epgSearch(EPGFULL)}" style="flex:1;min-width:160px">
  <label class="chk" title="${L('epg.full_tip')}"><input type="checkbox" ${EPGFULL?'checked':''} onchange="EPGFULL=this.checked;store('epgfull',EPGFULL?'1':'');if(EPGQ.trim().length>=2)epgSearch(EPGFULL)"> ${L('epg.full')}</label></div>`;
  const keep=$('#epgwrap').scrollTop,keepX=$('#epgwrap').scrollLeft;fillEpg();
@@ -106,7 +105,7 @@ function layoutEpg(){
 function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);
  return i<CELLMAX?0:Math.min(i,all.length-CELLMAX)}
 function fillEpg(){if(EPGQ.trim().length>=2)return epgSearch(EPGFULL);  // Suchtext da: Ergebnisliste statt Zeitschrift
- const chans=EPG.channels.filter(c=>c.epg&&(!EPGT||c.tags.includes(EPGT)));
+ const chans=chFilter(EPG.channels).filter(c=>c.epg);
  const evs=EPG.events,cell={};evs.forEach(e=>{(cell[blockOf(e.start)+'|'+e.channelUuid]??=[]).push(e)});EPGCELLS=cell;
  if(!chans.length||!evs.length){$('#epgwrap').innerHTML=`<p class="muted">${L('epg.empty')}</p>`;return}
  const rows=BLOCKS.map(h=>{

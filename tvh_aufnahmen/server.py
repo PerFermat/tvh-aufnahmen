@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler
 
 from . import i18n
 from .backup import check_password, restore, write_backup
-from .channels import channel_list, channel_numbers
+from .channels import channel_list, channel_numbers, tag_create, tag_delete, tag_list, tag_toggle
 from .epg import (alternatives, autorec_delete, autorec_load, autorec_preview, autorec_save, autorecs, check_uuid,
                   class_form, epg_day, epg_search, event_detail, move_recording, poster_status, record_event,
                   record_manual, repeats, upcoming, upcoming_cancel)
@@ -297,6 +297,8 @@ def make_handler(app):
                 self.run(lambda: scan_result(app.tvh))
             elif url.path == '/api/channels':
                 self.run(lambda: channel_list(app.tvh))
+            elif url.path == '/api/tags':
+                self.run(lambda: tag_list(app.tvh))
             else:
                 self.send(404, {'error': _('srv.not_found')})
 
@@ -358,6 +360,12 @@ def make_handler(app):
                 self.run(lambda: scan_add(app.tvh, req.get('uuids') or []))
             elif self.path == '/api/scan-delete':
                 self.run(lambda: scan_delete(app.tvh, req.get('uuids') or []))
+            elif self.path == '/api/tag-create':
+                self.run(lambda: tag_create(app.tvh, req.get('name')))
+            elif self.path == '/api/tag-delete':
+                self.run(lambda: tag_delete(app.tvh, req.get('uuid')))
+            elif self.path == '/api/tag-toggle':
+                self.run(lambda: tag_toggle(app.tvh, req.get('tag'), req.get('channel'), bool(req.get('on'))))
             elif self.path == '/api/channel-numbers':
                 self.run(lambda: channel_numbers(app.tvh, req.get('changes')))
             elif self.path == '/api/record-manual':

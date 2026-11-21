@@ -56,8 +56,16 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#t-unknown').textContent=L('nav.unknown_n',{n:S.unknown.length});
  $('#t-missing').textContent=L('nav.missing_n',{n:S.missing.length});
  $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;render()}
-// Senderauswahl (Favoritenliste) – wird mit den Sender-Tags gefüllt
-let chFilter=cs=>cs;
+// Senderliste (Favoriten = Sender-Tags von TVHeadend): gilt für Live-TV, Programm und Heute Abend, je Gerät gemerkt
+let TAGS=[],CHL=store('chlist')||'';
+async function loadTags(){try{TAGS=(await api('/api/tags')).tags}catch(e){}
+ if(CHL&&TAGS.length&&!TAGS.some(t=>t.uuid==CHL)){CHL='';store('chlist','')}
+ document.querySelectorAll('select.chlist').forEach(s=>s.outerHTML=listSel(s.dataset.after))}
+const chFilter=cs=>CHL?cs.filter(c=>(c.tagids||c.tags||[]).includes(CHL)):cs;
+function listSel(after){const own=TAGS.filter(t=>t.own),other=TAGS.filter(t=>!t.own),o=t=>`<option value="${t.uuid}" ${t.uuid==CHL?'selected':''}>${esc(t.name)} (${t.count})</option>`;
+ return `<select class="chlist" data-after="${esc(after)}" title="${L('chn.list_tip')}" onchange="CHL=this.value;store('chlist',CHL);${after};toolsState()"><option value="">${L('epg.all_channels')}</option>
+ ${own.length?`<optgroup label="${L('chn.own_lists')}">${own.map(o).join('')}</optgroup>`:''}${other.length?`<optgroup label="${L('chn.tvh_tags')}">${other.map(o).join('')}</optgroup>`:''}</select>`}
+loadTags();
 const TABS={live:()=>renderLive(),epg:()=>renderEpg(),tonight:()=>renderTonight(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup(),scan:()=>renderScan(),channels:()=>renderChannels(),status:()=>renderStatus()};
 function tab(n){if(!TABS[n])n='live';if(cur=='channels'&&n!=cur&&chDirty()&&!confirm(L('chn.leave')))return;cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');
  $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);$('main').classList.toggle('tight',n=='epg');if(n!='epg')$('#hdrslot').innerHTML=HACTS[n]||'';render();toolsState()}
@@ -67,7 +75,7 @@ const HACTS={autorec:`<button class="b hact" onclick="editAutorec()" title="${L(
  rec:newRecBtn,upcoming:newRecBtn};
 // Suche und Filter (Elemente mit class="tools") über 🔍 im Kopf ein-/ausblenden; gilt für alle Reiter und wird gemerkt
 const TOOLTABS=['live','epg','rec','upcoming'];
-const activeQuery=()=>({live:()=>LQ,epg:()=>EPGQ||EPGT,rec:()=>Q,upcoming:()=>UPQ}[cur]||(()=>''))();
+const activeQuery=()=>({live:()=>LQ||CHL,epg:()=>EPGQ||CHL,rec:()=>Q,upcoming:()=>UPQ}[cur]||(()=>''))();
 function toolsState(){const open=store('tools')=='open',b=$('#toolsbtn');document.body.classList.toggle('tools-closed',!open);
  if(!b)return;b.hidden=!TOOLTABS.includes(cur);b.classList.toggle('on',open);b.classList.toggle('dot',!open&&!!activeQuery())}
 function toggleTools(){store('tools',store('tools')=='open'?'closed':'open');toolsState();

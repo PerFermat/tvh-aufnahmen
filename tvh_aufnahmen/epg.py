@@ -59,7 +59,7 @@ def epg_day(tvh, posters, archive, start=None):
         icon = re.fullmatch(r'imagecache/(\d+)', c.get('icon_public_url') or '')
         channels.append({'uuid': c['uuid'], 'name': c.get('name') or '', 'number': c.get('number') or 0,
                          'icon': '/api/icon?id=' + icon.group(1) if icon else '',
-                         'tags': [tags[t] for t in c.get('tags', []) if t in tags],
+                         'tags': [tags[t] for t in c.get('tags', []) if t in tags], 'tagids': c.get('tags', []),
                          'epg': c['uuid'] in with_epg})
     channels.sort(key=lambda c: (c['number'] or 1 << 30, c['name'].lower()))
     events.sort(key=lambda e: e['start'])

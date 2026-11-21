@@ -5,7 +5,7 @@ async function renderTonight(){const seq=++TNSEQ,base=new Date();base.setHours(0
  const start=Math.floor(base/1000);
  $('#main').innerHTML=`<div class="bar"><span class="seg">${[0,1,2,3,4,5,6].map(d=>{const x=new Date(base);x.setDate(x.getDate()-TND+d);
   return `<button class="${d==TND?'on':''}" onclick="TND=${d};renderTonight()">${d==0?L('tn.today'):d==1?L('tn.tomorrow'):x.toLocaleDateString(LOCALE,{weekday:'short'})}</button>`}).join('')}</span>
-  <span class="muted">${L('tn.hint')}</span></div><div class="tngrid" id="tngrid"><p class="muted">${L('common.loading')}</p></div>`;
+  ${listSel('fillTonight()')}<span class="muted">${L('tn.hint')}</span></div><div class="tngrid" id="tngrid"><p class="muted">${L('common.loading')}</p></div>`;
  let day;try{day=await api('/api/epg?start='+start)}catch(e){if(seq==TNSEQ)$('#tngrid').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
  if(seq!=TNSEQ||cur!='tonight')return;TNDAY=day;fillTonight();
  if(day.posters_pending)setTimeout(()=>{if(seq==TNSEQ&&cur=='tonight')renderTonight()},15000)}

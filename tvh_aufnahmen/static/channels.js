@@ -14,11 +14,31 @@ async function renderChannels(){if(!CHN){$('#main').innerHTML=`<p class="muted">
  <button class="b sec" id="chundo" onclick="chUndo()">${L('chn.undo')}</button>
  <button class="b sec" id="chreset" onclick="chReset()">${L('chn.reset')}</button>
  <input type="search" placeholder="${L('chn.search')}" value="${esc(CHQ)}" oninput="CHQ=this.value;chFind()" style="flex:1;min-width:180px"></div>
- <p class="muted">${L('chn.hint')}</p><div class="chgrid" id="chgrid"></div>`;
+ <p class="muted">${L('chn.hint')}</p><div class="tagbar" id="tagbar"></div><div class="chgrid" id="chgrid"></div>`;
+ chTagBar();
  chDraw()}
+// ---------- Senderlisten (Favoriten) ----------
+// Liste anklicken = Bearbeiten: Kacheln der Liste sind markiert, ein Klick nimmt einen Sender auf oder heraus
+let CHTAG='';
+function chTagBar(){const b=$('#tagbar');if(!b)return;const own=TAGS.filter(t=>t.own),act=TAGS.find(t=>t.uuid==CHTAG);
+ b.innerHTML=`<span class="muted">${L('chn.lists')}</span> ${own.map(t=>`<button class="b sec sm${t.uuid==CHTAG?' on':''}" onclick="chTagPick('${t.uuid}')">★ ${esc(t.name)} <span class="muted">(${t.count})</span></button>`).join(' ')}
+  <button class="b sec sm" onclick="chTagNew()">＋ ${L('chn.list_new')}</button>
+  ${act?`<span class="muted">${L('chn.list_edit',{name:esc(act.name)})}</span> <button class="b sec sm" onclick="chTagPick('')">${L('chn.list_done')}</button> <button class="b bad sm" onclick="chTagDel('${act.uuid}')">${L('chn.list_delete')}</button>`:''}`;
+ $('#chgrid')?.classList.toggle('tagmode',!!act)}
+function chTagPick(u){CHTAG=CHTAG==u?'':u;chTagBar();chDraw()}
+async function chTagNew(){const name=prompt(L('chn.list_ask'));if(!name)return;
+ try{TAGS=(await api('/api/tag-create',{name})).tags;const t=TAGS.find(x=>x.name==name.trim());CHTAG=t?t.uuid:'';chTagBar();chDraw();msg(L('chn.list_created',{name}),true)}catch(e){msg(e.message)}}
+async function chTagDel(u){const t=TAGS.find(x=>x.uuid==u);if(!confirm(L('chn.list_del_confirm',{name:t.name})))return;
+ try{TAGS=(await api('/api/tag-delete',{uuid:u})).tags;CHN.forEach(c=>c.tags=c.tags.filter(x=>x!=u));CHTAG='';if(CHL==u){CHL='';store('chlist','')}chTagBar();chDraw()}catch(e){msg(e.message)}}
+let CHCLK=null;// Klick erst nach kurzer Pause auswerten – ein Doppelklick soll die Liste nicht zweimal umschalten
+addEventListener('click',e=>{const t=CHTAG&&cur=='channels'&&e.target.closest('#chgrid .chtile');if(!t)return;
+ clearTimeout(CHCLK);if(e.detail>1)return;CHCLK=setTimeout(()=>chTagToggle(+t.dataset.i),260)});
+addEventListener('dblclick',()=>clearTimeout(CHCLK),true);
+async function chTagToggle(i){const c=CHN[i],on=!c.tags.includes(CHTAG);
+ try{c.tags=(await api('/api/tag-toggle',{tag:CHTAG,channel:c.uuid,on})).tags;const t=TAGS.find(x=>x.uuid==CHTAG);if(t)t.count+=on?1:-1;chTagBar();chDraw()}catch(e){msg(e.message)}}
 function chDraw(){const g=$('#chgrid');if(!g)return;
  const cnt={};CHN.forEach(c=>{if(c.number)cnt[c.number]=(cnt[c.number]||0)+1});
- g.innerHTML=CHN.map((c,i)=>{const dup=cnt[c.number]>1;return `<div class="chtile${c.number!=c.orig?' moved':''}${c.enabled?'':' off'}${dup?' dup':''}" data-i="${i}" title="${esc(c.name)}${c.enabled?'':' · '+L('common.disabled')}${dup?' · '+L('chn.dup'):''}">
+ g.innerHTML=CHN.map((c,i)=>{const dup=cnt[c.number]>1;return `<div class="chtile${c.number!=c.orig?' moved':''}${c.enabled?'':' off'}${dup?' dup':''}${CHTAG&&c.tags.includes(CHTAG)?' inl':''}" data-i="${i}" title="${esc(c.name)}${c.enabled?'':' · '+L('common.disabled')}${dup?' · '+L('chn.dup'):''}">
   ${chGap(i)}<span class="cn">${c.number||'–'}</span>${c.icon?`<img src="${c.icon}" alt="" loading="lazy" draggable="false">`:''}<span class="nm">${esc(c.name)}</span>
   ${c.number!=c.orig?`<s class="old">${c.orig||'–'}</s>`:''}</div>`}).join('');
  const n=CHN.filter(c=>c.number!=c.orig).length;

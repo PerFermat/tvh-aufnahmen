@@ -324,3 +324,7 @@ dialog.ask{max-width:520px;height:auto;max-height:calc(100vh - 48px);margin:auto
 .tnev{display:block;cursor:pointer;color:inherit;text-decoration:none;border-radius:8px;padding:6px;margin:0 -6px}
 .tnev:hover{background:var(--hover)}.tnev b{display:block;margin-top:2px}.tnev .st{display:block;font-size:12.5px}
 .tnev.later{font-size:13px;opacity:.85}.tnp{float:right;width:64px;height:90px;object-fit:cover;border-radius:6px;margin:0 0 4px 8px}
+/* Senderlisten */
+.tagbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}.tagbar .b.on{background:var(--acc);color:#fff}
+.chgrid.tagmode .chtile{opacity:.45}.chgrid.tagmode .chtile.inl{opacity:1;border-color:#f59e0b;box-shadow:inset 0 0 0 1px #f59e0b}
+.chgrid.tagmode .chtile.inl::after{content:"★";position:absolute;right:6px;bottom:2px;color:#f59e0b;font-size:12px}

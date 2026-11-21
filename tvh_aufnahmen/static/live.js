@@ -1,14 +1,15 @@
 // Reiter „Live-TV“: Sender mit laufender und folgenden Sendungen, Abspielen und Videotext
 let LIVE=null,LQ='',liveTimer=null;
 async function renderLive(){
- if(!$('#lbody')){$('#main').innerHTML=`<div class="bar"><input id="lq" class="tools" type="search" placeholder="${L('live.search')}" value="${esc(LQ)}" style="flex:1;min-width:220px" oninput="LQ=this.value;fillLive()"></div>
+ if(!$('#lbody')){$('#main').innerHTML=`<div class="bar"><input id="lq" class="tools" type="search" placeholder="${L('live.search')}" value="${esc(LQ)}" style="flex:1;min-width:220px" oninput="LQ=this.value;fillLive()"><span class="tools" id="lsel"></span></div>
  <p class="muted" id="lcount">${L('live.loading')}</p><table><tbody id="lbody"></tbody></table>`;if(LIVE)fillLive()}
  clearTimeout(liveTimer);
  try{LIVE=await api('/api/live')}catch(e){if(cur=='live')$('#lcount').textContent=e.message;return}
  if(cur!='live'||!$('#lbody'))return;
  fillLive();liveTimer=setTimeout(()=>{if(cur=='live')renderLive()},60000)}
 function fillLive(){const words=LQ.toLowerCase().split(/\s+/).filter(Boolean),now=Date.now()/1000;
- const list=LIVE.channels.filter(c=>{const t=[c.name,c.now?.title,...c.next.map(e=>e.title)].join(' ').toLowerCase();return words.every(w=>t.includes(w))});
+ if($('#lsel'))$('#lsel').innerHTML=listSel('fillLive()');
+ const list=chFilter(LIVE.channels).filter(c=>{const t=[c.name,c.now?.title,...c.next.map(e=>e.title)].join(' ').toLowerCase();return words.every(w=>t.includes(w))});
  $('#lcount').textContent=L('live.count',{n:list.length,total:LIVE.channels.length});
  $('#lbody').innerHTML=list.map(c=>{const n=c.now,p=n?Math.min(100,Math.max(0,(now-n.start)/(n.stop-n.start)*100)):0;
   // Spalten: Nr. | Logo | Sender | Zeit | laufende Sendung | danach | Abspielen (auf dem Handy: Nr./Zeit inline)
