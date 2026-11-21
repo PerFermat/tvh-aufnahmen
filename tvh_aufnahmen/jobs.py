@@ -19,6 +19,7 @@ STATE = os.path.expanduser('~/.cache/tvh-aufnahmen/jobs.json')
 ARCHIVE_COPY = 'epg-archiv.sqlite'  # Kopie des EPG-Archivs im Sicherungsordner, jede Nacht ersetzt
 BACKUP_NAME = re.compile(r'^tvheadend-sicherung-\d{4}-\d{2}-\d{2}\.tar\.gz$|^tvh-export-\d{4}-\d{2}-\d{2}\.json$')
 LOW_DISK = 0.10  # Warnung unter 10 % frei
+REMIND_LEAD = 5  # Minuten vor Beginn einer vorgemerkten Sendung
 
 
 def default_backup_dir(recdir):
@@ -194,11 +195,48 @@ class Jobs:
             self.state['disk_warned'] = time.strftime('%Y-%m-%d')
             self.save_state()
 
+    # ---------- Erinnerungen ----------
+    def reminder_list(self):
+        return {'reminders': sorted(self.state.get('reminders', []), key=lambda r: r['start'])}
+
+    def remind(self, event_id, on):
+        """Erinnerung an eine Sendung (per ntfy, REMIND_LEAD Minuten vorher) setzen oder entfernen."""
+        rs = [r for r in self.state.get('reminders', []) if r['eventId'] != int(event_id)]
+        if on:
+            if not self.settings()['notify']['url']:
+                raise ValueError(_('srv.need_ntfy'))
+            ev = (self.app.tvh.call('epg/events/load', eventId=int(event_id)).get('entries') or [None])[0]
+            if not ev:
+                raise ValueError(_('srv.event_not_found'))
+            rs.append({'eventId': ev['eventId'], 'title': ev.get('title') or '', 'channel': ev.get('channelName') or '',
+                       'channelUuid': ev.get('channelUuid'), 'start': ev['start'], 'stop': ev['stop']})
+        self.state['reminders'] = rs
+        self.save_state()
+        return self.reminder_list()
+
+    def check_reminders(self):
+        now = time.time()
+        rs, changed = [], False
+        for r in self.state.get('reminders', []):
+            if r['stop'] < now:  # vorbei (z. B. weil der Rechner aus war) – ohne Nachricht verwerfen
+                changed = True
+                continue
+            if now >= r['start'] - REMIND_LEAD * 60:
+                self.notify(_('srv.n_remind', t=r['title'], time=time.strftime('%H:%M', time.localtime(r['start']))),
+                            r['channel'], 'bell', 4, click='#play/' + (r.get('channelUuid') or ''))
+                changed = True
+                continue
+            rs.append(r)
+        if changed:
+            self.state['reminders'] = rs
+            self.save_state()
+
     # ---------- Takt ----------
     def loop(self):
         while True:
             time.sleep(60)
-            for step in (self.archive_epg, self.maybe_backup, self.check_recordings, self.check_disk):
+            for step in (self.check_reminders, self.archive_epg, self.maybe_backup, self.check_recordings,
+                         self.check_disk):
                 try:
                     step()
                 except Exception as e:  # ein Fehler darf die anderen Aufgaben nicht stoppen

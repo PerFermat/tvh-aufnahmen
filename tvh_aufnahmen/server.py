@@ -276,6 +276,8 @@ def make_handler(app):
                 self.run(lambda: alternatives(app.tvh, app.archive, q['uuid']))
             elif url.path == '/api/jobs':
                 self.run(app.jobs.settings)
+            elif url.path == '/api/reminders':
+                self.run(app.jobs.reminder_list)
             elif url.path == '/api/status':
                 self.run(lambda: dict(status(app.tvh, app.recdir), archive=app.archive.stats()))
             elif url.path == '/api/vt':
@@ -374,6 +376,8 @@ def make_handler(app):
                 self.run(lambda: upcoming_cancel(app.tvh, req['uuid']))
             elif self.path == '/api/jobs':
                 self.run(lambda: app.jobs.update(req))
+            elif self.path == '/api/remind':
+                self.run(lambda: app.jobs.remind(req['event'], bool(req.get('on'))))
             elif self.path == '/api/archive-restore':
                 self.run(app.jobs.restore_archive)
             elif self.path == '/api/backup-now':

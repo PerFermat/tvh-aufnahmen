@@ -1,10 +1,11 @@
 // Reiter „Geplante Aufnahmen“: alle zukünftigen Termine, auch die einzelnen Termine von Serienaufnahmen
 let UPQ='',UP=[];
-async function renderUpcoming(){let d;try{d=await api('/api/upcoming')}catch(e){$('#main').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
+async function renderUpcoming(){let d;try{[d]=await Promise.all([api('/api/upcoming'),loadReminders()])}catch(e){$('#main').innerHTML='<p class="muted">'+esc(e.message)+'</p>';return}
  if(cur!='upcoming')return;UP=d.upcoming;
  $('#main').innerHTML=`<div class="bar tools"><input type="search" placeholder="${L('up.search')}" value="${esc(UPQ)}" oninput="UPQ=this.value;fillUpcoming()" style="flex:1;min-width:220px"></div>
  ${d.conflicts.length?`<div class="alert">⚠ <b>${L('up.conflicts',{n:d.conflicts.length})}</b> ${L('up.conflicts_hint',{n:d.tuners})}<ul>${d.conflicts.map(g=>`<li>${esc(wday(g.start))} ${L('ar.from',{t:hm(g.start)})}: ${g.uuids.map(u=>UP.find(e=>e.uuid==u)).filter(Boolean).map(e=>
   `<span class="cfl">${esc(e.disp_title)} <span class="muted">(${esc(e.channelname)})</span>${e.broadcast&&e.sched_status!='recording'?` <button class="b sec sm" onclick="altDialog('${e.uuid}')">${L('up.alt')}</button>`:''}</span>`).join(' · ')}</li>`).join('')}</ul></div>`:''}
+ ${REM.length?`<h3>🔔 ${L('up.reminders')}</h3><ul class="remlist">${REM.map(r=>`<li>${esc(wday(r.start))} ${hm(r.start)} · ${esc(r.channel)} · <a onclick="showEvent(${r.eventId})"><b>${esc(r.title)}</b></a> <button class="b sec sm" onclick="toggleRemind(${r.eventId})">${L('common.delete')}</button></li>`).join('')}</ul>`:''}
  <p class="muted" id="upcount"></p><table><thead><tr><th>${L('ar.th_when')}</th><th>${L('common.channel')}</th><th>${L('common.title')}</th><th>${L('up.series')}</th><th></th></tr></thead><tbody id="upbody"></tbody></table>`;fillUpcoming()}
 function fillUpcoming(){const words=UPQ.toLowerCase().split(/\s+/).filter(Boolean);
  const list=UP.filter(e=>words.every(w=>[e.disp_title,e.disp_subtitle,e.channelname,e.autorec_caption].join(' ').toLowerCase().includes(w)));

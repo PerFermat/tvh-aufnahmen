@@ -140,6 +140,7 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
   ${e.start<=Date.now()/1000&&e.channelUuid?`<a class="b" style="text-decoration:none" href="${playHref(e.channelUuid)}" data-play="${e.channelUuid}" title="${L('live.play_tip')}">▶ ${L('common.play')}</a>
   <button class="b sec" data-ch="${e.channelUuid}" data-n="${esc(e.channelName||'')}" onclick="openTeletext(this.dataset.ch,this.dataset.n)">${L('common.teletext')}</button>`:''}
   <button class="b" onclick="recordEvent(${e.eventId})">${L('ev.record')}</button>
+  ${e.start>Date.now()/1000?`<button class="b sec" id="rembtn" onclick="toggleRemind(${e.eventId})">${remLabel(e.eventId)}</button>`:''}
   <button class="b sec" onclick="$('#serform').hidden=!$('#serform').hidden">${L('ev.series')} …</button></div>`}
  ${e.start<=Date.now()/1000?`<div class="bar" style="margin-top:10px"><button class="b sec" onclick="findRepeats(${e.eventId},this)">🔁 ${L('ev.find_repeats')}</button></div><div id="reps"></div>`:''}
  <form id="serform" hidden onsubmit="event.preventDefault();saveSeries(this)"><h3>${L('ev.series')}</h3>
@@ -197,3 +198,11 @@ async function recordRepeat(id,btn){btn.disabled=true;
  try{const r=await api('/api/record',{event:id,config:''});btn.outerHTML=`<span class="tag keep">${L('ev.planned_tag')}</span>`;
   if(r.conflict)msg(L('ev.planned_simple')+' – ⚠ '+L('up.conflict_msg',{n:r.conflict.titles.length-1,tuners:r.tuners})+'\n'+r.conflict.titles.join(', '));
   else msg(L('ev.planned_simple'),true)}catch(e){btn.disabled=false;msg(e.message)}}
+// Erinnerung per ntfy kurz vor Beginn; Tippen auf die Nachricht öffnet den Sender
+let REM=[];
+const remLabel=id=>REM.some(r=>r.eventId==id)?'🔕 '+L('ev.remind_off'):'🔔 '+L('ev.remind');
+async function loadReminders(){try{REM=(await api('/api/reminders')).reminders}catch(e){}}
+async function toggleRemind(id){const on=!REM.some(r=>r.eventId==id);
+ try{REM=(await api('/api/remind',{event:id,on})).reminders;const b=$('#rembtn');if(b)b.textContent=remLabel(id);
+  msg(on?L('ev.reminded'):L('ev.remind_removed'),true);if(cur=='upcoming')renderUpcoming()}catch(e){msg(e.message)}}
+loadReminders();

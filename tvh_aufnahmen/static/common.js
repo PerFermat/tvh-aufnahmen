@@ -17,7 +17,7 @@ const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localSto
 let cur=store('tab')||'live';
 // Direktlinks (z. B. aus ntfy-Nachrichten): #rec/free = Aufnahmen, Ansicht „Platz schaffen“; #play/<Sender> = abspielen
 const HASH=location.hash.slice(1).split('/').map(decodeURIComponent);
-if(HASH[0]&&HASH[0]!='play'){cur=HASH[0];if(HASH[0]=='rec'&&HASH[1])store('view',HASH[1])}
+if(HASH[0]){cur=HASH[0]=='play'?'live':HASH[0];if(HASH[0]=='rec'&&HASH[1])store('view',HASH[1])}
 if(location.hash)history.replaceState(null,'',location.pathname);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

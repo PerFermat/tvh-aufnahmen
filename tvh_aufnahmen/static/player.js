@@ -116,3 +116,5 @@ async function playRec(uuid,from){await qualities();const r=R(uuid),dur=Math.max
   if(v.currentTime>0){PLAST.t=t;if(Math.abs(t-PLAST.saved)>=30)recSavePos(uuid,t)}
   if(document.activeElement!==s){s.value=t;$('#ptime').textContent=hms(t)}},500)}
 function recJump(uuid,d){const v=$('#pv'),t=POFF+(v?v.currentTime:0)+d,r=R(uuid);playRec(uuid,Math.max(0,Math.min(t,r.stop-r.start-5)))}
+// Direktlink #play/<Sender> (Erinnerung per ntfy): gleich abspielen
+if(HASH[0]=='play'&&HASH[1])addEventListener('load',()=>{if(playerMode()=='intern'&&canPlayInline())playLive(HASH[1]);else location.href=playHref(HASH[1])});
