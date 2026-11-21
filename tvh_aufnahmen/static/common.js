@@ -56,7 +56,9 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#t-unknown').textContent=L('nav.unknown_n',{n:S.unknown.length});
  $('#t-missing').textContent=L('nav.missing_n',{n:S.missing.length});
  $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;render()}
-const TABS={live:()=>renderLive(),epg:()=>renderEpg(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup(),scan:()=>renderScan(),channels:()=>renderChannels(),status:()=>renderStatus()};
+// Senderauswahl (Favoritenliste) – wird mit den Sender-Tags gefüllt
+let chFilter=cs=>cs;
+const TABS={live:()=>renderLive(),epg:()=>renderEpg(),tonight:()=>renderTonight(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup(),scan:()=>renderScan(),channels:()=>renderChannels(),status:()=>renderStatus()};
 function tab(n){if(!TABS[n])n='live';if(cur=='channels'&&n!=cur&&chDirty()&&!confirm(L('chn.leave')))return;cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');
  $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);$('main').classList.toggle('tight',n=='epg');if(n!='epg')$('#hdrslot').innerHTML=HACTS[n]||'';render();toolsState()}
 // Knöpfe im Kopf je Reiter (auf dem Handy nur „＋“)
@@ -75,7 +77,7 @@ function toggleTools(){store('tools',store('tools')=='open'?'closed':'open');too
 function toggleMenu(open){const t=$('#top'),o=open??!t.classList.contains('open');t.classList.toggle('open',o);
  document.body.classList.toggle('menu-open',o);$('.menu').setAttribute('aria-expanded',o)}
 addEventListener('keydown',e=>{if(e.key=='Escape')toggleMenu(false)})
-function render(){if(['live','epg','autorec','upcoming','config','backup','scan','channels','status'].includes(cur))return TABS[cur]();if(!S){$('#main').innerHTML=`<p class="muted">${L('common.no_data')}</p>`;return}
+function render(){if(['live','epg','tonight','autorec','upcoming','config','backup','scan','channels','status'].includes(cur))return TABS[cur]();if(!S){$('#main').innerHTML=`<p class="muted">${L('common.no_data')}</p>`;return}
  TABS[cur]()}
 // Formulare aus der Klassenbeschreibung von TVHeadend (/api/form) – zeigt alle Optionen einer Klasse
 const FORMS={};

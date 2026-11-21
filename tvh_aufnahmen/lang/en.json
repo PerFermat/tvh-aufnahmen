@@ -34,6 +34,7 @@
   "nav.menu": "Menu",
   "nav.tools": "Search and filter",
   "nav.tools_tip": "Show/hide search and filter",
+  "nav.tonight": "Tonight",
   "hdr.new_rec": "New recording",
   "hdr.new_rec_tip": "Schedule a recording with a fixed channel and fixed times",
   "hdr.new_autorec": "New series recording",
@@ -643,5 +644,10 @@
   "srv.last_user": "The last user cannot be deleted while sign-in is always required.",
   "srv.already_recording": "The recording is already running",
   "srv.bad_regex": "The title is not a valid regular expression: {err}",
-  "srv.link_url": "The address of the interface must start with http:// or https://"
+  "srv.link_url": "The address of the interface must start with http:// or https://",
+  "tn.today": "Today",
+  "tn.tomorrow": "Tomorrow",
+  "tn.hint": "What is on at 20:15 and afterwards – tap for details and recording",
+  "tn.none": "There is no programme data for this evening (yet).",
+  "tn.rec": "recording"
 }

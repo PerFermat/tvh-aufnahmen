@@ -317,3 +317,10 @@ dialog.ask{max-width:520px;height:auto;max-height:calc(100vh - 48px);margin:auto
 .tag.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
 .cfl{display:inline-block;margin:2px 0}
 .rprog{height:4px;max-width:160px;margin-top:6px;border-radius:2px;background:var(--line);overflow:hidden}.rprog>div{height:100%;background:var(--acc)}
+/* Heute Abend */
+.tngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.tncard{border:1px solid var(--line);border-radius:12px;background:var(--solid);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.tnch{display:flex;align-items:center;gap:8px;font-size:13px}.tnch img{width:34px;height:24px;object-fit:contain}
+.tnev{display:block;cursor:pointer;color:inherit;text-decoration:none;border-radius:8px;padding:6px;margin:0 -6px}
+.tnev:hover{background:var(--hover)}.tnev b{display:block;margin-top:2px}.tnev .st{display:block;font-size:12.5px}
+.tnev.later{font-size:13px;opacity:.85}.tnp{float:right;width:64px;height:90px;object-fit:cover;border-radius:6px;margin:0 0 4px 8px}

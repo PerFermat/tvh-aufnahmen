@@ -34,6 +34,7 @@
   "nav.menu": "Menü",
   "nav.tools": "Suche und Filter",
   "nav.tools_tip": "Suche und Filter ein-/ausblenden",
+  "nav.tonight": "Heute Abend",
   "hdr.new_rec": "Neue Aufnahme",
   "hdr.new_rec_tip": "Aufnahme mit festem Sender und festen Zeiten planen",
   "hdr.new_autorec": "Neue Serienaufnahme",
@@ -643,5 +644,10 @@
   "srv.last_user": "Der letzte Benutzer kann nicht gelöscht werden, solange die Anmeldung immer nötig ist.",
   "srv.already_recording": "Die Aufnahme läuft bereits",
   "srv.bad_regex": "Titel ist kein gültiger regulärer Ausdruck: {err}",
-  "srv.link_url": "Die Adresse der Oberfläche muss mit http:// oder https:// beginnen"
+  "srv.link_url": "Die Adresse der Oberfläche muss mit http:// oder https:// beginnen",
+  "tn.today": "Heute",
+  "tn.tomorrow": "Morgen",
+  "tn.hint": "Was um 20:15 läuft und danach – antippen für Details und Aufnahme",
+  "tn.none": "Für diesen Abend gibt es (noch) keine Programmdaten.",
+  "tn.rec": "Aufnahme"
 }
