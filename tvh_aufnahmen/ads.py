@@ -21,7 +21,7 @@ output_txt=0
 output_default=0
 output_framearray=0
 live_tv=0
-thread_count=2
+thread_count=4
 """
 
 
@@ -95,19 +95,28 @@ class Ads:
     def __init__(self, app):
         self.app = app
         self.lock = threading.Lock()
-        self.proc = None  # (uuid, Popen, Arbeitsordner, Dateiname)
-        self.wanted = []  # auf Wunsch vorgezogene Aufnahmen
+        self.proc = None  # (uuid, Popen, Arbeitsordner, Dateiname, auf Wunsch?)
+        self.wanted = []  # auf Wunsch vorgezogene Aufnahmen (übersteht einen Neustart, siehe save_wanted)
         os.makedirs(DIR, exist_ok=True)
         with open(os.path.join(DIR, 'comskip.ini'), 'w') as f:
             f.write(INI)
+        try:
+            with open(os.path.join(DIR, 'wanted.json')) as f:
+                self.wanted = json.load(f)
+        except (OSError, ValueError):
+            pass
         self.results = {}
         for name in os.listdir(DIR):
-            if name.endswith('.json'):
+            if name.endswith('.json') and name != 'wanted.json':
                 try:
                     with open(os.path.join(DIR, name)) as f:
                         self.results[name[:-5]] = json.load(f)
                 except (OSError, ValueError):
                     pass
+
+    def save_wanted(self):
+        with open(os.path.join(DIR, 'wanted.json'), 'w') as f:
+            json.dump(self.wanted, f)
 
     @staticmethod
     def available():
@@ -133,26 +142,33 @@ class Ads:
                 os.remove(os.path.join(DIR, uuid + '.json'))
             except OSError:
                 pass
-            if uuid not in self.wanted and not (self.proc and self.proc[0] == uuid):
+            if uuid not in self.wanted and not (self.proc and self.proc[0] == uuid and self.proc[4]):
                 self.wanted.append(uuid)
+                self.save_wanted()
         return self.summary()
 
     def step(self):
-        """Läuft comskip, nur nachsehen; sonst die nächste Aufnahme beginnen."""
+        """Läuft comskip, nur nachsehen; sonst die nächste Aufnahme beginnen. Wartet eine gewünschte Aufnahme,
+        wird eine automatische Untersuchung abgebrochen – sie kommt später von vorn wieder dran."""
         if not self.available():
             return
         with self.lock:
             if self.proc:
-                uuid, p, work, fn = self.proc
+                uuid, p, work, fn, wanted = self.proc
                 if p.poll() is None:
-                    return
-                self.proc = None
+                    if not (self.wanted and not wanted):
+                        return
+                    p.terminate()
+                    p.wait(timeout=30)
+                    self.proc, uuid = None, None
+                else:
+                    self.proc = None
             else:
                 uuid = None
         if uuid:
             self.finish(uuid, p.returncode, work, fn)
             return
-        uuid, fn = self.next()
+        uuid, fn, wanted = self.next()
         if not uuid:
             return
         work = os.path.join(DIR, 'arbeit')
@@ -161,7 +177,8 @@ class Ads:
         cmd = ['nice', '-n', '19', 'ionice', '-c', '3', 'comskip', '--ini=' + os.path.join(DIR, 'comskip.ini'),
                '--output=' + work, fn]
         with self.lock:
-            self.proc = (uuid, subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL), work, fn)
+            self.proc = (uuid, subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL), work, fn,
+                         wanted)
 
     def next(self):
         entries = self.app.tvh.call('dvr/entry/grid_finished', limit=100000).get('entries', [])
@@ -169,17 +186,18 @@ class Ads:
         with self.lock:
             while self.wanted:
                 u = self.wanted.pop(0)
+                self.save_wanted()
                 e = by_uuid.get(u)
                 if e and os.path.isfile(e.get('filename') or ''):
-                    return u, e['filename']
+                    return u, e['filename'], True
             done = set(self.results)
         since = time.time() - AUTO_DAYS * 86400
         for e in sorted(entries, key=lambda e: -(e.get('start') or 0)):
             if e['uuid'] in done or (e.get('start') or 0) < since:
                 continue
             if os.path.isfile(e.get('filename') or ''):
-                return e['uuid'], e['filename']
-        return None, None
+                return e['uuid'], e['filename'], False
+        return None, None, False
 
     def finish(self, uuid, code, work, fn):
         edl = next((os.path.join(work, n) for n in os.listdir(work) if n.endswith('.edl')), None) if os.path.isdir(work) else None
