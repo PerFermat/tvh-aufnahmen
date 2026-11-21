@@ -296,6 +296,8 @@
   "scan.note": "Hinweis",
   "scan.never_seen": "nie",
   "scan.has_autorec": "Serienaufnahme: {t}",
+  "scan.missing": "fehlt im Senderverzeichnis",
+  "scan.missing_tip": "Der Transponder führt den Dienst nicht mehr in seinem Senderverzeichnis (PAT/SDT) – TVHeadend hat ihn deshalb abgeschaltet",
   "common.delete_sel": "Ausgewählte löschen",
   "scan.all_found": "Alle Sender wurden im Suchlauf gefunden.",
   "scan.no_signal": "Ohne Empfang: {m}. Sender auf diesen Transpondern stehen oben unter „Nicht mehr gefunden“ – bei schlechtem Wetter lieber später noch einmal suchen.",

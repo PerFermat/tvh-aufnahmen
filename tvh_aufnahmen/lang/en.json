@@ -296,6 +296,8 @@
   "scan.note": "Note",
   "scan.never_seen": "never",
   "scan.has_autorec": "Series recording: {t}",
+  "scan.missing": "missing from channel list",
+  "scan.missing_tip": "The transponder no longer lists the service in its channel directory (PAT/SDT) – TVHeadend has therefore disabled it",
   "common.delete_sel": "Delete selected",
   "scan.all_found": "All channels were found in the scan.",
   "scan.no_signal": "No signal: {m}. Channels on these transponders are listed above under “No longer found” – in bad weather better scan again later.",

@@ -28,6 +28,7 @@ JUNK = re.compile(r'sendersuchlauf|astra demo|^alt_|_alt$|^\.|\btest\b|^tmp|^dum
 ADULT = re.compile(r'sex|erotik|babes|babestation|dates? tv|treff tv|girls tv', re.I)
 # TVHeadend aktualisiert last_seen nur grob (höchstens etwa täglich) – deshalb mit Spielraum vergleichen
 SEEN_SLACK = 2 * 86400
+MISSING = 2  # „Automatische Überprüfung“: fehlt in PAT/SDT – TVHeadend schaltet den Dienst dann ab
 STAMP = os.path.expanduser('~/.cache/tvh-aufnahmen/scan-start')
 
 
@@ -66,6 +67,12 @@ def scan_status(tvh):
             'running': bool(t0) and (queued > 0 or active > 0), 'failed': failed}
 
 
+def alive(s, fresh):
+    """Wird der Dienst noch ausgestrahlt? last_seen allein reicht nicht: TVHeadend setzt es auch für Dienste,
+    die es als „fehlt in PAT/SDT“ abschaltet."""
+    return (s.get('last_seen') or 0) >= fresh and s.get('auto') != MISSING and bool(s.get('enabled'))
+
+
 def base_name(name):
     return re.sub(r'\s+(hd|uhd|sd)$', '', (name or '').lower().strip())
 
@@ -87,7 +94,7 @@ def candidates(tvh, t0, chans, svcs):
         name = (s.get('svcname') or '').strip()
         enc = bool(s.get('encrypted'))
         if (s.get('channel') or s.get('dvb_servicetype') not in TV_TYPES or not name or JUNK.search(name)
-                or (s.get('last_seen') or 0) < fresh or (name.lower(), enc) in seen):
+                or (s.get('last_seen') or 0) < fresh or s.get('auto') == MISSING or (name.lower(), enc) in seen):
             continue
         streams = tvh.call('service/streams', uuid=s['uuid']).get('streams', [])
         video = [x for x in streams if x.get('type') in VIDEO]
@@ -115,7 +122,7 @@ def candidates(tvh, t0, chans, svcs):
 
 def scan_result(tvh):
     """Wertet den letzten Suchlauf aus: Kandidaten für neue Sender (siehe candidates) und Sender, von denen
-    kein Dienst in den zwei Tagen vor dem Suchlauf oder danach gesehen wurde."""
+    kein Dienst mehr ausgestrahlt wird (siehe alive)."""
     t0 = scan_started()
     if not t0:
         raise ValueError(_('srv.no_scan'))
@@ -132,11 +139,12 @@ def scan_result(tvh):
     dead = []
     for c in chans:
         ss = [svcs.get(u) for u in c.get('services', [])]
-        if any(s and (s.get('last_seen') or 0) >= fresh for s in ss):
+        if any(s and alive(s, fresh) for s in ss):
             continue
         dead.append({'uuid': c['uuid'], 'name': c.get('name') or '', 'number': c.get('number') or 0,
                      'enabled': c.get('enabled'),
                      'last_seen': max([s.get('last_seen') or 0 for s in ss if s] or [0]),
+                     'missing': any(s and s.get('auto') == MISSING for s in ss),
                      'autorecs': [a.get('name') or a.get('title') for a in autorecs if a.get('channel') == c['uuid']]})
     return {'status': status, 'items': items, 'languages': languages,
             'dead': sorted(dead, key=lambda d: d['number']),
