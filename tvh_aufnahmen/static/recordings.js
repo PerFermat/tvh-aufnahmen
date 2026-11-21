@@ -4,9 +4,9 @@ const mins=r=>Math.round((r.stop-r.start)/60)+' min';
 const R=u=>S.recordings.find(r=>r.uuid===u);
 function renderRecordings(){
  $('#main').innerHTML=`<div class="bar"><input id="q" class="tools" type="search" placeholder="${L('rec.search')}" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
- <span class="seg"><button id="v-list" onclick="setView('list')">${L('rec.v_list')}</button><button id="v-dir" onclick="setView('dir')">${L('rec.v_dir')}</button><button id="v-dup" onclick="setView('dup')" title="${L('rec.v_dup_tip')}">${L('rec.v_dup')}</button></span>
+ <span class="seg"><button id="v-list" onclick="setView('list')">${L('rec.v_list')}</button><button id="v-dir" onclick="setView('dir')">${L('rec.v_dir')}</button><button id="v-dup" onclick="setView('dup')" title="${L('rec.v_dup_tip')}">${L('rec.v_dup')}</button><button id="v-free" onclick="setView('free')" title="${L('rec.v_free_tip')}">${L('rec.v_free')}</button></span>
  <button class="b bad" onclick="removeSel()">${L('common.delete_sel')}</button>
- <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked)"> ${L('rec.all_visible')}</label></div>
+ <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked);freeSum()"> ${L('rec.all_visible')}</label></div>
  <p class="muted" id="rcount"></p>
  <table><thead><tr><th></th><th>${sh('title',L('rec.name'))}</th><th>${sh('channel',L('common.channel'))} / ${sh('date',L('common.date'))}</th><th>${sh('dur',L('rec.duration'))} / ${sh('size',L('common.size'))}</th><th></th></tr></thead><tbody id="rbody"></tbody></table>`;
  fillRecordings()}
@@ -20,12 +20,13 @@ function cmp(a,b){const k=KEYS[SORT],x=k(a),y=k(b);
  const c=typeof x=='number'?x-y:coll.compare(x,y);return (DESC?-c:c)||b.start-a.start}
 function toggleFolder(f){OPEN.has(f)?OPEN.delete(f):OPEN.add(f);fillRecordings()}
 function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolean);
- ['list','dir','dup'].forEach(v=>$('#v-'+v).className=VIEW==v?'on':'');
+ ['list','dir','dup','free'].forEach(v=>$('#v-'+v).className=VIEW==v?'on':'');
  const list=S.recordings.filter(r=>{const t=(r.title+' '+r.subtitle+' '+r.channel+' '+r.rel).toLowerCase();return words.every(w=>t.includes(w))});
  list.sort(cmp);
  $('#rcount').textContent=L('rec.count',{n:list.length,total:S.recordings.length});$('#allr').checked=false;
  if(VIEW=='list'){$('#rbody').innerHTML=list.map(recRow).join('');return}
  if(VIEW=='dup')return fillDuplicates(list);
+ if(VIEW=='free')return fillFree(list);
  const groups=new Map();list.forEach(r=>{const f=folder(r);if(!groups.has(f))groups.set(f,[]);groups.get(f).push(r)});
  let gs=[...groups];const total=g=>g[1].reduce((n,r)=>n+r.size,0);
  if(SORT=='title')gs.sort((a,b)=>coll.compare(a[0],b[0])*(DESC?-1:1));
@@ -34,8 +35,11 @@ function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolea
  $('#rbody').innerHTML=gs.map(g=>{const open=OPEN.has(g[0])||words.length>0;
   return `<tr class="fold" onclick="toggleFolder(this.dataset.f)" data-f="${esc(g[0])}"><td>${open?'▾':'▸'}</td><td colspan="2">📁 ${esc(g[0])} <span class="muted">(${g[1].length})</span></td><td colspan="2"><span class="muted">${gb(total(g))}</span></td></tr>`+(open?g[1].map(recRow).join(''):'')}).join('')
   +root.flatMap(g=>g[1]).map(recRow).join('')}
+// Wiedergabestand aus TVHeadend (playcount/playposition – setzen auch Kodi und der interne Player)
+const watched=r=>r.played>0||r.pos>(r.stop-r.start)*.9;
+const watchTag=r=>watched(r)?`<br><span class="tag ok">✓ ${L('rec.watched')}</span>`:r.pos>30?`<div class="rprog" title="${L('rec.resume_at',{t:Math.round(r.pos/60)})}"><div style="width:${Math.min(100,r.pos/Math.max(1,r.stop-r.start)*100)}%"></div></div>`:'';
 const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
- <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}&v=p20" alt="" loading="lazy" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="${L('rec.enlarge')}"><a class="rtitle" onclick="recInfo('${r.uuid}')" title="${L('rec.show_details')}">${esc(r.title)}</a>${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}</td>
+ <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}&v=p20" alt="" loading="lazy" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="${L('rec.enlarge')}"><a class="rtitle" onclick="recInfo('${r.uuid}')" title="${L('rec.show_details')}">${esc(r.title)}</a>${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}${watchTag(r)}</td>
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">${L('rec.download')}</a>
@@ -87,8 +91,8 @@ const dnorm=s=>(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').re
 const ddesc=r=>dnorm(r.description);
 const perMin=r=>r.size/Math.max(60,r.stop-r.start)*60;
 const isHD=r=>/\bhd\b/i.test(r.channel)||perMin(r)>45e6;  // HD-Sender oder > ~6 Mbit/s
-// beste Fassung zuerst: HD, dann längste, dann größte, dann älteste
-const dupScore=(a,b)=>(isHD(b)-isHD(a))||((b.stop-b.start)-(a.stop-a.start))||(b.size-a.size)||(a.start-b.start);
+// beste Fassung zuerst: HD, ohne Empfangsfehler, dann längste, dann größte, dann älteste
+const dupScore=(a,b)=>(isHD(b)-isHD(a))||((a.errors>0)-(b.errors>0))||((b.stop-b.start)-(a.stop-a.start))||(b.size-a.size)||(a.start-b.start);
 function duplicateGroups(list){
  const byEpisode=new Map();
  for(const r of list){const t=dnorm(r.title),sub=dnorm(r.subtitle.split('\n')[0]),d=ddesc(r);
@@ -110,6 +114,15 @@ function fillDuplicates(list){const groups=duplicateGroups(list);DUPS=new Map();
  $('#rcount').textContent=groups.length?L('rec.dup_count',{n:groups.length,extra,size:gb(space)}):L('rec.no_dups');
  $('#rbody').innerHTML=groups.map(g=>`<tr class="fold dup"><td></td><td colspan="4">${g.length}× <b>${esc(g[0].title)}</b>${g[0].subtitle&&g[0].subtitle!=g[0].title?' – '+esc(g[0].subtitle.split('\n')[0]):` <span class="muted">(${L('rec.same_desc')})</span>`}</td></tr>`
   +g.map((r,i)=>recRow(r).replace('class="cr"',`class="cr"${i?' checked':''}`).replace('<td><img',`<td>${i?'':`<span class="tag keep">${L('rec.keep')}</span><br>`}<span class="tag">${isHD(r)?'HD':'SD'}</span> <img`)).join('')).join('')}
+
+// ---------- Platz schaffen ----------
+// Vorschläge zum Löschen: angesehene zuerst, dann die ältesten; die Auswahl zeigt, wie viel danach frei ist
+function fillFree(list){list=[...list].sort((a,b)=>(watched(b)-watched(a))||(a.start-b.start));
+ $('#rbody').innerHTML=list.map(r=>recRow(r).replace('<td><img',`<td><span class="tag">${L('rec.age',{n:Math.floor((Date.now()/1000-r.start)/86400)})}</span><br><img`)).join('');
+ $('#rbody').onchange=freeSum;freeSum()}
+function freeSum(){if(VIEW!='free')return;const d=S.disk,sel=[...document.querySelectorAll('.cr:checked')].map(c=>R(c.value)).filter(Boolean);
+ const size=sel.reduce((n,r)=>n+r.size,0),after=d.free+size;
+ $('#rcount').innerHTML=`${L('rec.free_now',{free:gb(d.free),pct:Math.round(d.free/d.total*100)})}`+(sel.length?` · <b>${L('rec.free_sel',{n:sel.length,size:gb(size),free:gb(after),pct:Math.round(after/d.total*100)})}</b>`:` · ${L('rec.free_hint')}`)}
 
 // ---------- Details einer Aufnahme ----------
 // In der Ansicht „Doppelte“: links die zu behaltende Fassung, rechts die angeklickte (bzw. die erste Kopie)

@@ -60,7 +60,9 @@ def build_state(tvh, recdir):
                            'description': e.get('disp_description') or '',
                            'channel': e.get('channelname') or '', 'start': e.get('start', 0),
                            'stop': e.get('stop', 0), 'status': e.get('status') or '',
-                           'rel': rel, 'size': os.path.getsize(fn)})
+                           'rel': rel, 'size': os.path.getsize(fn),
+                           'played': e.get('playcount') or 0, 'pos': e.get('playposition') or 0,
+                           'errors': (e.get('errors') or 0) + (e.get('data_errors') or 0)})
     recordings.sort(key=lambda r: r['start'], reverse=True)
 
     return {'recdir': recdir, 'recordings': recordings, 'unknown': unknown, 'missing': missing,

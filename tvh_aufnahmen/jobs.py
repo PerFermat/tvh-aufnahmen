@@ -47,7 +47,7 @@ class Jobs:
         cfg = self.app.cfg
         b = dict({'enabled': True, 'dir': default_backup_dir(cfg.get('recdir')), 'hour': 3, 'minute': 30, 'keep': 14},
                  **(cfg.get('autobackup') or {}))
-        n = dict({'url': '', 'done': True, 'failed': True, 'disk': True}, **(cfg.get('notify') or {}))
+        n = dict({'url': '', 'done': True, 'failed': True, 'disk': True, 'link': ''}, **(cfg.get('notify') or {}))
         copy = os.path.join(b['dir'], ARCHIVE_COPY) if b['dir'] else ''
         archive_copy = ({'size': os.path.getsize(copy), 'mtime': int(os.path.getmtime(copy))}
                         if copy and os.path.isfile(copy) else None)
@@ -74,8 +74,11 @@ class Jobs:
         if url and not re.match(r'https?://[^/\s]+/\S+$', url):
             raise ValueError(_('srv.ntfy_url'))
         self.app.cfg['autobackup'] = new_b
+        link = (n.get('link') or '').strip().rstrip('/')
+        if link and not re.match(r'https?://[^/\s]+(/\S*)?$', link):
+            raise ValueError(_('srv.link_url'))
         self.app.cfg['notify'] = {'url': url, 'done': bool(n.get('done')), 'failed': bool(n.get('failed')),
-                                  'disk': bool(n.get('disk'))}
+                                  'disk': bool(n.get('disk')), 'link': link}
         save_config(self.app.path, self.app.cfg)
         return self.settings()
 
@@ -135,14 +138,20 @@ class Jobs:
             self.lock.release()
 
     # ---------- Benachrichtigungen ----------
-    def notify(self, title, text, tags='', priority=3, url=None):
-        """Nachricht an ntfy. Als JSON an die Server-Adresse, weil Umlaute in HTTP-Kopfzeilen nicht gehen."""
-        url = url or self.settings()['notify']['url']
+    def notify(self, title, text, tags='', priority=3, url=None, click=None):
+        """Nachricht an ntfy. Als JSON an die Server-Adresse, weil Umlaute in HTTP-Kopfzeilen nicht gehen.
+        click: Stelle in der Oberfläche (z. B. „#rec/free“), die ein Tippen auf die Nachricht öffnet – nur, wenn
+        unter „link“ die Adresse der Oberfläche eingetragen ist."""
+        n = self.settings()['notify']
+        url = url or n['url']
         if not url:
             return False
         server, topic = url.rstrip('/').rsplit('/', 1)
-        body = json.dumps({'topic': topic, 'title': title, 'message': text, 'priority': priority,
-                           'tags': [t for t in tags.split(',') if t]}).encode()
+        msg = {'topic': topic, 'title': title, 'message': text, 'priority': priority,
+               'tags': [t for t in tags.split(',') if t]}
+        if click and n.get('link'):
+            msg['click'] = n['link'] + '/' + click
+        body = json.dumps(msg).encode()
         req = urllib.request.Request(server, data=body, headers={'Content-Type': 'application/json',
                                                                  'User-Agent': 'tvh-aufnahmen'})
         with urllib.request.urlopen(req, timeout=15):
@@ -170,7 +179,7 @@ class Jobs:
             text = '%s · %s' % (e.get('channelname') or '', time.strftime(_('srv.n_date'), time.localtime(e.get('start') or 0)))
             if not ok:
                 text += '\n' + (e.get('status') or _('srv.n_error'))
-            self.notify(title, text, 'white_check_mark' if ok else 'warning', 3 if ok else 4)
+            self.notify(title, text, 'white_check_mark' if ok else 'warning', 3 if ok else 4, click='#rec')
         self.state['notified'] = sorted(seen)[-2000:]
         self.save_state()
 
@@ -181,7 +190,7 @@ class Jobs:
         d = disk_info(self.app.recdir)
         if d['free'] < d['total'] * LOW_DISK:
             self.notify(_('srv.n_disk'), _('srv.n_disk_text', gb='%.0f' % (d['free'] / 1e9), pct='%.0f' % (d['free'] / d['total'] * 100)),
-                        'floppy_disk', 4)
+                        'floppy_disk', 4, click='#rec/free')
             self.state['disk_warned'] = time.strftime('%Y-%m-%d')
             self.save_state()
 

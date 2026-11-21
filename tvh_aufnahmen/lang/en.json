@@ -220,6 +220,8 @@
   "cfg.trakt_saved": "Trakt Client ID saved – images will be loaded bit by bit",
   "cfg.trakt_removed": "Trakt Client ID removed",
   "cfg.saved": "Settings saved",
+  "cfg.n_link": "Address of this interface (for links in the messages, optional)",
+  "cfg.n_link_hint": "Tapping a message opens the matching place, e.g. the deletion suggestions for “Disk almost full”. Preferably the address under which the interface can also be reached from outside.",
   "bk.s_tags": "Channel tags",
   "bk.s_autorecs": "Series timers",
   "bk.full": "Full backup",
@@ -423,6 +425,14 @@
   "rec.keep_suggested": "keep (suggestion)",
   "rec.copy": "copy",
   "rec.clicked": "clicked",
+  "rec.watched": "watched",
+  "rec.resume_at": "watched up to minute {t}",
+  "rec.v_free": "Free up space",
+  "rec.v_free_tip": "Suggestions for deleting: watched ones first, then the oldest",
+  "rec.age": "{n} days ago",
+  "rec.free_now": "Free: {free} ({pct} %)",
+  "rec.free_sel": "{n} selected, {size} – free afterwards: {free} ({pct} %)",
+  "rec.free_hint": "Tick recordings, then “Delete selected”",
   "epg.loading": "Loading TV guide …",
   "epg.prev_day": "Previous day",
   "epg.next_day": "Next day",
@@ -626,5 +636,6 @@
   "srv.always_needs_login": "“Always” only works while you are signed in – otherwise you would be locked out at once. Please create a user and sign in first.",
   "srv.last_user": "The last user cannot be deleted while sign-in is always required.",
   "srv.already_recording": "The recording is already running",
-  "srv.bad_regex": "The title is not a valid regular expression: {err}"
+  "srv.bad_regex": "The title is not a valid regular expression: {err}",
+  "srv.link_url": "The address of the interface must start with http:// or https://"
 }

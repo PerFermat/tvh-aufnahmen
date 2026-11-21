@@ -55,12 +55,13 @@ async function renderNotify(){let j;try{j=await api('/api/jobs')}catch(e){return
  <p class="muted">${L('cfg.notify_hint',{link:'<a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a>',ex:'<code>tvh-'+Math.random().toString(36).slice(2,10)+'</code>'})}</p>
  <form class="ed" onsubmit="event.preventDefault();saveNotify(this)">
   <label class="wide">${L('cfg.ntfy_url')}<input name="url" value="${esc(n.url)}" placeholder="https://ntfy.sh/${L('cfg.ntfy_ph')}"></label>
+  <label class="wide">${L('cfg.n_link')}<input name="link" value="${esc(n.link||'')}" placeholder="${esc(location.origin)}"><span class="muted small">${L('cfg.n_link_hint')}</span></label>
   <label class="chk"><input type="checkbox" name="done" ${n.done?'checked':''}> ${L('cfg.n_done')}</label>
   <label class="chk"><input type="checkbox" name="failed" ${n.failed?'checked':''}> ${L('cfg.n_failed')}</label>
   <label class="chk"><input type="checkbox" name="disk" ${n.disk?'checked':''}> ${L('cfg.n_disk')}</label>
   <div class="wide bar" style="margin:0"><button class="b">${L('common.save')}</button><button type="button" class="b sec" onclick="testNotify(this.form)">${L('cfg.n_test')}</button></div></form>`}
 async function saveNotify(f){const j=await api('/api/jobs').catch(()=>null);
- try{await api('/api/jobs',{autobackup:j?j.autobackup:{},notify:{url:f.url.value,done:f.done.checked,failed:f.failed.checked,disk:f.disk.checked}});msg(L('cfg.n_saved'),true)}catch(e){msg(e.message)}}
+ try{await api('/api/jobs',{autobackup:j?j.autobackup:{},notify:{url:f.url.value,link:f.link.value,done:f.done.checked,failed:f.failed.checked,disk:f.disk.checked}});msg(L('cfg.n_saved'),true)}catch(e){msg(e.message)}}
 async function testNotify(f){if(!f.url.value.trim())return msg(L('cfg.n_need_url'));
  try{const r=await api('/api/notify-test',{url:f.url.value});msg(r.sent?L('cfg.n_sent'):L('cfg.n_not_sent'),r.sent)}catch(e){msg(e.message)}}
 // Bilder von Trakt: Filme und Serien, die Wikipedia und TVmaze nicht kennen

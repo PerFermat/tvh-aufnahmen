@@ -220,6 +220,8 @@
   "cfg.trakt_saved": "Trakt-Client-ID gespeichert – Bilder werden nach und nach nachgeladen",
   "cfg.trakt_removed": "Trakt-Client-ID entfernt",
   "cfg.saved": "Einstellungen gespeichert",
+  "cfg.n_link": "Adresse dieser Oberfläche (für Links in den Nachrichten, optional)",
+  "cfg.n_link_hint": "Tippt man auf eine Nachricht, öffnet sich die passende Stelle, z. B. bei „Platte fast voll“ die Vorschläge zum Löschen. Am besten die Adresse, unter der die Oberfläche auch von unterwegs erreichbar ist.",
   "bk.s_tags": "Sender-Tags",
   "bk.s_autorecs": "Serien-Timer",
   "bk.full": "Komplettsicherung",
@@ -423,6 +425,14 @@
   "rec.keep_suggested": "behalten (Vorschlag)",
   "rec.copy": "Kopie",
   "rec.clicked": "angeklickt",
+  "rec.watched": "angesehen",
+  "rec.resume_at": "angesehen bis Minute {t}",
+  "rec.v_free": "Platz schaffen",
+  "rec.v_free_tip": "Vorschläge zum Löschen: angesehene zuerst, dann die ältesten",
+  "rec.age": "vor {n} Tagen",
+  "rec.free_now": "Frei: {free} ({pct} %)",
+  "rec.free_sel": "{n} ausgewählt, {size} – danach frei: {free} ({pct} %)",
+  "rec.free_hint": "Aufnahmen ankreuzen, dann „Ausgewählte löschen“",
   "epg.loading": "Lade Programm …",
   "epg.prev_day": "Voriger Tag",
   "epg.next_day": "Nächster Tag",
@@ -626,5 +636,6 @@
   "srv.always_needs_login": "„Immer“ geht nur, wenn du angemeldet bist – sonst wärst du sofort ausgesperrt. Bitte erst einen Benutzer anlegen und dich anmelden.",
   "srv.last_user": "Der letzte Benutzer kann nicht gelöscht werden, solange die Anmeldung immer nötig ist.",
   "srv.already_recording": "Die Aufnahme läuft bereits",
-  "srv.bad_regex": "Titel ist kein gültiger regulärer Ausdruck: {err}"
+  "srv.bad_regex": "Titel ist kein gültiger regulärer Ausdruck: {err}",
+  "srv.link_url": "Die Adresse der Oberfläche muss mit http:// oder https:// beginnen"
 }

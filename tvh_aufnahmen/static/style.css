@@ -316,3 +316,4 @@ dialog.ask{max-width:520px;height:auto;max-height:calc(100vh - 48px);margin:auto
 .b.sm{padding:3px 10px;font-size:12.5px}
 .tag.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
 .cfl{display:inline-block;margin:2px 0}
+.rprog{height:4px;max-width:160px;margin-top:6px;border-radius:2px;background:var(--line);overflow:hidden}.rprog>div{height:100%;background:var(--acc)}

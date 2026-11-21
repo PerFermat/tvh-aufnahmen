@@ -15,6 +15,10 @@ function setUiLang(code){document.cookie=`lang=${code};path=/;max-age=${code?315
 const nfmt=n=>Number(n).toLocaleString(LOCALE);  // Zahl mit Tausenderpunkt je Sprache
 const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
 let cur=store('tab')||'live';
+// Direktlinks (z. B. aus ntfy-Nachrichten): #rec/free = Aufnahmen, Ansicht „Platz schaffen“; #play/<Sender> = abspielen
+const HASH=location.hash.slice(1).split('/').map(decodeURIComponent);
+if(HASH[0]&&HASH[0]!='play'){cur=HASH[0];if(HASH[0]=='rec'&&HASH[1])store('view',HASH[1])}
+if(location.hash)history.replaceState(null,'',location.pathname);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
