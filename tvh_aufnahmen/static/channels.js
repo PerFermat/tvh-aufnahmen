@@ -1,6 +1,7 @@
 // Reiter „Sender ordnen“: Sender als Kacheln, per Ziehen (Maus sofort, Finger nach kurzem Halten) oder
-// Doppelklick mit Nummer verschieben. Der verschobene Sender bekommt die Nummer hinter seinem neuen Vorgänger,
-// die folgenden rücken nur so weit auf, bis eine Lücke kommt. Gespeichert wird erst mit „Speichern“.
+// Doppelklick mit Nummer verschieben. Der verschobene Sender bekommt die Nummer hinter seinem neuen Vorgänger;
+// ist sie schon vergeben, wird gefragt, ob die folgenden bis zur nächsten Lücke aufrücken – sonst ist sie
+// doppelt (rot markiert). Gespeichert wird erst mit „Speichern“.
 let CHN=null,CHUNDO=[],CHQ='';
 const chDirty=()=>!!CHN&&CHN.some(c=>c.number!=c.orig);
 async function renderChannels(){if(!CHN){$('#main').innerHTML=`<p class="muted">${L('common.loading')}</p>`;
@@ -14,9 +15,10 @@ async function renderChannels(){if(!CHN){$('#main').innerHTML=`<p class="muted">
  <p class="muted">${L('chn.hint')}</p><div class="chgrid" id="chgrid"></div>`;
  chDraw()}
 function chDraw(){const g=$('#chgrid');if(!g)return;
- g.innerHTML=CHN.map((c,i)=>`<div class="chtile${c.number!=c.orig?' moved':''}${c.enabled?'':' off'}" data-i="${i}" title="${esc(c.name)}${c.enabled?'':' · '+L('common.disabled')}">
+ const cnt={};CHN.forEach(c=>{if(c.number)cnt[c.number]=(cnt[c.number]||0)+1});
+ g.innerHTML=CHN.map((c,i)=>{const dup=cnt[c.number]>1;return `<div class="chtile${c.number!=c.orig?' moved':''}${c.enabled?'':' off'}${dup?' dup':''}" data-i="${i}" title="${esc(c.name)}${c.enabled?'':' · '+L('common.disabled')}${dup?' · '+L('chn.dup'):''}">
   <span class="cn">${c.number||'–'}</span>${c.icon?`<img src="${c.icon}" alt="" loading="lazy" draggable="false">`:''}<span class="nm">${esc(c.name)}</span>
-  ${c.number!=c.orig?`<s class="old">${c.orig||'–'}</s>`:''}</div>`).join('');
+  ${c.number!=c.orig?`<s class="old">${c.orig||'–'}</s>`:''}</div>`}).join('');
  const n=CHN.filter(c=>c.number!=c.orig).length;
  $('#chsave').textContent=n?L('chn.save_n',{n}):L('chn.save');$('#chsave').disabled=!n;
  $('#chundo').disabled=!CHUNDO.length;$('#chreset').disabled=!n;chFind(true)}
@@ -25,14 +27,27 @@ function chFind(quiet){const g=$('#chgrid'),q=CHQ.trim().toLowerCase();if(!g)ret
  g.querySelectorAll('.chtile').forEach(t=>{const hit=!!q&&CHN[t.dataset.i].name.toLowerCase().includes(q);t.classList.toggle('hit',hit);if(hit&&!first)first=t});
  if(first&&!quiet)first.scrollIntoView({block:'center',behavior:'smooth'})}
 // ---------- Verschieben ----------
+let CHP=null;// Verschiebung, die auf die Antwort im Dialog wartet
 function chMove(from,to,number){// to: Einfügestelle in der Liste vor dem Herausnehmen
  if(to>from)to--;
  if(to==from&&number===undefined)return;
+ const list=[...CHN],[c]=list.splice(from,1);list.splice(to,0,c);
+ const n=number??Math.max(0,...list.slice(0,to).map(x=>x.number||0))+1;
+ // Wer müsste aufrücken? Die folgenden, solange ihre Nummer nicht größer ist als die davor (bis zur Lücke)
+ const shift=[];let prev=n;
+ for(let j=to+1;j<list.length;j++){const x=list[j];if(!x.number||x.number>prev)break;prev++;shift.push([x,prev])}
+ CHP={list,c,n,shift};
+ if(!shift.length)return chApply(false);
+ const show=shift.slice(0,8).map(([x,m])=>`<li>${esc(x.name)}: ${x.number} → <b>${m}</b></li>`).join('')+(shift.length>8?`<li>… ${L('chn.more',{n:shift.length-8})}</li>`:'');
+ dialog(`<h3>${L('chn.shift_title',{name:esc(c.name),n})}</h3>
+  <p>${L(shift.length>1?'chn.shift_q':'chn.shift_q1',{n,name:esc(shift[0][0].name),k:shift.length,m:shift[0][1]})}</p><ul class="chshift">${show}</ul>
+  <div class="bar"><button class="b" onclick="chApply(true)">${L(shift.length>1?'chn.shift_yes':'chn.shift_yes1',{k:shift.length})}</button>
+  <button class="b sec" onclick="chApply(false)">${L('chn.shift_no',{name:esc(c.name)})}</button>
+  <button class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button></div>`).classList.add('ask');
+ $('#dlg').addEventListener('close',()=>{$('#dlg').classList.remove('ask');CHP=null},{once:true})}
+function chApply(withShift){const p=CHP;if(!p)return;CHP=null;if($('#dlg').open)$('#dlg').close();
  CHUNDO.push(CHN.map(c=>[c.uuid,c.number]));
- const [c]=CHN.splice(from,1);CHN.splice(to,0,c);
- const before=Math.max(0,...CHN.slice(0,to).map(x=>x.number||0));
- c.number=number??before+1;
- for(let j=to+1;j<CHN.length;j++){const x=CHN[j];if(!x.number||x.number>CHN[j-1].number)break;x.number=CHN[j-1].number+1}
+ CHN=p.list;p.c.number=p.n;if(withShift)p.shift.forEach(([x,m])=>x.number=m);
  chDraw()}
 function chUndo(){const s=CHUNDO.pop();if(!s)return;const by=Object.fromEntries(CHN.map(c=>[c.uuid,c]));
  CHN=s.map(([u,n])=>({...by[u],number:n}));chDraw()}

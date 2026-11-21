@@ -19,8 +19,8 @@ def channel_list(tvh):
 
 
 def channel_numbers(tvh, changes):
-    """Speichert neue Nummern: changes = [{uuid, number}]. Nur geänderte Sender werden geschrieben; eine
-    Nummer, die danach doppelt vergeben wäre, lehnt das Ganze ab (schon vorher doppelte bleiben erlaubt)."""
+    """Speichert neue Nummern: changes = [{uuid, number}]. Nur geänderte Sender werden geschrieben. Doppelte
+    Nummern sind erlaubt (TVHeadend kennt sie auch) – wer beim Verschieben nicht aufrücken lässt, bekommt sie."""
     current = {c['uuid']: c for c in channel_list(tvh)['channels']}
     new = {}
     for ch in changes or []:
@@ -31,11 +31,6 @@ def channel_numbers(tvh, changes):
             raise ValueError(_('chn.bad_number', n=n))
         if n != current[u]['number']:
             new[u] = n
-    final = {u: new.get(u, c['number']) for u, c in current.items()}
-    for u, n in new.items():
-        same = [current[o]['name'] for o, m in final.items() if m == n and o != u and n]
-        if same:
-            raise ValueError(_('chn.duplicate', n=n, a=current[u]['name'], b=same[0]))
     for u, n in new.items():
         tvh.call('idnode/save', node=json.dumps({'uuid': u, 'number': n}))
     return {'saved': len(new)}
