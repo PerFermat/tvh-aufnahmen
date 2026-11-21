@@ -309,4 +309,6 @@ video::cue{background:rgba(0,0,0,.78);color:#fff;font-size:clamp(14px,2.6vw,26px
 .chtile.dup{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}.chtile.dup .cn{color:var(--bad)}
 dialog.ask{max-width:520px;height:auto;max-height:calc(100vh - 48px);margin:auto;border-radius:18px;width:calc(100% - 32px)}
 .chshift{margin:6px 0 14px;padding-left:20px;font-size:13.5px}
+.chtile .gapm{position:absolute;left:-6px;top:-2px;bottom:-2px;width:4px;border-radius:2px;background:#3b82f6}
+.chghost .gapm{display:none}
 .chghost{position:fixed;z-index:1000;pointer-events:none;cursor:grabbing;box-shadow:var(--shadow);transform:rotate(2deg);opacity:.95;margin:0}

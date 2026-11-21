@@ -19,11 +19,14 @@ async function renderChannels(){if(!CHN){$('#main').innerHTML=`<p class="muted">
 function chDraw(){const g=$('#chgrid');if(!g)return;
  const cnt={};CHN.forEach(c=>{if(c.number)cnt[c.number]=(cnt[c.number]||0)+1});
  g.innerHTML=CHN.map((c,i)=>{const dup=cnt[c.number]>1;return `<div class="chtile${c.number!=c.orig?' moved':''}${c.enabled?'':' off'}${dup?' dup':''}" data-i="${i}" title="${esc(c.name)}${c.enabled?'':' · '+L('common.disabled')}${dup?' · '+L('chn.dup'):''}">
-  <span class="cn">${c.number||'–'}</span>${c.icon?`<img src="${c.icon}" alt="" loading="lazy" draggable="false">`:''}<span class="nm">${esc(c.name)}</span>
+  ${chGap(i)}<span class="cn">${c.number||'–'}</span>${c.icon?`<img src="${c.icon}" alt="" loading="lazy" draggable="false">`:''}<span class="nm">${esc(c.name)}</span>
   ${c.number!=c.orig?`<s class="old">${c.orig||'–'}</s>`:''}</div>`}).join('');
  const n=CHN.filter(c=>c.number!=c.orig).length;
  $('#chsave').textContent=n?L('chn.save_n',{n}):L('chn.save');$('#chsave').disabled=!n;
  $('#chundo').disabled=!CHUNDO.length;$('#chreset').disabled=!n;chFind(true)}
+// Lücke vor dieser Kachel (fehlende Nummern zum Vorgänger): blauer Strich, im Tooltip die freien Nummern
+function chGap(i){const c=CHN[i],p=i?CHN[i-1].number:0;if(!c.number||(i&&!p)||c.number<=p+1)return '';
+ const a=p+1,b=c.number-1;return `<i class="gapm" title="${L('chn.gap',{n:a==b?a:a+'–'+b})}"></i>`}
 // Suche: Treffer hervorheben, den ersten ins Bild holen
 function chFind(quiet){const g=$('#chgrid'),q=CHQ.trim().toLowerCase();if(!g)return;g.classList.toggle('q',!!q);let first=null;
  g.querySelectorAll('.chtile').forEach(t=>{const hit=!!q&&CHN[t.dataset.i].name.toLowerCase().includes(q);t.classList.toggle('hit',hit);if(hit&&!first)first=t});

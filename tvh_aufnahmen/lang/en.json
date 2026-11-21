@@ -334,6 +334,7 @@
   "chn.cancel": "Cancel",
   "chn.more": "and {n} more",
   "chn.dup": "Number used twice",
+  "chn.gap": "Gap: number {n} free",
   "chn.unknown": "Unknown channel – please reload the page",
   "pl.subs_tip": "Subtitles from teletext",
   "pl.subs_on": "Subtitles: on",

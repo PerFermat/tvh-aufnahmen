@@ -334,6 +334,7 @@
   "chn.cancel": "Abbrechen",
   "chn.more": "und {n} weitere",
   "chn.dup": "Nummer doppelt vergeben",
+  "chn.gap": "Lücke: Nummer {n} frei",
   "chn.unknown": "Unbekannter Sender – bitte die Seite neu laden",
   "pl.subs_tip": "Untertitel aus dem Videotext",
   "pl.subs_on": "Untertitel: an",
