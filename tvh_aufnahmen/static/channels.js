@@ -48,9 +48,10 @@ function chShiftAsk(question,yes){const {c,n,shift}=CHP;
  dialog(`<h3>${L('chn.shift_title',{name:esc(c.name),n})}</h3><p>${question}</p><ul class="chshift">${show}</ul>
   <div class="bar"><button class="b" onclick="chApply(true)">${yes}</button>
   <button class="b sec" onclick="chApply(false)">${L('chn.shift_no',{name:esc(c.name)})}</button>
-  <button class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button></div>`).classList.add('ask');
- chDlgDone()}
-function chDlgDone(){$('#dlg').addEventListener('close',()=>{$('#dlg').classList.remove('ask');CHP=null},{once:true})}
+  <button class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button></div>`).classList.add('ask');}
+// Dialog geschlossen: offene Rückfrage verwerfen. Das close-Ereignis kommt verzögert – ist der Dialog bis dahin
+// schon wieder offen (Nummer eingegeben → gleich die Rückfrage), gilt es nicht mehr.
+$('#dlg').addEventListener('close',()=>{if($('#dlg').open)return;$('#dlg').classList.remove('ask');CHP=null});
 function chApply(withShift){const p=CHP;if(!p)return;CHP=null;if($('#dlg').open)$('#dlg').close();
  CHUNDO.push(CHN.map(c=>[c.uuid,c.number]));
  CHN=p.list;p.c.number=p.n;if(withShift)p.shift.forEach(([x,m])=>x.number=m);
@@ -66,12 +67,12 @@ function chRange(i){const prev=Math.max(0,...CHN.slice(0,i).map(x=>x.number||0))
 function chAsk(i){const c=CHN[i],[lo,hi]=chRange(i);
  const nb=k=>CHN[k]?`„${esc(CHN[k].name)}“ (${CHN[k].number||'–'})`:'';
  if(lo>hi||(lo==hi&&c.number==lo)){dialog(`<h3>${esc(c.name)}</h3><p>${i?L('chn.no_room',{name:esc(c.name),a:nb(i-1),b:nb(i+1)}):L('chn.no_room_first',{name:esc(c.name),b:nb(i+1)})}</p>
-  <div class="bar"><button class="b" onclick="$('#dlg').close()">${L('common.close')}</button></div>`).classList.add('ask');chDlgDone();return}
+  <div class="bar"><button class="b" onclick="$('#dlg').close()">${L('common.close')}</button></div>`).classList.add('ask');return}
  dialog(`<h3>${L('chn.ask',{name:esc(c.name)})}</h3><form onsubmit="event.preventDefault();chNumber(${i},this.n.value)">
   <p class="muted">${L('chn.range',{lo,hi:hi<99999?hi:'…'})}</p>
   <div class="bar"><input name="n" type="number" min="${lo}" max="${hi}" value="${c.number||lo}" required style="width:8em">
   <button class="b">${L('common.save')}</button><button type="button" class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button></div></form>`).classList.add('ask');
- chDlgDone();const inp=$('#dlg input');inp.focus();inp.select()}
+ const inp=$('#dlg input');inp.focus();inp.select()}
 // Neue Nummer übernehmen; die direkt anschließenden Sender (lückenlos ab der alten Nummer) können mitgehen
 function chNumber(i,v){const c=CHN[i],[lo,hi]=chRange(i),n=parseInt(v,10);
  if(!(n>=lo&&n<=hi)){msg(L('chn.bad_number',{n:v})+' – '+L('chn.range',{lo,hi:hi<99999?hi:'…'}));return}
