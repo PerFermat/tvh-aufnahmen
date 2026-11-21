@@ -10,9 +10,9 @@ from http.server import BaseHTTPRequestHandler
 from . import i18n
 from .backup import check_password, restore, write_backup
 from .channels import channel_list, channel_numbers
-from .epg import (alternatives, autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day,
-                  epg_search, event_detail, move_recording, poster_status, record_event, record_manual, repeats,
-                  upcoming, upcoming_cancel)
+from .epg import (alternatives, autorec_delete, autorec_load, autorec_preview, autorec_save, autorecs, class_form,
+                  epg_day, epg_search, event_detail, move_recording, poster_status, record_event, record_manual,
+                  repeats, upcoming, upcoming_cancel)
 from .files import file_exists
 from .i18n import _
 from .live import channel_icon, channel_playlist, live_channels, qualities
@@ -363,6 +363,8 @@ def make_handler(app):
                 self.run(lambda: autorec_save(app.tvh, req))
             elif self.path == '/api/autorec-delete':
                 self.run(lambda: autorec_delete(app.tvh, req['uuid']))
+            elif self.path == '/api/autorec-preview':
+                self.run(lambda: autorec_preview(app.tvh, req))
             elif self.path == '/api/move-recording':
                 self.run(lambda: move_recording(app.tvh, req['uuid'], req['event']))
             elif self.path == '/api/upcoming-cancel':

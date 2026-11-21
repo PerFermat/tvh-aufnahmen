@@ -71,6 +71,14 @@
   "ar.saved": "Series recording saved: {name}",
   "ar.confirm_delete": "Delete series recording “{name}”?\nProgrammes already recorded are kept.",
   "ar.deleted": "Series recording deleted: {name}",
+  "ar.preview": "Preview",
+  "ar.preview_n": "Matches {n} programmes in the programme data",
+  "ar.preview_many": "That is a lot ({n}) – maybe the rule is too wide (make the title more exact, set a channel or time).",
+  "ar.preview_planned": "scheduled",
+  "ar.preview_more": "… and {n} more",
+  "ar.preview_none": "No programme in the programme data matches – the rule only takes effect once a matching one appears.",
+  "ar.preview_recorded": "already recorded",
+  "ar.preview_off": "The rule is disabled – it schedules nothing until it is enabled again.",
   "miss.none": "No entries with a missing file.",
   "miss.repair_n": "Repair {n} paths",
   "miss.delete_sel": "Delete selected entries",
@@ -617,5 +625,6 @@
   "login.submit": "Sign in",
   "srv.always_needs_login": "“Always” only works while you are signed in – otherwise you would be locked out at once. Please create a user and sign in first.",
   "srv.last_user": "The last user cannot be deleted while sign-in is always required.",
-  "srv.already_recording": "The recording is already running"
+  "srv.already_recording": "The recording is already running",
+  "srv.bad_regex": "The title is not a valid regular expression: {err}"
 }

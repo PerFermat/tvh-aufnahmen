@@ -71,6 +71,14 @@
   "ar.saved": "Serienaufnahme gespeichert: {name}",
   "ar.confirm_delete": "Serienaufnahme „{name}“ löschen?\nBereits aufgenommene Sendungen bleiben erhalten.",
   "ar.deleted": "Serienaufnahme gelöscht: {name}",
+  "ar.preview": "Vorschau",
+  "ar.preview_n": "Trifft {n} Sendungen in den Programmdaten",
+  "ar.preview_many": "Das sind sehr viele ({n}) – vielleicht ist die Regel zu weit (Titel genauer, Sender oder Uhrzeit festlegen).",
+  "ar.preview_planned": "geplant",
+  "ar.preview_more": "… und {n} weitere",
+  "ar.preview_none": "Keine Sendung in den Programmdaten passt – die Regel greift erst, wenn eine passende auftaucht.",
+  "ar.preview_recorded": "schon aufgenommen",
+  "ar.preview_off": "Die Regel ist abgeschaltet – sie plant nichts, bis sie wieder eingeschaltet wird.",
   "miss.none": "Keine Einträge mit fehlender Datei.",
   "miss.repair_n": "{n} Pfade reparieren",
   "miss.delete_sel": "Ausgewählte Einträge löschen",
@@ -617,5 +625,6 @@
   "login.submit": "Anmelden",
   "srv.always_needs_login": "„Immer“ geht nur, wenn du angemeldet bist – sonst wärst du sofort ausgesperrt. Bitte erst einen Benutzer anlegen und dich anmelden.",
   "srv.last_user": "Der letzte Benutzer kann nicht gelöscht werden, solange die Anmeldung immer nötig ist.",
-  "srv.already_recording": "Die Aufnahme läuft bereits"
+  "srv.already_recording": "Die Aufnahme läuft bereits",
+  "srv.bad_regex": "Titel ist kein gültiger regulärer Ausdruck: {err}"
 }

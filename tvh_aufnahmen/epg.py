@@ -258,6 +258,68 @@ def autorecs(tvh):
     return {'autorecs': out}
 
 
+def _minutes(v):
+    m = re.fullmatch(r'(\d{1,2}):(\d{2})', str(v or ''))
+    return int(m.group(1)) * 60 + int(m.group(2)) if m else None
+
+
+def autorec_preview(tvh, conf, limit=300):
+    """Welche Sendungen der Programmdaten würde diese Serienaufnahme treffen? Nachgebaut nach den Regeln von
+    TVHeadend: Titel als regulärer Ausdruck (ohne Groß-/Kleinschreibung, mit „Volltext“ auch Untertitel und
+    Beschreibung), Sender, Sender-Tag, Startzeitfenster, Wochentage, Dauer und Genre."""
+    try:
+        rx = re.compile(conf.get('title') or '', re.I)
+    except re.error as e:
+        raise ValueError(_('srv.bad_regex', err=e))
+    if not (conf.get('title') or conf.get('channel') or conf.get('tag') or conf.get('content_type')):
+        raise ValueError(_('srv.autorec_too_wide'))
+    chans = tvh.call('channel/grid', limit=100000, all=1).get('entries', [])
+    in_tag = {c['uuid'] for c in chans if conf.get('tag') in (c.get('tags') or [])}
+    lo, hi = _minutes(conf.get('start')), _minutes(conf.get('start_window'))
+    days = set(conf.get('weekdays') or range(1, 8))
+    mind, maxd = int(conf.get('minduration') or 0), int(conf.get('maxduration') or 0)
+    ctype = int(conf.get('content_type') or 0)
+    planned = upcoming_entries(tvh)
+    by_event = {e.get('broadcast') for e in planned if e.get('broadcast')}
+    # Schon aufgenommene Folgen (Titel + Untertitel) – die überspringt TVHeadend je nach Duplikat-Einstellung
+    done = {(_norm(e.get('disp_title')), _norm((e.get('disp_subtitle') or '').split('\n')[0]))
+            for e in tvh.call('dvr/entry/grid_finished', limit=100000).get('entries', [])}
+    now = time.time()
+    hits = []
+    for e in tvh.call('epg/events/grid', limit=100000).get('entries', []):
+        if e.get('stop', 0) <= now:
+            continue
+        text = e.get('title') or ''
+        if conf.get('fulltext'):
+            text = ' '.join(filter(None, [text, e.get('subtitle'), e.get('summary'), e.get('description')]))
+        if conf.get('title') and not rx.search(text):
+            continue
+        if conf.get('channel') and e.get('channelUuid') != conf['channel']:
+            continue
+        if conf.get('tag') and e.get('channelUuid') not in in_tag:
+            continue
+        t = datetime.fromtimestamp(e['start'])
+        if t.isoweekday() not in days:
+            continue
+        m = t.hour * 60 + t.minute
+        if lo is not None and hi is not None:
+            if not (lo <= m <= hi if lo <= hi else m >= lo or m <= hi):  # Fenster über Mitternacht
+                continue
+        elif lo is not None and m < lo or hi is not None and m > hi:
+            continue
+        dur = e['stop'] - e['start']
+        if mind and dur < mind or maxd and dur > maxd:
+            continue
+        if ctype and not any(g >> 4 == ctype >> 4 for g in e.get('genre') or []):
+            continue
+        hits.append({'eventId': e['eventId'], 'title': e.get('title') or '', 'subtitle': (e.get('subtitle') or '').split('\n')[0],
+                     'channelName': e.get('channelName') or '', 'start': e['start'], 'stop': e['stop'],
+                     'planned': e['eventId'] in by_event,
+                     'recorded': (_norm(e.get('title')), _norm((e.get('subtitle') or '').split('\n')[0])) in done})
+    hits.sort(key=lambda h: h['start'])
+    return {'count': len(hits), 'hits': hits[:limit]}
+
+
 def check_uuid(uuid):
     if not re.fullmatch(r'[0-9a-f]{32}', uuid or ''):
         raise ValueError(_('srv.bad_id'))

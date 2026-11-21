@@ -144,7 +144,7 @@ async function showEvent(id){let e;try{e=await api('/api/epg/event?id='+id)}catc
  ${e.start<=Date.now()/1000?`<div class="bar" style="margin-top:10px"><button class="b sec" onclick="findRepeats(${e.eventId},this)">🔁 ${L('ev.find_repeats')}</button></div><div id="reps"></div>`:''}
  <form id="serform" hidden onsubmit="event.preventDefault();saveSeries(this)"><h3>${L('ev.series')}</h3>
   ${idnodeForm(schema,{name:e.title,title:'^'+e.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$',channel:e.channelUuid,weekdays:[wdv]})}
-  <div class="bar" style="margin-top:12px"><button class="b">${L('ev.series_create')}</button></div></form>`)}
+  <div class="bar" style="margin-top:12px"><button class="b">${L('ev.series_create')}</button>${previewBtn}</div><div class="arprev"></div></form>`)}
 let EVENT=null;
 const posterFig=p=>`<figure class="wp"><a href="${esc(p.page)}" target="_blank" rel="noopener"><img src="${esc(p.thumb)}" alt="" onerror="this.closest('figure').remove()"></a><figcaption class="muted">${L('ev.image')}: <a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.caption)}${p.kind?' – '+L('ev.kind_'+p.kind):''}</a> (${p.src=='tvmaze'?'TVmaze':p.src=='trakt'?'Trakt':p.src=='wikidata'||String(p.thumb).includes('Special:FilePath')?'Wikidata':'Wikipedia'})</figcaption></figure>`;
 // Bild für die geöffnete Sendung: Der Server sucht es vorrangig, hier nachfragen, bis es da ist (max. 1 Minute)
