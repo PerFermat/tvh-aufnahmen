@@ -60,7 +60,7 @@ function chApply(withShift){const p=CHP;if(!p)return;CHP=null;if($('#dlg').open)
  CHN=p.list;p.c.number=p.n;if(withShift)p.shift.forEach(([x,m])=>x.number=m);
  chDraw()}
 function chUndo(){const s=CHUNDO.pop();if(!s)return;const by=Object.fromEntries(CHN.map(c=>[c.uuid,c]));
- CHN=s.map(([u,n])=>({...by[u],number:n}));chDraw()}
+ CHN=s.filter(([u])=>by[u]).map(([u,n])=>({...by[u],number:n}));chDraw()}
 function chReset(){if(!confirm(L('chn.reset_confirm')))return;
  CHN=CHN.map(c=>({...c,number:c.orig})).sort((a,b)=>(a.number||1e9)-(b.number||1e9)||a.name.localeCompare(b.name));CHUNDO=[];chDraw()}
 // Doppelklick: Nummer ändern, aber nur innerhalb der Lücke zwischen Vorgänger und Nachfolger – wer weiter
@@ -70,12 +70,19 @@ function chRange(i){const prev=Math.max(0,...CHN.slice(0,i).map(x=>x.number||0))
 function chAsk(i){const c=CHN[i],[lo,hi]=chRange(i);
  const nb=k=>CHN[k]?`„${esc(CHN[k].name)}“ (${CHN[k].number||'–'})`:'';
  if(lo>hi||(lo==hi&&c.number==lo)){dialog(`<h3>${esc(c.name)}</h3><p>${i?L('chn.no_room',{name:esc(c.name),a:nb(i-1),b:nb(i+1)}):L('chn.no_room_first',{name:esc(c.name),b:nb(i+1)})}</p>
-  <div class="bar"><button class="b" onclick="$('#dlg').close()">${L('common.close')}</button></div>`).classList.add('ask');return}
+  <div class="bar"><button class="b" onclick="$('#dlg').close()">${L('common.close')}</button>${chDelBtn(i)}</div>`).classList.add('ask');return}
  dialog(`<h3>${L('chn.ask',{name:esc(c.name)})}</h3><form onsubmit="event.preventDefault();chNumber(${i},this.n.value)">
   <p class="muted">${L('chn.range',{lo,hi:hi<99999?hi:'…'})}</p>
   <div class="bar"><input name="n" type="number" min="${lo}" max="${hi}" value="${c.number||lo}" required style="width:8em">
-  <button class="b">${L('common.save')}</button><button type="button" class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button></div></form>`).classList.add('ask');
+  <button class="b">${L('common.save')}</button><button type="button" class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button>${chDelBtn(i)}</div></form>`).classList.add('ask');
  const inp=$('#dlg input');inp.focus();inp.select()}
+// Löschen: sofort in TVHeadend (nach Rückfrage); ungespeicherte Nummernänderungen der anderen bleiben erhalten
+const chDelBtn=i=>`<button type="button" class="b bad" style="margin-left:auto" onclick="chDelete(${i})">${L('chn.delete')}</button>`;
+async function chDelete(i){const c=CHN[i];
+ if(!confirm(L('chn.del_confirm',{name:c.name})+(c.autorecs.length?'\n\n'+L('chn.del_autorec',{t:c.autorecs.join(', ')}):'')+'\n\n'+L('chn.del_keep')))return;
+ try{await api('/api/scan-delete',{uuids:[c.uuid]});$('#dlg').close();
+  CHN=CHN.filter(x=>x.uuid!=c.uuid);msg(L('chn.deleted',{name:c.name}),true);chDraw()}
+ catch(e){msg(e.message)}}
 // Neue Nummer übernehmen; die direkt anschließenden Sender (lückenlos ab der alten Nummer) können mitgehen
 function chNumber(i,v){const c=CHN[i],[lo,hi]=chRange(i),n=parseInt(v,10);
  if(!(n>=lo&&n<=hi)){msg(L('chn.bad_number',{n:v})+' – '+L('chn.range',{lo,hi:hi<99999?hi:'…'}));return}

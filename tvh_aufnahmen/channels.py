@@ -1,4 +1,5 @@
-"""Reiter „Sender ordnen“: alle Sender mit Nummer und Logo, neue Nummern in TVHeadend speichern.
+"""Reiter „Sender ordnen“: alle Sender mit Nummer und Logo, neue Nummern in TVHeadend speichern (gelöscht
+wird über scan_delete).
 Das Verschieben und Nachrücken selbst passiert in der Oberfläche; hier wird nur geprüft und gespeichert."""
 import json
 import re
@@ -8,12 +9,16 @@ from .i18n import _
 
 def channel_list(tvh):
     """Alle Sender (auch abgeschaltete), nach Nummer sortiert; Sender ohne Nummer am Ende."""
+    autorecs = {}
+    for a in tvh.call('dvr/autorec/grid', limit=100000).get('entries', []):
+        autorecs.setdefault(a.get('channel'), []).append(a.get('name') or a.get('title') or '')
     chans = []
     for c in tvh.call('channel/grid', limit=100000, all=1).get('entries', []):
         icon = re.fullmatch(r'imagecache/(\d+)', c.get('icon_public_url') or '')
         chans.append({'uuid': c['uuid'], 'name': c.get('name') or '', 'number': c.get('number') or 0,
                       'enabled': bool(c.get('enabled', True)),
-                      'icon': '/api/icon?id=' + icon.group(1) if icon else ''})
+                      'icon': '/api/icon?id=' + icon.group(1) if icon else '',
+                      'autorecs': autorecs.get(c['uuid'], [])})
     chans.sort(key=lambda c: (c['number'] or 1 << 30, c['name'].lower()))
     return {'channels': chans}
 
