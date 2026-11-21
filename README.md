@@ -4,11 +4,17 @@ Web-Oberfläche für TVHeadend 4.3 (deutsch und englisch, weitere Sprachen als J
 
 - das **Programm** wie eine Fernsehzeitschrift zu zeigen – ein ganzer Tag, Sender als Spalten, sechs Zeilen zu je 4 Stunden mit allen Sendungen, die darin beginnen; die Schnellauswahl springt zum Block – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
 - im Programm **über alle Tage zu suchen** (Titel, auf Wunsch auch Beschreibungen); laufende Sendungen sind markiert, vorbeigelaufene grau,
-- den **Status** zu sehen: Tuner mit Signal und Fehlern, laufende Aufnahmen und Streams, Temperatur, Last und Speicher des Rechners,
-- **Konflikte** zu erkennen, wenn mehr Aufnahmen gleichzeitig auf verschiedenen Transpondern geplant sind, als es Tuner gibt,
-- **doppelte Aufnahmen** zu finden (Ansicht „Doppelte“ bei Aufnahmen: gleicher Titel und Untertitel, ohne Untertitel gleiche Beschreibung) – behalten wird die HD- bzw. längste Fassung, die übrigen sind zum Löschen vorausgewählt,
+- **„Heute Abend“**: je Sender die Sendung um 20:15 und die danach, mit Plakat, für heute und die nächsten sechs Tage,
+- sich an eine Sendung **erinnern** zu lassen – 5 Minuten vor Beginn kommt eine ntfy-Nachricht; Antippen öffnet den Sender im Player,
+- **Senderlisten** (Favoriten) anzulegen und zu füllen; Live-TV, Programm und „Heute Abend“ zeigen auf Wunsch nur die Sender einer Liste (gespeichert als Sender-Tags in TVHeadend, Kodi & Co. sehen sie also auch),
+- den **Status** zu sehen: Tuner mit Signal und Fehlern, laufende Aufnahmen und Streams, Temperatur, Last und Speicher des Rechners, dazu den **Empfangsverlauf** je Transponder (SNR und Fehler je Stunde, Aufnahmen mit Fehlern) – so sieht man, ob es am Wetter, an der Schüssel oder an einem Transponder liegt,
+- **Konflikte** zu erkennen, wenn mehr Aufnahmen gleichzeitig auf verschiedenen Transpondern geplant sind, als es Tuner gibt – und sie zu **lösen**: Wiederholungen derselben Sendung werden als Ausweichtermin angeboten, jeweils mit der Angabe, ob dort genug Tuner frei sind; ein Klick verlegt die Aufnahme,
+- **doppelte Aufnahmen** zu finden (Ansicht „Doppelte“ bei Aufnahmen: gleicher Titel und Untertitel, ohne Untertitel gleiche Beschreibung) – behalten wird die HD- bzw. fehlerfreie, längste Fassung, die übrigen sind zum Löschen vorausgewählt,
+- **Platz zu schaffen** (Ansicht „Platz schaffen“ bei Aufnahmen): angesehene und älteste Aufnahmen zuerst, mit Summe und freiem Platz danach; die ntfy-Warnung „Platte fast voll“ führt direkt dorthin,
+- **weiterzuschauen**: Der interne Player merkt sich den Stand in TVHeadend (wie Kodi) und macht dort weiter; angesehene Aufnahmen sind markiert, angefangene haben einen Fortschrittsbalken,
+- **Werbung zu erkennen** (mit comskip, im Hintergrund): Werbeblöcke erscheinen rot auf der Zeitleiste und werden auf Wunsch übersprungen; für Avidemux gibt es eine Projektdatei, die die heruntergeladene Aufnahme ohne die Werbeblöcke lädt,
 - Aufnahmen **von Hand** zu planen (Sender, Titel, Datum, Beginn, Ende, Vor-/Nachlauf) – Knopf „＋ Neue Aufnahme“ im Kopf bei „Aufnahmen“ und „Geplante Aufnahmen“,
-- **Serienaufnahmen** zu verwalten (anlegen, bearbeiten, aktivieren/deaktivieren, löschen) und alle **geplanten Aufnahmen** einzeln zu sehen und zu löschen,
+- **Serienaufnahmen** zu verwalten (anlegen, bearbeiten, aktivieren/deaktivieren, löschen) – mit **Vorschau**, welche Sendungen die Regel trifft (geplant, schon aufgenommen, Warnung bei zu vielen) – und alle **geplanten Aufnahmen** einzeln zu sehen und zu löschen,
 - **Live-TV**: alle Sender mit Logo, der laufenden Sendung (mit Fortschrittsbalken) und den nächsten drei Sendungen anzuzeigen und einen Sender direkt im Browser abzuspielen (oder extern, z. B. in VLC),
 - den **Videotext** eines Senders anzusehen (mit Farben und Blockgrafik) und Videotext-**Untertitel** im Player einzublenden,
 - **Aufnahmen** als Liste oder nach Ordnern gruppiert anzuzeigen, nach Name, Sender, Datum, Dauer oder Größe zu sortieren, zu durchsuchen, herunterzuladen, in VLC als Stream abzuspielen, Titel, Untertitel und Beschreibung zu ändern, die Videodatei zu ersetzen (z. B. nach dem Schneiden) und Aufnahmen samt Datei zu löschen; abgespielt wird ebenfalls direkt im Browser,
@@ -77,6 +83,8 @@ python3 tvh-aufnahmen.py --recdir /media/HDD/Aufnahmen --tvh http://localhost:99
 
 `python3 tvh-aufnahmen.py --help` zeigt alle Optionen.
 
+Für die Werbeerkennung zusätzlich comskip installieren (Debian/Ubuntu/Raspberry Pi OS: `sudo apt install comskip`). Ohne comskip fehlt nur diese Funktion.
+
 ## Dauerhaft als Dienst
 
 `/etc/systemd/system/tvh-aufnahmen.service`:
@@ -138,6 +146,16 @@ Der Proxy muss den ursprünglichen Host (`Host` oder `X-Forwarded-Host`), die Ab
 
 **Proxy auf einem anderen Server** (z. B. ein gemieteter Server mit nginx, der den Rechner zu Hause über einen WireGuard-Tunnel erreicht – das geht auch ohne Portfreigabe und bei DS-Lite): Dessen Tunneladresse ist privat und sähe wie das Heimnetz aus. Sie gehört deshalb in die Konfigurationsdatei als vertrauenswürdiger Proxy, z. B. `"trusted_proxies": ["10.77.0.1"]` – dann zählt der Absender aus `X-Forwarded-For`, und der Proxy selbst gilt nie als Heimnetz. Der nginx-Block dazu: `proxy_pass http://<tunneladresse>:8099;` mit `proxy_set_header` für `Host`, `X-Forwarded-Host`, `X-Forwarded-For $remote_addr` und `X-Forwarded-Proto https`, außerdem `proxy_buffering off`, `proxy_request_buffering off`, `client_max_body_size 0` und lange `proxy_read_timeout` für Streams und Uploads. Auf dem Rechner zu Hause sollte die Firewall durch den Tunnel nur Port 8099 durchlassen.
 
+## Werbung und Avidemux
+
+Ist comskip installiert, untersucht das Tool neue Aufnahmen der letzten 30 Tage im Hintergrund – mit niedrigster Priorität und immer nur eine zugleich; ältere auf Wunsch über „Werbung suchen“ im Detailfenster einer Aufnahme. Die Aufnahmen selbst bleiben unverändert, die Ergebnisse liegen in `~/.cache/tvh-aufnahmen/werbung/`. Abschalten lässt es sich unter Einstellungen → „Werbung erkennen“.
+
+Im internen Player sind die Werbeblöcke rot auf der Zeitleiste; mit „Werbung überspringen“ springt er beim Erreichen eines Blocks an dessen Ende.
+
+**Avidemux:** Im Detailfenster einer Aufnahme lädt „Avidemux-Projekt“ eine Projektdatei (`<aufnahme>.ts.py`) herunter. Vorher fragt das Tool, in welchem Ordner die heruntergeladene Aufnahme auf dem PC liegt (z. B. `/home/name/Downloads`) – das merkt es sich. In Avidemux über **Datei → Projektskript → Ausführen** öffnen: Die Aufnahme erscheint ohne die Werbeblöcke (als Abschnitte, die Schnittstellen sind auf der Zeitleiste zu sehen und lassen sich nachbessern), Video und Ton werden beim Speichern nur kopiert. Die `.idx2`-Datei ist dagegen nur Avidemux' eigener Index, den es beim ersten Öffnen einer `.ts`-Datei selbst anlegt – Marken lassen sich darin nicht ablegen.
+
+comskip erkennt Werbung an schwarzen Bildern, am fehlenden Senderlogo, an Tonpausen und Formatwechseln. Bei deutschen Privatsendern trennen oft keine schwarzen Bilder die Werbung – dann hängt alles am Logo, und die Erkennung ist nicht immer genau. Die Blöcke deshalb vor dem endgültigen Schneiden ansehen.
+
 ## Sicherung
 
 Der Reiter **Sicherung** bietet zwei Wege:
@@ -168,10 +186,12 @@ Empfohlener Ablauf nach einer Neuinstallation:
 | `tvh_aufnahmen/teletext.py` | Videotext: liest die Videotext-Pakete aus dem Senderstream und setzt die Seiten zusammen |
 | `tvh_aufnahmen/posters.py` | Bilder zu langen Sendungen aus der Wikipedia, von TVmaze (Serien) und Trakt, im Hintergrund gesucht und zwischengespeichert |
 | `tvh_aufnahmen/scan.py` | Sendersuchlauf, Auswertung, neue Sender anlegen, verschwundene löschen |
-| `tvh_aufnahmen/channels.py` | Sender ordnen: Senderliste, neue Nummern prüfen und speichern |
+| `tvh_aufnahmen/channels.py` | Sender ordnen: Senderliste, neue Nummern prüfen und speichern, Senderlisten (Tags) |
+| `tvh_aufnahmen/reception.py` | Empfangsverlauf: minütliche Messung der arbeitenden Tuner (SQLite) und Fehler der Aufnahmen je Transponder |
+| `tvh_aufnahmen/ads.py` | Werbung erkennen: comskip im Hintergrund, Werbeblöcke je Aufnahme |
 | `tvh_aufnahmen/status.py` | Status-Seite: Tuner, laufende Aufnahmen und Streams, Rechner |
 | `tvh_aufnahmen/thumbs.py` | Vorschaubilder der Aufnahmen per ffmpeg |
-| `tvh_aufnahmen/jobs.py` | Hintergrundaufgaben: nächtliche Sicherung, Benachrichtigungen per ntfy |
+| `tvh_aufnahmen/jobs.py` | Hintergrundaufgaben: nächtliche Sicherung, Benachrichtigungen und Erinnerungen per ntfy, Empfangsmessung, Werbesuche |
 | `tvh_aufnahmen/state.py` | Abgleich Einträge ↔ Dateien: Aufnahmen, nicht eingetragene Dateien, Einträge ohne Datei |
 | `tvh_aufnahmen/recordings.py` | Ändern: importieren, bearbeiten, Datei ersetzen, löschen, Pfade reparieren |
 | `tvh_aufnahmen/backup.py` | Komplettsicherung des TVHeadend-Ordners und Wiederherstellung |

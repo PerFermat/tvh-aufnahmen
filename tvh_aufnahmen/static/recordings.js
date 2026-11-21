@@ -2,6 +2,26 @@
 let VIEW=store('view')||'list',SORT=store('sort')||'date',DESC=(store('desc')??'1')=='1';const OPEN=new Set();
 const mins=r=>Math.round((r.stop-r.start)/60)+' min';
 const R=u=>S.recordings.find(r=>r.uuid===u);
+// ---------- Werbung (comskip) ----------
+let ADS=null;
+async function loadAds(){try{ADS=await api('/api/ads')}catch(e){ADS=null}}
+const adOf=u=>ADS&&ADS.results[u];
+const adSecs=a=>a.ads.reduce((n,[x,y])=>n+y-x,0);
+const adTag=r=>{const a=adOf(r.uuid);if(ADS&&ADS.running==r.uuid)return `<br><span class="tag idle">⏳ ${L('ads.running')}</span>`;
+ if(!a||a.error)return '';return a.ads.length?`<br><span class="tag" title="${L('ads.tip')}">📺 ${L('ads.found',{n:a.ads.length,m:Math.round(adSecs(a)/60)})}</span>`:`<br><span class="tag idle">${L('ads.none')}</span>`};
+async function adScan(u){try{ADS=await api('/api/ads-scan',{uuid:u});msg(L('ads.queued'),true);$('#dlg').close();fillRecordings()}catch(e){msg(e.message)}}
+// Avidemux-Projekt: behält alles außer den Werbeblöcken (Segmente, vom Server schon auf Schlüsselbilder gelegt),
+// Video und Ton nur kopiert. Der Pfad ist der der heruntergeladenen Datei.
+function avidemuxProject(u){const r=R(u),a=adOf(u);if(!a)return;
+ const dir=prompt(L('ads.adm_dir'),store('admdir')||'');if(dir===null)return;store('admdir',dir.replace(/\/+$/,''));
+ const name=r.rel.split('/').pop(),path=(dir.replace(/\/+$/,'')+'/'+name).replace(/"/g,'\\"');
+ const py=['#PY  <- Needed to identify #','#--automatically built-- tvh-aufnahmen: '+r.title+' – Werbung laut comskip:',
+  ...a.ads.map(([x,y])=>'#   '+hms(x)+' – '+hms(y)),'','adm = Avidemux()','ed = Editor()',`if not adm.loadVideo("${path}"):`,`    raise("Cannot load ${path}")`,
+  '# Zeiten ab dem ersten Schlüsselbild – dessen Lage bei Avidemux:','t0 = ed.getTimeOffsetForSegment(0)',
+  'adm.clearSegments()',...a.cuts.map(([s,d])=>`adm.addSegment(0, t0 + ${s}, ${d})`),'adm.markerA = 0',
+  `adm.markerB = ${a.cuts.reduce((n,[s,d])=>n+d,0)}`,'adm.videoCodec("Copy")',''].join('\n');
+ const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([py],{type:'text/x-python'}));link.download=name+'.py';link.click();
+ msg(L('ads.adm_saved',{f:name+'.py'}),true)}
 function renderRecordings(){
  $('#main').innerHTML=`<div class="bar"><input id="q" class="tools" type="search" placeholder="${L('rec.search')}" value="${esc(Q)}" style="flex:1;min-width:220px" oninput="Q=this.value;fillRecordings()">
  <span class="seg"><button id="v-list" onclick="setView('list')">${L('rec.v_list')}</button><button id="v-dir" onclick="setView('dir')">${L('rec.v_dir')}</button><button id="v-dup" onclick="setView('dup')" title="${L('rec.v_dup_tip')}">${L('rec.v_dup')}</button><button id="v-free" onclick="setView('free')" title="${L('rec.v_free_tip')}">${L('rec.v_free')}</button></span>
@@ -9,7 +29,7 @@ function renderRecordings(){
  <label><input type="checkbox" id="allr" onchange="document.querySelectorAll('.cr').forEach(c=>c.checked=this.checked);freeSum()"> ${L('rec.all_visible')}</label></div>
  <p class="muted" id="rcount"></p>
  <table><thead><tr><th></th><th>${sh('title',L('rec.name'))}</th><th>${sh('channel',L('common.channel'))} / ${sh('date',L('common.date'))}</th><th>${sh('dur',L('rec.duration'))} / ${sh('size',L('common.size'))}</th><th></th></tr></thead><tbody id="rbody"></tbody></table>`;
- fillRecordings()}
+ fillRecordings();loadAds().then(()=>{if(cur=='rec')fillRecordings()})}
 const sh=(k,t)=>`<a class="${SORT==k?'on':''}" onclick="sortBy('${k}')">${t}${SORT==k?(DESC?' ▼':' ▲'):''}</a>`;
 function sortBy(k){if(SORT==k)DESC=!DESC;else{SORT=k;DESC=k=='date'||k=='size'||k=='dur'}store('sort',SORT);store('desc',DESC?'1':'0');renderRecordings()}
 function setView(v){VIEW=v;store('view',v);fillRecordings()}
@@ -39,7 +59,7 @@ function fillRecordings(){const words=Q.toLowerCase().split(/\s+/).filter(Boolea
 const watched=r=>r.played>0||r.pos>(r.stop-r.start)*.9;
 const watchTag=r=>watched(r)?`<br><span class="tag ok">✓ ${L('rec.watched')}</span>`:r.pos>30?`<div class="rprog" title="${L('rec.resume_at',{t:Math.round(r.pos/60)})}"><div style="width:${Math.min(100,r.pos/Math.max(1,r.stop-r.start)*100)}%"></div></div>`:'';
 const recRow=r=>`<tr><td><input type="checkbox" class="cr" value="${r.uuid}"></td>
- <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}&v=p20" alt="" loading="lazy" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="${L('rec.enlarge')}"><a class="rtitle" onclick="recInfo('${r.uuid}')" title="${L('rec.show_details')}">${esc(r.title)}</a>${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}${watchTag(r)}</td>
+ <td><img class="thumb" src="/api/thumb?uuid=${r.uuid}&v=p20" alt="" loading="lazy" onerror="this.remove()" onclick="showThumb('${r.uuid}')" title="${L('rec.enlarge')}"><a class="rtitle" onclick="recInfo('${r.uuid}')" title="${L('rec.show_details')}">${esc(r.title)}</a>${r.subtitle?'<br><span class="muted">'+esc(r.subtitle.split('\n')[0])+'</span>':''}${r.status&&r.status!='Completed OK'?'<br><span class="tag">'+esc(r.status)+'</span>':''}${watchTag(r)}${adTag(r)}</td>
  <td>${esc(r.channel)}<br><span class="muted">${fmt(r.start)}</span></td>
  <td>${mins(r)}<br><span class="muted">${gb(r.size)}</span></td>
  <td style="white-space:nowrap"><a class="b" style="text-decoration:none;display:inline-block" href="/api/download?uuid=${r.uuid}">${L('rec.download')}</a>
@@ -135,6 +155,8 @@ function recCard(r,label,keep){return `<div class="rcard${keep?' keep':''}"><div
  <p style="white-space:pre-line">${esc(r.description||L('rec.no_desc'))}</p>
  <div class="bar" style="margin:0"><a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${r.uuid}" data-playrec="${r.uuid}">${L('common.play')}</a>
   <a class="b sec" style="text-decoration:none" href="/api/download?uuid=${r.uuid}">${L('rec.download')}</a>
+  ${ADS&&ADS.available?(adOf(r.uuid)&&adOf(r.uuid).cuts.length?`<button class="b sec" onclick="avidemuxProject('${r.uuid}')" title="${L('ads.adm_tip')}">✂ ${L('ads.adm')}</button>`:'')
+   +(ADS.running==r.uuid||ADS.wanted.includes(r.uuid)?'':`<button class="b sec" onclick="adScan('${r.uuid}')">${adOf(r.uuid)?L('ads.rescan'):L('ads.scan')}</button>`):''}
   <button class="b sec" onclick="toggleWatched('${r.uuid}')">${watched(r)?L('rec.mark_unwatched'):L('rec.mark_watched')}</button>
   <button class="b bad" onclick="removeRec(['${r.uuid}'])">${L('common.delete')}</button></div></div>`}
 async function toggleWatched(u){const r=R(u);try{const x=await api('/api/playpos',{uuid:u,pos:0,done:!watched(r)});r.pos=x.pos;r.played=x.played;

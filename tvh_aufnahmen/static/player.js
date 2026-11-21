@@ -93,6 +93,9 @@ async function playLive(uuid){await qualities();const c=(LIVE&&LIVE.channels.fin
 // Weiterschauen: Der Stand wird in TVHeadend gespeichert (playposition/playcount – wie bei Kodi), alle 30 s,
 // beim Schließen und am Ende (ab 95 % gilt die Aufnahme als angesehen). Ohne Startzeit geht es dort weiter.
 let PLAST={uuid:null,t:0,saved:0};
+// Werbeblöcke (comskip, siehe recordings.js) als rote Abschnitte über der Zeitleiste
+const adBlocks=u=>(typeof adOf=='function'&&adOf(u)&&adOf(u).ads)||[];
+const adMarks=(u,dur)=>adBlocks(u).map(([x,y])=>`<i class="admark" style="left:${(x/dur*100).toFixed(2)}%;width:${Math.max(.3,(y-x)/dur*100).toFixed(2)}%" title="${L('ads.block',{a:hms(x),b:hms(y)})}"></i>`).join('');
 async function recSavePos(uuid,t,done){const r=R(uuid);if(!r)return;t=Math.floor(t);
  if(done===undefined)done=t>=(r.stop-r.start)*.95;
  if(!done&&Math.abs(t-PLAST.saved)<5&&PLAST.uuid==uuid)return;PLAST.saved=t;
@@ -100,10 +103,11 @@ async function recSavePos(uuid,t,done){const r=R(uuid);if(!r)return;t=Math.floor
 async function playRec(uuid,from){await qualities();const r=R(uuid),dur=Math.max(60,r.stop-r.start);
  const resume=from===undefined&&r.pos>30&&!watched(r)?r.pos:0;POFF=from??resume;
  if(!($('#dlg').open&&$('#pseek')&&$('#pseek').dataset.uuid==uuid)){playerDialog(r.title,(r.subtitle?r.subtitle.split('\n')[0]+' · ':'')+r.channel+' · '+fmt(r.start),
-  `<div class="pbar"><span id="ptime">0:00</span><input type="range" id="pseek" data-uuid="${uuid}" min="0" max="${dur}" step="1" value="${POFF}"><span>${hms(dur)}</span></div>
+  `<div class="pbar"><span id="ptime">0:00</span><span class="pseekw">${adMarks(uuid,dur)}<input type="range" id="pseek" data-uuid="${uuid}" min="0" max="${dur}" step="1" value="${POFF}"></span><span>${hms(dur)}</span></div>
   <div class="bar" style="margin:6px 0 0">${qualSel()}<button class="b sec" onclick="recJump('${uuid}',-300)">−5 min</button><button class="b sec" onclick="recJump('${uuid}',-30)">−30 s</button>
   <button class="b sec" onclick="recJump('${uuid}',30)">+30 s</button><button class="b sec" onclick="recJump('${uuid}',300)">+5 min</button>
-  <a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${uuid}" onclick="event.stopPropagation()">${L('pl.vlc')}</a>${subsBtn()}</div>`);
+  <a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${uuid}" onclick="event.stopPropagation()">${L('pl.vlc')}</a>${subsBtn()}
+  ${adBlocks(uuid).length?`<label class="chk" title="${L('ads.skip_tip')}"><input type="checkbox" ${store('adskip')!='off'?'checked':''} onchange="store('adskip',this.checked?'on':'off')"> ${L('ads.skip')}</label>`:''}</div>`);
   $('#pseek').addEventListener('change',e=>playRec(uuid,+e.target.value));
   PLAST={uuid,t:POFF,saved:r.pos};$('#dlg').addEventListener('close',()=>{if(PLAST.uuid==uuid&&PLAST.t>30)recSavePos(uuid,PLAST.t);if(cur=='rec')fillRecordings()},{once:true});
   $('#pseek').addEventListener('input',e=>$('#ptime').textContent=hms(+e.target.value))}
@@ -114,6 +118,8 @@ async function playRec(uuid,from){await qualities();const r=R(uuid),dur=Math.max
  $('#pv').addEventListener('ended',()=>recSavePos(uuid,dur,true),{once:true});
  PTIMER=setInterval(()=>{const v=$('#pv');if(!v)return clearInterval(PTIMER);const t=POFF+v.currentTime,s=$('#pseek');
   if(v.currentTime>0){PLAST.t=t;if(Math.abs(t-PLAST.saved)>=30)recSavePos(uuid,t)}
+  // Werbung überspringen: nur beim Hineinlaufen (nicht, wenn man selbst mitten hinein gesprungen ist)
+  if(store('adskip')!='off'&&v.currentTime>2){const b=adBlocks(uuid).find(([x,y])=>t>=x&&t<x+3&&y-t>5);if(b){clearInterval(PTIMER);msg(L('ads.skipped',{m:Math.round((b[1]-b[0])/60)}),true);return playRec(uuid,b[1])}}
   if(document.activeElement!==s){s.value=t;$('#ptime').textContent=hms(t)}},500)}
 function recJump(uuid,d){const v=$('#pv'),t=POFF+(v?v.currentTime:0)+d,r=R(uuid);playRec(uuid,Math.max(0,Math.min(t,r.stop-r.start-5)))}
 // Direktlink #play/<Sender> (Erinnerung per ntfy): gleich abspielen

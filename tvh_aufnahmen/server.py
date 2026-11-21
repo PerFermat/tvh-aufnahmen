@@ -297,6 +297,8 @@ def make_handler(app):
                 self.run(lambda: scan_result(app.tvh))
             elif url.path == '/api/channels':
                 self.run(lambda: channel_list(app.tvh))
+            elif url.path == '/api/ads':
+                self.run(app.ads.summary)
             elif url.path == '/api/reception':
                 self.run(lambda: app.reception.history(app.tvh, max(1, min(60, int(q.get('days') or 7)))))
             elif url.path == '/api/tags':
@@ -362,6 +364,10 @@ def make_handler(app):
                 self.run(lambda: scan_add(app.tvh, req.get('uuids') or []))
             elif self.path == '/api/scan-delete':
                 self.run(lambda: scan_delete(app.tvh, req.get('uuids') or []))
+            elif self.path == '/api/ads-config':
+                self.run(lambda: app.ads.set_enabled(req.get('on')))
+            elif self.path == '/api/ads-scan':
+                self.run(lambda: app.ads.request(check_uuid(req.get('uuid'))))
             elif self.path == '/api/tag-create':
                 self.run(lambda: tag_create(app.tvh, req.get('name')))
             elif self.path == '/api/tag-delete':

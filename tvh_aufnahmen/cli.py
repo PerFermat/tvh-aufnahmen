@@ -5,6 +5,7 @@ import socket
 from http.server import ThreadingHTTPServer
 
 from . import i18n
+from .ads import Ads
 from .auth import Auth
 from .config import App, find_tvhconf, load_config
 from .epg_archive import EpgArchive
@@ -73,6 +74,7 @@ def main():
                           client_id=lambda: app.cfg.get('trakt_id'))
     app.archive = EpgArchive()
     app.reception = Reception()
+    app.ads = Ads(app)
     app.teletext = TeletextService(lambda: app.tvh)
     app.jobs = Jobs(app)
     app.auth = Auth(app)

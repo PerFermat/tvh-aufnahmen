@@ -19,7 +19,12 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  <div id="qualitycfg"></div>
  <div id="notifycfg"></div>
  <div id="traktcfg"></div>
- <div id="authcfg"></div>`;renderQuality();renderNotify();renderTrakt(c);renderAuth()}
+ <div id="adscfg"></div>
+ <div id="authcfg"></div>`;renderQuality();renderNotify();renderTrakt(c);renderAuth();renderAdsCfg()}
+async function renderAdsCfg(){let a;try{a=await api('/api/ads')}catch(e){return}if(!$('#adscfg'))return;const n=Object.keys(a.results).length;
+ $('#adscfg').innerHTML=`<h3>${L('cfg.ads')}</h3><p class="muted">${L('cfg.ads_hint')}</p>${a.available?`<label class="chk"><input type="checkbox" ${a.enabled?'checked':''}
+  onchange="api('/api/ads-config',{on:this.checked}).then(()=>msg(L('cfg.saved'),true)).catch(e=>msg(e.message))"> ${L('cfg.ads_on')}</label>
+  <p class="muted small">${L('cfg.ads_state',{n})}${a.running?' · '+L('ads.running'):''}</p>`:`<p class="alert">${L('cfg.ads_missing')}</p>`}`}
 // Anmeldung für den Zugriff von außen: wann nötig, Benutzer anlegen/ändern/löschen
 async function renderAuth(a){if(!a)try{a=await api('/api/users')}catch(e){return}if(cur!='config'||!$('#authcfg'))return;
  $('#authcfg').innerHTML=`<h3>${L('auth.title')}</h3>
