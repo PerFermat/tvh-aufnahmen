@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler
 
 from . import i18n
 from .backup import check_password, restore, write_backup
+from .channels import channel_list, channel_numbers
 from .epg import (autorec_delete, autorec_load, autorec_save, autorecs, class_form, epg_day, epg_search,
                   event_detail, poster_status, record_event, record_manual, repeats, upcoming,
                   upcoming_cancel)
@@ -290,6 +291,8 @@ def make_handler(app):
                 self.run(lambda: scan_status(app.tvh))
             elif url.path == '/api/scan-result':
                 self.run(lambda: scan_result(app.tvh))
+            elif url.path == '/api/channels':
+                self.run(lambda: channel_list(app.tvh))
             else:
                 self.send(404, {'error': _('srv.not_found')})
 
@@ -348,6 +351,8 @@ def make_handler(app):
                 self.run(lambda: scan_add(app.tvh, req.get('uuids') or []))
             elif self.path == '/api/scan-delete':
                 self.run(lambda: scan_delete(app.tvh, req.get('uuids') or []))
+            elif self.path == '/api/channel-numbers':
+                self.run(lambda: channel_numbers(app.tvh, req.get('changes')))
             elif self.path == '/api/record-manual':
                 self.run(lambda: record_manual(app.tvh, app.cfg.get('lang') or 'ger', req))
             elif self.path == '/api/record':

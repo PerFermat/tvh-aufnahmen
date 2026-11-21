@@ -1,6 +1,7 @@
 """Zugriff auf die HTTP-API von TVHeadend 4.3."""
 import hashlib
 import json
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,13 +26,21 @@ class Utf8DigestAuthHandler(urllib.request.HTTPDigestAuthHandler):
 class Tvh:
     def __init__(self, url, user, password):
         self.url = url.rstrip('/')
-        handlers = []
+        self.mgr = None
         if user:
-            mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-            mgr.add_password(None, self.url, user, password or '')
-            handlers += [Utf8DigestAuthHandler(mgr),
-                         urllib.request.HTTPBasicAuthHandler(mgr)]
-        self.opener = urllib.request.build_opener(*handlers)
+            self.mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+            self.mgr.add_password(None, self.url, user, password or '')
+        self.local = threading.local()
+
+    @property
+    def opener(self):
+        """Je Thread ein eigener Opener: Der Digest-Handler zählt Wiederholungen in einem gemeinsamen Zähler.
+        Bei vielen gleichzeitigen Anfragen (z. B. alle Senderlogos) überschreitet er sonst die Grenze von 5 und
+        jede weitere Anfrage scheitert mit „digest auth failed“, bis das Programm neu startet."""
+        if not hasattr(self.local, 'opener'):
+            handlers = [Utf8DigestAuthHandler(self.mgr), urllib.request.HTTPBasicAuthHandler(self.mgr)] if self.mgr else []
+            self.local.opener = urllib.request.build_opener(*handlers)
+        return self.local.opener
 
     def call(self, path, **params):
         data = urllib.parse.urlencode(params).encode()
