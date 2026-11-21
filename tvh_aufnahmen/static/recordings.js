@@ -135,7 +135,10 @@ function recCard(r,label,keep){return `<div class="rcard${keep?' keep':''}"><div
  <p style="white-space:pre-line">${esc(r.description||L('rec.no_desc'))}</p>
  <div class="bar" style="margin:0"><a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${r.uuid}" data-playrec="${r.uuid}">${L('common.play')}</a>
   <a class="b sec" style="text-decoration:none" href="/api/download?uuid=${r.uuid}">${L('rec.download')}</a>
+  <button class="b sec" onclick="toggleWatched('${r.uuid}')">${watched(r)?L('rec.mark_unwatched'):L('rec.mark_watched')}</button>
   <button class="b bad" onclick="removeRec(['${r.uuid}'])">${L('common.delete')}</button></div></div>`}
+async function toggleWatched(u){const r=R(u);try{const x=await api('/api/playpos',{uuid:u,pos:0,done:!watched(r)});r.pos=x.pos;r.played=x.played;
+ $('#dlg').close();fillRecordings();msg(watched(r)?L('rec.marked_watched'):L('rec.marked_unwatched'),true)}catch(e){msg(e.message)}}
 function recInfo(u){const r=R(u),g=VIEW=='dup'?DUPS.get(u):null;
  if(!g)return dialog(`<div style="margin-top:34px">${recCard(r,L('st.recording'),false)}</div>`);
  const keep=g[0],other=u==keep.uuid?g[1]:r,same=dnorm(keep.description)==dnorm(other.description);

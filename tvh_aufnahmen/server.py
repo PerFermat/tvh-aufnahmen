@@ -10,14 +10,14 @@ from http.server import BaseHTTPRequestHandler
 from . import i18n
 from .backup import check_password, restore, write_backup
 from .channels import channel_list, channel_numbers
-from .epg import (alternatives, autorec_delete, autorec_load, autorec_preview, autorec_save, autorecs, class_form,
-                  epg_day, epg_search, event_detail, move_recording, poster_status, record_event, record_manual,
-                  repeats, upcoming, upcoming_cancel)
+from .epg import (alternatives, autorec_delete, autorec_load, autorec_preview, autorec_save, autorecs, check_uuid,
+                  class_form, epg_day, epg_search, event_detail, move_recording, poster_status, record_event,
+                  record_manual, repeats, upcoming, upcoming_cancel)
 from .files import file_exists
 from .i18n import _
 from .live import channel_icon, channel_playlist, live_channels, qualities
 from .player import live_source, recording_source, stream as player_stream, subtitles
-from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file
+from .recordings import do_delete, do_edit, do_import, do_move, do_remove, replace_file, set_playpos
 from .status import status
 from .scan import scan_add, scan_delete, scan_result, scan_start, scan_status
 from .state import build_state
@@ -333,6 +333,9 @@ def make_handler(app):
                 self.run(lambda: do_edit(app.tvh, app.cfg.get('lang') or 'ger', req))
             elif self.path == '/api/remove':
                 self.run(lambda: do_remove(app.tvh, req['uuids']))
+            elif self.path == '/api/playpos':
+                self.run(lambda: set_playpos(app.tvh, check_uuid(req.get('uuid')), int(req.get('pos') or 0),
+                                             bool(req.get('done'))))
             elif self.path == '/api/import':
                 self.run(lambda: do_import(app.tvh, app.recdir, app.cfg.get('lang') or 'ger', req))
             elif self.path == '/api/delete':

@@ -90,17 +90,29 @@ async function playLive(uuid){await qualities();const c=(LIVE&&LIVE.channels.fin
  startPlayer(`/api/play-live?uuid=${uuid}&q=${encodeURIComponent(pq())}`,()=>playLive(uuid));
  $('#pv').addEventListener('playing',()=>$('#pmsg').textContent='',{once:true})}
 
-async function playRec(uuid,from){await qualities();const r=R(uuid),dur=Math.max(60,r.stop-r.start);POFF=from||0;
+// Weiterschauen: Der Stand wird in TVHeadend gespeichert (playposition/playcount – wie bei Kodi), alle 30 s,
+// beim Schließen und am Ende (ab 95 % gilt die Aufnahme als angesehen). Ohne Startzeit geht es dort weiter.
+let PLAST={uuid:null,t:0,saved:0};
+async function recSavePos(uuid,t,done){const r=R(uuid);if(!r)return;t=Math.floor(t);
+ if(done===undefined)done=t>=(r.stop-r.start)*.95;
+ if(!done&&Math.abs(t-PLAST.saved)<5&&PLAST.uuid==uuid)return;PLAST.saved=t;
+ try{const x=await api('/api/playpos',{uuid,pos:done?0:t,done});r.pos=x.pos;r.played=x.played}catch(e){}}
+async function playRec(uuid,from){await qualities();const r=R(uuid),dur=Math.max(60,r.stop-r.start);
+ const resume=from===undefined&&r.pos>30&&!watched(r)?r.pos:0;POFF=from??resume;
  if(!($('#dlg').open&&$('#pseek')&&$('#pseek').dataset.uuid==uuid)){playerDialog(r.title,(r.subtitle?r.subtitle.split('\n')[0]+' · ':'')+r.channel+' · '+fmt(r.start),
   `<div class="pbar"><span id="ptime">0:00</span><input type="range" id="pseek" data-uuid="${uuid}" min="0" max="${dur}" step="1" value="${POFF}"><span>${hms(dur)}</span></div>
   <div class="bar" style="margin:6px 0 0">${qualSel()}<button class="b sec" onclick="recJump('${uuid}',-300)">−5 min</button><button class="b sec" onclick="recJump('${uuid}',-30)">−30 s</button>
   <button class="b sec" onclick="recJump('${uuid}',30)">+30 s</button><button class="b sec" onclick="recJump('${uuid}',300)">+5 min</button>
   <a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${uuid}" onclick="event.stopPropagation()">${L('pl.vlc')}</a>${subsBtn()}</div>`);
   $('#pseek').addEventListener('change',e=>playRec(uuid,+e.target.value));
+  PLAST={uuid,t:POFF,saved:r.pos};$('#dlg').addEventListener('close',()=>{if(PLAST.uuid==uuid&&PLAST.t>30)recSavePos(uuid,PLAST.t);if(cur=='rec')fillRecordings()},{once:true});
   $('#pseek').addEventListener('input',e=>$('#ptime').textContent=hms(+e.target.value))}
  $('#pmsg').textContent=L('pl.loading_from',{t:hms(POFF)});
+ if(resume)$('#pmsg').innerHTML=`${L('pl.resume',{t:hms(resume)})} <button class="b sec sm" onclick="playRec('${uuid}',0)">${L('pl.from_start')}</button>`;
  startPlayer(`/api/play-rec?uuid=${uuid}&q=${encodeURIComponent(pq())}&t=${Math.floor(POFF)}`,()=>{const v=$('#pv');playRec(uuid,POFF+(v?v.currentTime:0))});
- $('#pv').addEventListener('playing',()=>$('#pmsg').textContent='',{once:true});
+ $('#pv').addEventListener('playing',()=>{if(!resume)$('#pmsg').textContent='';else setTimeout(()=>{if($('#pmsg'))$('#pmsg').textContent=''},8000)},{once:true});
+ $('#pv').addEventListener('ended',()=>recSavePos(uuid,dur,true),{once:true});
  PTIMER=setInterval(()=>{const v=$('#pv');if(!v)return clearInterval(PTIMER);const t=POFF+v.currentTime,s=$('#pseek');
+  if(v.currentTime>0){PLAST.t=t;if(Math.abs(t-PLAST.saved)>=30)recSavePos(uuid,t)}
   if(document.activeElement!==s){s.value=t;$('#ptime').textContent=hms(t)}},500)}
 function recJump(uuid,d){const v=$('#pv'),t=POFF+(v?v.currentTime:0)+d,r=R(uuid);playRec(uuid,Math.max(0,Math.min(t,r.stop-r.start-5)))}

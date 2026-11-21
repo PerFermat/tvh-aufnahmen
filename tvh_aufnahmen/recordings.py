@@ -129,6 +129,20 @@ def recreate_entry(tvh, uuid, info, lang, title, subtitle, desc):
     return {'uuid': new}
 
 
+def set_playpos(tvh, uuid, pos, done=False):
+    """Wiedergabestand in TVHeadend speichern (dieselben Felder nutzt Kodi): Position in Sekunden, beim
+    Ende playcount + 1 und Position 0; done=False mit pos=0 setzt „angesehen“ zurück."""
+    info = entry_info(tvh, uuid)
+    played = info.get('playcount') or 0
+    if done:
+        played, pos = max(1, played + (0 if played else 1)), 0
+    elif done is False and pos == 0:
+        played = 0
+    node = {'uuid': uuid, 'playposition': max(0, int(pos)), 'playcount': played}
+    tvh.call('idnode/save', node=json.dumps(node))
+    return {'pos': node['playposition'], 'played': played}
+
+
 def do_remove(tvh, uuids):
     """Löscht Aufnahmen samt Datei über TVHeadend."""
     if uuids:
