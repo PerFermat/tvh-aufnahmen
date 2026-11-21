@@ -235,12 +235,17 @@ class Jobs:
     def loop(self):
         while True:
             time.sleep(60)
-            for step in (self.check_reminders, self.archive_epg, self.maybe_backup, self.check_recordings,
+            for step in (self.check_reminders, self.sample_reception, self.archive_epg, self.maybe_backup, self.check_recordings,
                          self.check_disk):
                 try:
                     step()
                 except Exception as e:  # ein Fehler darf die anderen Aufgaben nicht stoppen
                     print('Hintergrundaufgabe %s: %s' % (step.__name__, e))
+
+    def sample_reception(self):
+        reception = getattr(self.app, 'reception', None)
+        if reception:
+            reception.sample(self.app.tvh)
 
     def archive_epg(self):
         """Alle 10 Minuten laufende und bald beginnende Sendungen archivieren (siehe epg_archive)."""

@@ -11,6 +11,7 @@ from .epg_archive import EpgArchive
 from .i18n import _
 from .jobs import Jobs
 from .posters import Posters
+from .reception import Reception
 from .server import make_handler
 from .teletext import TeletextService
 
@@ -71,6 +72,7 @@ def main():
     app.posters = Posters(os.path.expanduser('~/.cache/tvh-aufnahmen/posters.json'),
                           client_id=lambda: app.cfg.get('trakt_id'))
     app.archive = EpgArchive()
+    app.reception = Reception()
     app.teletext = TeletextService(lambda: app.tvh)
     app.jobs = Jobs(app)
     app.auth = Auth(app)

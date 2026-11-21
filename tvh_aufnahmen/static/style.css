@@ -328,3 +328,5 @@ dialog.ask{max-width:520px;height:auto;max-height:calc(100vh - 48px);margin:auto
 .tagbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}.tagbar .b.on{background:var(--acc);color:#fff}
 .chgrid.tagmode .chtile{opacity:.45}.chgrid.tagmode .chtile.inl{opacity:1;border-color:#f59e0b;box-shadow:inset 0 0 0 1px #f59e0b}
 .chgrid.tagmode .chtile.inl::after{content:"★";position:absolute;right:6px;bottom:2px;color:#f59e0b;font-size:12px}
+.spark{width:100%;height:40px;display:block;background:color-mix(in srgb,var(--line) 25%,transparent);border-radius:6px}
+table.recep td{vertical-align:middle}table.recep details summary{cursor:pointer}

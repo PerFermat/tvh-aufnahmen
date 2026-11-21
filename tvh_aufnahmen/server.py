@@ -297,6 +297,8 @@ def make_handler(app):
                 self.run(lambda: scan_result(app.tvh))
             elif url.path == '/api/channels':
                 self.run(lambda: channel_list(app.tvh))
+            elif url.path == '/api/reception':
+                self.run(lambda: app.reception.history(app.tvh, max(1, min(60, int(q.get('days') or 7)))))
             elif url.path == '/api/tags':
                 self.run(lambda: tag_list(app.tvh))
             else:
