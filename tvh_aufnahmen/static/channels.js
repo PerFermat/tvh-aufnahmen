@@ -1,7 +1,9 @@
 // Reiter „Sender ordnen“: Sender als Kacheln, per Ziehen (Maus sofort, Finger nach kurzem Halten) oder
-// Doppelklick mit Nummer verschieben. Der verschobene Sender bekommt die Nummer hinter seinem neuen Vorgänger;
+// Doppelklick die Nummer ändern. Der verschobene Sender bekommt die Nummer hinter seinem neuen Vorgänger;
 // ist sie schon vergeben, wird gefragt, ob die folgenden bis zur nächsten Lücke aufrücken – sonst ist sie
-// doppelt (rot markiert). Gespeichert wird erst mit „Speichern“.
+// doppelt (rot markiert). Die Nummer eintippen geht nur innerhalb der Lücke zwischen den Nachbarn (die
+// Reihenfolge bleibt); danach wird gefragt, ob die direkt folgenden bis zur nächsten Lücke mitgehen.
+// Gespeichert wird erst mit „Speichern“.
 let CHN=null,CHUNDO=[],CHQ='';
 const chDirty=()=>!!CHN&&CHN.some(c=>c.number!=c.orig);
 async function renderChannels(){if(!CHN){$('#main').innerHTML=`<p class="muted">${L('common.loading')}</p>`;
@@ -28,23 +30,27 @@ function chFind(quiet){const g=$('#chgrid'),q=CHQ.trim().toLowerCase();if(!g)ret
  if(first&&!quiet)first.scrollIntoView({block:'center',behavior:'smooth'})}
 // ---------- Verschieben ----------
 let CHP=null;// Verschiebung, die auf die Antwort im Dialog wartet
-function chMove(from,to,number){// to: Einfügestelle in der Liste vor dem Herausnehmen
+function chMove(from,to){// to: Einfügestelle in der Liste vor dem Herausnehmen
  if(to>from)to--;
- if(to==from&&number===undefined)return;
+ if(to==from)return;
  const list=[...CHN],[c]=list.splice(from,1);list.splice(to,0,c);
- const n=number??Math.max(0,...list.slice(0,to).map(x=>x.number||0))+1;
+ const n=Math.max(0,...list.slice(0,to).map(x=>x.number||0))+1;
  // Wer müsste aufrücken? Die folgenden, solange ihre Nummer nicht größer ist als die davor (bis zur Lücke)
  const shift=[];let prev=n;
  for(let j=to+1;j<list.length;j++){const x=list[j];if(!x.number||x.number>prev)break;prev++;shift.push([x,prev])}
  CHP={list,c,n,shift};
  if(!shift.length)return chApply(false);
+ chShiftAsk(L(shift.length>1?'chn.shift_q':'chn.shift_q1',{n,name:esc(shift[0][0].name),k:shift.length,m:shift[0][1]}),
+  L(shift.length>1?'chn.shift_yes':'chn.shift_yes1',{k:shift.length}))}
+// Rückfrage zu CHP: die folgenden Sender (CHP.shift) mit ändern, nur diesen Sender oder abbrechen
+function chShiftAsk(question,yes){const {c,n,shift}=CHP;
  const show=shift.slice(0,8).map(([x,m])=>`<li>${esc(x.name)}: ${x.number} → <b>${m}</b></li>`).join('')+(shift.length>8?`<li>… ${L('chn.more',{n:shift.length-8})}</li>`:'');
- dialog(`<h3>${L('chn.shift_title',{name:esc(c.name),n})}</h3>
-  <p>${L(shift.length>1?'chn.shift_q':'chn.shift_q1',{n,name:esc(shift[0][0].name),k:shift.length,m:shift[0][1]})}</p><ul class="chshift">${show}</ul>
-  <div class="bar"><button class="b" onclick="chApply(true)">${L(shift.length>1?'chn.shift_yes':'chn.shift_yes1',{k:shift.length})}</button>
+ dialog(`<h3>${L('chn.shift_title',{name:esc(c.name),n})}</h3><p>${question}</p><ul class="chshift">${show}</ul>
+  <div class="bar"><button class="b" onclick="chApply(true)">${yes}</button>
   <button class="b sec" onclick="chApply(false)">${L('chn.shift_no',{name:esc(c.name)})}</button>
   <button class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button></div>`).classList.add('ask');
- $('#dlg').addEventListener('close',()=>{$('#dlg').classList.remove('ask');CHP=null},{once:true})}
+ chDlgDone()}
+function chDlgDone(){$('#dlg').addEventListener('close',()=>{$('#dlg').classList.remove('ask');CHP=null},{once:true})}
 function chApply(withShift){const p=CHP;if(!p)return;CHP=null;if($('#dlg').open)$('#dlg').close();
  CHUNDO.push(CHN.map(c=>[c.uuid,c.number]));
  CHN=p.list;p.c.number=p.n;if(withShift)p.shift.forEach(([x,m])=>x.number=m);
@@ -53,11 +59,28 @@ function chUndo(){const s=CHUNDO.pop();if(!s)return;const by=Object.fromEntries(
  CHN=s.map(([u,n])=>({...by[u],number:n}));chDraw()}
 function chReset(){if(!confirm(L('chn.reset_confirm')))return;
  CHN=CHN.map(c=>({...c,number:c.orig})).sort((a,b)=>(a.number||1e9)-(b.number||1e9)||a.name.localeCompare(b.name));CHUNDO=[];chDraw()}
-// Doppelklick: gewünschte Nummer eintippen – der Sender kommt vor den ersten mit dieser oder höherer Nummer
-function chAsk(i){const c=CHN[i],v=prompt(L('chn.ask',{name:c.name}),c.number||'');if(v===null)return;
- const n=parseInt(v,10);if(!(n>0&&n<=99999)){msg(L('chn.bad_number',{n:v}));return}
- let to=CHN.findIndex((x,k)=>k!=i&&x.number&&x.number>=n);if(to<0)to=CHN.length;
- chMove(i,to,n)}
+// Doppelklick: Nummer ändern, aber nur innerhalb der Lücke zwischen Vorgänger und Nachfolger – wer weiter
+// weg soll, wird verschoben. Beispiel 1 2 3 4 6 8 9 10 12: 1–3 haben keinen Spielraum, 4 kann 5 werden, 8 kann 7 werden.
+function chRange(i){const prev=Math.max(0,...CHN.slice(0,i).map(x=>x.number||0)),next=CHN.slice(i+1).find(x=>x.number);
+ return [prev+1,next?next.number-1:99999]}
+function chAsk(i){const c=CHN[i],[lo,hi]=chRange(i);
+ const nb=k=>CHN[k]?`„${esc(CHN[k].name)}“ (${CHN[k].number||'–'})`:'';
+ if(lo>hi||(lo==hi&&c.number==lo)){dialog(`<h3>${esc(c.name)}</h3><p>${i?L('chn.no_room',{name:esc(c.name),a:nb(i-1),b:nb(i+1)}):L('chn.no_room_first',{name:esc(c.name),b:nb(i+1)})}</p>
+  <div class="bar"><button class="b" onclick="$('#dlg').close()">${L('common.close')}</button></div>`).classList.add('ask');chDlgDone();return}
+ dialog(`<h3>${L('chn.ask',{name:esc(c.name)})}</h3><form onsubmit="event.preventDefault();chNumber(${i},this.n.value)">
+  <p class="muted">${L('chn.range',{lo,hi:hi<99999?hi:'…'})}</p>
+  <div class="bar"><input name="n" type="number" min="${lo}" max="${hi}" value="${c.number||lo}" required style="width:8em">
+  <button class="b">${L('common.save')}</button><button type="button" class="b sec" onclick="$('#dlg').close()">${L('chn.cancel')}</button></div></form>`).classList.add('ask');
+ chDlgDone();const inp=$('#dlg input');inp.focus();inp.select()}
+// Neue Nummer übernehmen; die direkt anschließenden Sender (lückenlos ab der alten Nummer) können mitgehen
+function chNumber(i,v){const c=CHN[i],[lo,hi]=chRange(i),n=parseInt(v,10);
+ if(!(n>=lo&&n<=hi)){msg(L('chn.bad_number',{n:v})+' – '+L('chn.range',{lo,hi:hi<99999?hi:'…'}));return}
+ $('#dlg').close();if(n==c.number)return;
+ const d=n-(c.number||n),shift=[];
+ if(c.number)for(let j=i+1,p=c.number;j<CHN.length&&CHN[j].number==p+1;j++,p++)shift.push([CHN[j],CHN[j].number+d]);
+ CHP={list:[...CHN],c,n,shift};
+ if(!shift.length)return chApply(false);
+ chShiftAsk(L('chn.follow_q',{k:shift.length,d:(d>0?'+':'')+d}),L('chn.follow_yes',{k:shift.length}))}
 let CHD=null;// laufendes Ziehen
 function chDown(e){const t=e.target.closest('.chtile');if(!t||e.button>0)return;
  const touch=e.pointerType!='mouse';
