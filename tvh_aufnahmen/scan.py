@@ -144,7 +144,8 @@ def scan_result(tvh):
 
 
 def scan_add(tvh, uuids):
-    """Legt für die Dienste Sender an, fortlaufend nach der höchsten vorhandenen Nummer."""
+    """Legt für die Dienste Sender an, fortlaufend nach der höchsten vorhandenen Nummer, und schaltet die
+    Dienste ein, falls sie in TVHeadend abgeschaltet sind."""
     chans = grid(tvh, 'channel/grid')
     svcs = {s['uuid']: s for s in grid(tvh, 'mpegts/service/grid')}
     number = max([c.get('number') or 0 for c in chans] or [0])
@@ -158,6 +159,8 @@ def scan_add(tvh, uuids):
                                                           'name': s.get('svcname') or '', 'number': number,
                                                           'services': [u]}))
         if res.get('uuid'):
+            if not s.get('enabled'):  # abgeschaltete Dienste liefern kein Bild, der Sender bliebe stumm
+                tvh.call('idnode/save', node=json.dumps({'uuid': u, 'enabled': 1}))
             added.append({'name': s.get('svcname'), 'number': number})
         else:
             number -= 1
