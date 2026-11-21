@@ -156,6 +156,16 @@
   "up.plan": "Schedule recording",
   "up.planned": "Recording scheduled: {t}",
   "up.conflict_msg": "Conflict: {n} other recording(s) on other transponders are already scheduled at this time – but there are only {tuners} tuners:",
+  "up.alt": "Alternative …",
+  "up.alt_title": "Alternative time for “{t}”",
+  "up.alt_hint": "Other broadcasts of the same programme. “Free” means: there are enough tuners at that time. Moving deletes the previous recording.",
+  "up.alt_hint_series": "Other broadcasts of the same programme. “Free” means: there are enough tuners at that time. Moving disables the previous date of the series recording (not deleted, otherwise it would be scheduled again).",
+  "up.alt_free": "free",
+  "up.alt_clash": "Conflict with {t}",
+  "up.alt_move": "Move here",
+  "up.alt_none": "No other broadcast found in the programme data.",
+  "up.alt_moved": "Recording moved – the conflict is solved",
+  "up.alt_moved_clash": "Recording moved – but there are not enough tuners there either",
   "cfg.ui_lang": "Language",
   "cfg.ui_lang_label": "Interface language (this device)",
   "cfg.ui_lang_browser": "Same as the browser",
@@ -606,5 +616,6 @@
   "login.title": "Sign in",
   "login.submit": "Sign in",
   "srv.always_needs_login": "“Always” only works while you are signed in – otherwise you would be locked out at once. Please create a user and sign in first.",
-  "srv.last_user": "The last user cannot be deleted while sign-in is always required."
+  "srv.last_user": "The last user cannot be deleted while sign-in is always required.",
+  "srv.already_recording": "The recording is already running"
 }

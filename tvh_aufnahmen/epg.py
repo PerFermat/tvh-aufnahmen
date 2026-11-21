@@ -187,15 +187,21 @@ def record_manual(tvh, lang, req):
     return {'uuid': uuid, 'conflict': next((g for g in c['groups'] if uuid in g['uuids']), None), 'tuners': c['tuners']}
 
 
-def conflicts(tvh, entries=None):
-    """Zeiten, in denen mehr Transponder gleichzeitig gebraucht werden, als es Tuner gibt.
-    Mehrere Sender auf demselben Transponder teilen sich einen Tuner. Vor- und Nachlauf zählen mit."""
-    entries = upcoming_entries(tvh) if entries is None else entries
+def tuner_context(tvh):
+    """Anzahl der Tuner und Transponder je Sender – Grundlage für die Konfliktprüfung."""
     tuners = len(tvh.call('status/inputs').get('entries', [])) or 1
     svc_mux = {s['uuid']: s.get('multiplex_uuid') for s in
                tvh.call('mpegts/service/grid', limit=100000, all=1).get('entries', [])}
     chan_mux = {c['uuid']: next((svc_mux.get(u) for u in c.get('services', []) if svc_mux.get(u)), c['uuid'])
                 for c in tvh.call('channel/grid', limit=100000, all=1).get('entries', [])}
+    return tuners, chan_mux
+
+
+def conflicts(tvh, entries=None, ctx=None):
+    """Zeiten, in denen mehr Transponder gleichzeitig gebraucht werden, als es Tuner gibt.
+    Mehrere Sender auf demselben Transponder teilen sich einen Tuner. Vor- und Nachlauf zählen mit."""
+    entries = upcoming_entries(tvh) if entries is None else entries
+    tuners, chan_mux = ctx or tuner_context(tvh)
     span = lambda e: (e.get('start_real') or e.get('start') or 0, e.get('stop_real') or e.get('stop') or 0)
     active = [e for e in entries if e.get('enabled', True) is not False]
     groups = []
@@ -289,12 +295,52 @@ def upcoming(tvh):
     for e in upcoming_entries(tvh):
         out.append({k: e.get(k) for k in ('uuid', 'disp_title', 'disp_subtitle', 'channelname', 'start', 'stop',
                                           'start_real', 'stop_real', 'sched_status', 'status', 'autorec',
-                                          'autorec_caption', 'enabled', 'config_name')})
+                                          'autorec_caption', 'enabled', 'config_name', 'broadcast')})
     out.sort(key=lambda e: e.get('start') or 0)
     c = conflicts(tvh)
     for e in out:
         e['conflict'] = e['uuid'] in c['uuids']
     return {'upcoming': out, 'tuners': c['tuners'], 'conflicts': c['groups']}
+
+
+def alternatives(tvh, archive, uuid):
+    """Ausweichtermine für eine geplante Aufnahme: weitere Ausstrahlungen derselben Sendung (siehe repeats),
+    jeweils mit der Angabe, ob sie mit den übrigen Aufnahmen ohne Konflikt aufgenommen werden könnten."""
+    entries = upcoming_entries(tvh)
+    entry = next((e for e in entries if e['uuid'] == check_uuid(uuid)), None)
+    if not entry:
+        raise ValueError(_('srv.not_scheduled'))
+    if not entry.get('broadcast'):
+        return {'title': entry.get('disp_title'), 'alternatives': []}
+    pre = (entry.get('start') or 0) - (entry.get('start_real') or entry.get('start') or 0)
+    post = (entry.get('stop_real') or entry.get('stop') or 0) - (entry.get('stop') or 0)
+    others = [e for e in entries if e['uuid'] != entry['uuid']]
+    ctx = tuner_context(tvh)
+    out = []
+    for r in repeats(tvh, archive, entry['broadcast'])['repeats']:
+        if r['planned']:
+            continue
+        probe = {'uuid': '-', 'channel': r['channelUuid'], 'start_real': r['start'] - pre, 'stop_real': r['stop'] + post,
+                 'disp_title': r['title']}
+        clash = [g for g in conflicts(tvh, others + [probe], ctx)['groups'] if '-' in g['uuids']]
+        out.append(dict(r, free=not clash, clash=sorted({t for g in clash for t in g['titles'] if t != r['title']})))
+    return {'title': entry.get('disp_title'), 'alternatives': out}
+
+
+def move_recording(tvh, uuid, event_id):
+    """Aufnahme auf eine andere Ausstrahlung verlegen: neue anlegen (gleiches Profil), die alte löschen –
+    stammt sie aus einer Serienaufnahme, wird sie nur abgeschaltet, sonst legt die Serienaufnahme sie neu an."""
+    entry = next((e for e in upcoming_entries(tvh) if e['uuid'] == check_uuid(uuid)), None)
+    if not entry:
+        raise ValueError(_('srv.not_scheduled'))
+    if entry.get('sched_status') == 'recording':
+        raise ValueError(_('srv.already_recording'))
+    res = record_event(tvh, event_id, entry.get('config_name') or '')
+    if entry.get('autorec'):
+        tvh.call('idnode/save', node=json.dumps({'uuid': entry['uuid'], 'enabled': False}))
+    else:
+        tvh.call('idnode/delete', uuid=entry['uuid'])
+    return res
 
 
 def upcoming_cancel(tvh, uuid):

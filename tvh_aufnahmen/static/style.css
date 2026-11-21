@@ -312,3 +312,7 @@ dialog.ask{max-width:520px;height:auto;max-height:calc(100vh - 48px);margin:auto
 .chtile .gapm{position:absolute;left:-6px;top:-2px;bottom:-2px;width:4px;border-radius:2px;background:#3b82f6}
 .chghost .gapm{display:none}
 .chghost{position:fixed;z-index:1000;pointer-events:none;cursor:grabbing;box-shadow:var(--shadow);transform:rotate(2deg);opacity:.95;margin:0}
+/* Konflikte: Ausweichtermine */
+.b.sm{padding:3px 10px;font-size:12.5px}
+.tag.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.cfl{display:inline-block;margin:2px 0}

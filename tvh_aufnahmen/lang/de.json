@@ -156,6 +156,16 @@
   "up.plan": "Aufnahme planen",
   "up.planned": "Aufnahme geplant: {t}",
   "up.conflict_msg": "Konflikt: Zu dieser Zeit sind schon {n} andere Aufnahme(n) auf anderen Transpondern geplant – es gibt aber nur {tuners} Tuner:",
+  "up.alt": "Ausweichtermin …",
+  "up.alt_title": "Ausweichtermin für „{t}“",
+  "up.alt_hint": "Weitere Ausstrahlungen derselben Sendung. „Frei“ heißt: Zu dieser Zeit reichen die Tuner. Beim Verlegen wird die bisherige Aufnahme gelöscht.",
+  "up.alt_hint_series": "Weitere Ausstrahlungen derselben Sendung. „Frei“ heißt: Zu dieser Zeit reichen die Tuner. Beim Verlegen wird der bisherige Termin der Serienaufnahme abgeschaltet (nicht gelöscht, sonst plant sie ihn neu).",
+  "up.alt_free": "frei",
+  "up.alt_clash": "Konflikt mit {t}",
+  "up.alt_move": "Hierhin verlegen",
+  "up.alt_none": "Keine weitere Ausstrahlung in den Programmdaten gefunden.",
+  "up.alt_moved": "Aufnahme verlegt – der Konflikt ist gelöst",
+  "up.alt_moved_clash": "Aufnahme verlegt – aber auch dort reicht die Zahl der Tuner nicht",
   "cfg.ui_lang": "Sprache",
   "cfg.ui_lang_label": "Sprache der Oberfläche (dieses Gerät)",
   "cfg.ui_lang_browser": "Wie der Browser",
@@ -606,5 +616,6 @@
   "login.title": "Anmelden",
   "login.submit": "Anmelden",
   "srv.always_needs_login": "„Immer“ geht nur, wenn du angemeldet bist – sonst wärst du sofort ausgesperrt. Bitte erst einen Benutzer anlegen und dich anmelden.",
-  "srv.last_user": "Der letzte Benutzer kann nicht gelöscht werden, solange die Anmeldung immer nötig ist."
+  "srv.last_user": "Der letzte Benutzer kann nicht gelöscht werden, solange die Anmeldung immer nötig ist.",
+  "srv.already_recording": "Die Aufnahme läuft bereits"
 }
