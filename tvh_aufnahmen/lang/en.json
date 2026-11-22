@@ -352,6 +352,8 @@
   "scan.del_autorec": "Attention: {n} of them have series recordings.",
   "scan.del_keep": "Recordings of these channels are kept.",
   "scan.deleted": "{n} channels deleted",
+  "scan.noname": "no name – probably no longer broadcasting",
+  "scan.noname_tip": "The service is only listed without a name in the transponder's directory (“Service <number>”) – discontinued channels often remain like this. Play it briefly to check.",
   "chn.save": "Save",
   "chn.save_n": "Save ({n} changed)",
   "chn.undo": "Undo",

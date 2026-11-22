@@ -352,6 +352,8 @@
   "scan.del_autorec": "Achtung: {n} davon haben Serienaufnahmen.",
   "scan.del_keep": "Aufnahmen dieser Sender bleiben erhalten.",
   "scan.deleted": "{n} Sender gelöscht",
+  "scan.noname": "ohne Namen – sendet vermutlich nicht mehr",
+  "scan.noname_tip": "Der Dienst steht nur noch ohne Namen im Verzeichnis des Transponders („Service <Nummer>“) – so bleiben eingestellte Sender oft zurück. Zum Prüfen kurz abspielen.",
   "chn.save": "Speichern",
   "chn.save_n": "Speichern ({n} geändert)",
   "chn.undo": "Rückgängig",

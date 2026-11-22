@@ -29,6 +29,9 @@ ADULT = re.compile(r'sex|erotik|babes|babestation|dates? tv|treff tv|girls tv', 
 # TVHeadend aktualisiert last_seen nur grob (höchstens etwa täglich) – deshalb mit Spielraum vergleichen
 SEEN_SLACK = 2 * 86400
 MISSING = 2  # „Automatische Überprüfung“: fehlt in PAT/SDT – TVHeadend schaltet den Dienst dann ab
+# Ohne Eintrag im Senderverzeichnis (SDT) gibt TVHeadend einem Dienst nur einen Platzhalternamen – steht er noch in
+# der PAT, bleibt er eingeschaltet, sendet aber meist nichts mehr (so z. B. ein eingestellter ORF-Sender)
+NONAME = re.compile(r'^Service \d+$')
 STAMP = os.path.expanduser('~/.cache/tvh-aufnahmen/scan-start')
 
 
@@ -69,8 +72,9 @@ def scan_status(tvh):
 
 def alive(s, fresh):
     """Wird der Dienst noch ausgestrahlt? last_seen allein reicht nicht: TVHeadend setzt es auch für Dienste,
-    die es als „fehlt in PAT/SDT“ abschaltet."""
-    return (s.get('last_seen') or 0) >= fresh and s.get('auto') != MISSING and bool(s.get('enabled'))
+    die es als „fehlt in PAT/SDT“ abschaltet, und für solche, die nur noch ohne Namen in der PAT stehen."""
+    return ((s.get('last_seen') or 0) >= fresh and s.get('auto') != MISSING and bool(s.get('enabled'))
+            and not NONAME.match(s.get('svcname') or ''))
 
 
 def base_name(name):
@@ -145,6 +149,7 @@ def scan_result(tvh):
                      'enabled': c.get('enabled'),
                      'last_seen': max([s.get('last_seen') or 0 for s in ss if s] or [0]),
                      'missing': any(s and s.get('auto') == MISSING for s in ss),
+                     'noname': any(s and NONAME.match(s.get('svcname') or '') for s in ss),
                      'autorecs': [a.get('name') or a.get('title') for a in autorecs if a.get('channel') == c['uuid']]})
     return {'status': status, 'items': items, 'languages': languages,
             'dead': sorted(dead, key=lambda d: d['number']),
