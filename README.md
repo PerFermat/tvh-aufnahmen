@@ -148,7 +148,7 @@ Der Proxy muss den ursprünglichen Host (`Host` oder `X-Forwarded-Host`), die Ab
 
 ## Werbung und Avidemux
 
-Ist comskip installiert, untersucht das Tool neue Aufnahmen der letzten 30 Tage im Hintergrund – mit niedrigster Priorität und immer nur eine zugleich; ältere auf Wunsch über „Werbung suchen“ im Detailfenster einer Aufnahme. Die Aufnahmen selbst bleiben unverändert, die Ergebnisse liegen in `~/.cache/tvh-aufnahmen/werbung/`. Abschalten lässt es sich unter Einstellungen → „Werbung erkennen“.
+Ist comskip installiert, untersucht das Tool neue Aufnahmen der letzten 30 Tage im Hintergrund – mit niedrigster Priorität und immer nur eine zugleich; ältere auf Wunsch über „Werbung suchen“ im Detailfenster einer Aufnahme. Die Aufnahmen selbst bleiben unverändert, die Ergebnisse liegen in `~/.cache/tvh-aufnahmen/werbung/`. Unter Einstellungen → „Werbung erkennen“ lässt sich wählen: automatisch, nur auf Wunsch oder ganz aus (dann gibt es auch keine Anzeige). Dort lassen sich Beginn und Ende der Werbeblöcke um einige Sekunden verschieben – für Sender, die ihr Logo schon vor der Werbung ausblenden oder nach der Werbung noch eine Programmvorschau mit Logo zeigen. Der Versatz gilt sofort für alle Aufnahmen, auch für schon untersuchte.
 
 Im internen Player sind die Werbeblöcke rot auf der Zeitleiste; mit „Werbung überspringen“ springt er beim Erreichen eines Blocks an dessen Ende.
 

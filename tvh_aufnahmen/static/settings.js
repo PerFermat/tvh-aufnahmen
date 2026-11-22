@@ -22,9 +22,14 @@ async function renderConfig(){let c;try{c=await api('/api/config')}catch(e){$('#
  <div id="adscfg"></div>
  <div id="authcfg"></div>`;renderQuality();renderNotify();renderTrakt(c);renderAuth();renderAdsCfg()}
 async function renderAdsCfg(){let a;try{a=await api('/api/ads')}catch(e){return}if(!$('#adscfg'))return;const n=Object.keys(a.results).length;
- $('#adscfg').innerHTML=`<h3>${L('cfg.ads')}</h3><p class="muted">${L('cfg.ads_hint')}</p>${a.available?`<label class="chk"><input type="checkbox" ${a.enabled?'checked':''}
-  onchange="api('/api/ads-config',{on:this.checked}).then(()=>msg(L('cfg.saved'),true)).catch(e=>msg(e.message))"> ${L('cfg.ads_on')}</label>
-  <p class="muted small">${L('cfg.ads_state',{n})}${a.running?' · '+L('ads.running'):''}</p>`:`<p class="alert">${L('cfg.ads_missing')}</p>`}`}
+ $('#adscfg').innerHTML=`<h3>${L('cfg.ads')}</h3><p class="muted">${L('cfg.ads_hint')}</p>${a.comskip?`<form class="ed" onsubmit="event.preventDefault();saveAdsCfg(this)">
+  <label class="wide">${L('cfg.ads_mode')}<select name="mode">${['auto','manual','off'].map(m=>`<option value="${m}" ${a.mode==m?'selected':''}>${L('cfg.ads_'+m)}</option>`).join('')}</select></label>
+  <label>${L('cfg.ads_start')}<input type="number" name="start" step="1" min="-120" max="120" value="${a.start}"></label>
+  <label>${L('cfg.ads_end')}<input type="number" name="end" step="1" min="-120" max="120" value="${a.end}"></label>
+  <p class="muted small wide" style="margin:0">${L('cfg.ads_shift_hint')}</p>
+  <div class="wide bar" style="margin:0"><button class="b">${L('common.save')}</button><span class="muted small">${a.mode=='off'?'':L('cfg.ads_state',{n})+(a.running?' · '+L('ads.running'):'')}</span></div></form>`
+  :`<p class="alert">${L('cfg.ads_missing')}</p>`}`}
+async function saveAdsCfg(f){try{await api('/api/ads-config',{mode:f.mode.value,start:+f.start.value,end:+f.end.value});ADS=null;msg(L('cfg.saved'),true);renderAdsCfg()}catch(e){msg(e.message)}}
 // Anmeldung für den Zugriff von außen: wann nötig, Benutzer anlegen/ändern/löschen
 async function renderAuth(a){if(!a)try{a=await api('/api/users')}catch(e){return}if(cur!='config'||!$('#authcfg'))return;
  $('#authcfg').innerHTML=`<h3>${L('auth.title')}</h3>

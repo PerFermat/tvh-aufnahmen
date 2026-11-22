@@ -4,7 +4,13 @@ Die Hintergrundaufgabe nimmt sich jede Minute höchstens eine fertige Aufnahme v
 (nice/ionice), immer nur eine zugleich. Automatisch werden nur Aufnahmen der letzten AUTO_DAYS Tage untersucht,
 ältere auf Wunsch. Ergebnis je Aufnahme: Werbeblöcke in Sekunden ab Dateianfang, die Dateilänge und der
 Versatz des ersten Videobilds (für Avidemux, das ab dem Dateianfang zählt). Die Aufnahmen selbst bleiben
-unverändert; comskip schreibt nur in den Cache-Ordner."""
+unverändert; comskip schreibt nur in den Cache-Ordner.
+
+Gespeichert werden die Blöcke so, wie comskip sie findet. Der Zeitversatz aus den Einstellungen (Beginn und Ende
+je eigens, in Sekunden) wird erst bei der Ausgabe angewendet – so wirkt eine Änderung sofort auf alle Aufnahmen.
+Er gleicht aus, dass Sender ihr Logo oft schon ein paar Sekunden vor der Werbung ausblenden und danach eine
+Programmvorschau mit Logo zeigen, die comskip zur Sendung zählt. Betriebsart: auto (neue Aufnahmen von selbst),
+manual (nur auf Wunsch) oder off (keine Erkennung, keine Anzeige)."""
 import json
 import os
 import shutil
@@ -12,8 +18,12 @@ import subprocess
 import threading
 import time
 
+from .i18n import _
+
 DIR = os.path.expanduser('~/.cache/tvh-aufnahmen/werbung')
 AUTO_DAYS = 30
+MODES = ('auto', 'manual', 'off')
+MAX_SHIFT = 120  # Sekunden Zeitversatz höchstens
 INI = """detect_method=111
 verbose=0
 output_edl=1
@@ -53,6 +63,17 @@ def next_keyframe(path, t, base):
         return keys[0] if keys else t
     except (OSError, ValueError, subprocess.SubprocessError):
         return t
+
+
+def shifted(ads, duration, start, end):
+    """Werbeblöcke mit Zeitversatz. Ein Block ab Dateianfang bzw. bis Dateiende bleibt dort verankert."""
+    out = []
+    for a, b in ads:
+        a2 = a if a <= 1 else max(0.0, a + start)
+        b2 = b if duration and b >= duration - 1 else (min(duration, b + end) if duration else b + end)
+        if b2 - a2 > 1:
+            out.append([round(a2, 2), round(b2, 2)])
+    return out
 
 
 def cut_list(path, ads, duration, offset, base):
@@ -122,20 +143,62 @@ class Ads:
     def available():
         return bool(shutil.which('comskip'))
 
+    def settings(self):
+        cfg = self.app.cfg
+        mode = cfg.get('ads_mode') if cfg.get('ads_mode') in MODES else ('auto' if cfg.get('ads', True) else 'manual')
+        return {'mode': mode, 'start': float(cfg.get('ads_start') or 0), 'end': float(cfg.get('ads_end') or 0)}
+
+    def blocks(self, r):
+        s = self.settings()
+        return shifted(r.get('ads', []), r.get('duration', 0), s['start'], s['end'])
+
     def summary(self):
-        """Für die Oberfläche: je Aufnahme Werbeblöcke, dazu was gerade läuft und was noch wartet."""
+        """Für die Oberfläche: je Aufnahme Werbeblöcke (mit Zeitversatz), dazu was gerade läuft und was wartet.
+        Bei „off“ bleibt die Liste leer – dann zeigt die Oberfläche nichts zur Werbung."""
+        s = self.settings()
         with self.lock:
             running = self.proc[0] if self.proc else None
-            return {'available': self.available(), 'enabled': self.app.cfg.get('ads', True), 'running': running,
-                    'wanted': list(self.wanted),
-                    'results': {u: {'ads': r.get('ads', []), 'cuts': r.get('cuts', []), 'error': r.get('error')}
-                                for u, r in self.results.items()}}
+            return dict(s, comskip=self.available(), available=self.available() and s['mode'] != 'off',
+                        running=running, wanted=list(self.wanted),
+                        results={} if s['mode'] == 'off' else
+                        {u: {'ads': self.blocks(r), 'error': r.get('error')} for u, r in self.results.items()})
 
-    def set_enabled(self, on):
-        self.app.save(dict(self.app.cfg, ads=bool(on)))
+    def configure(self, req):
+        mode = req.get('mode')
+        if mode not in MODES:
+            raise ValueError(_('srv.bad_mode'))
+        try:
+            start, end = float(req.get('start') or 0), float(req.get('end') or 0)
+        except (TypeError, ValueError):
+            raise ValueError(_('srv.ads_shift', n=MAX_SHIFT))
+        if abs(start) > MAX_SHIFT or abs(end) > MAX_SHIFT:
+            raise ValueError(_('srv.ads_shift', n=MAX_SHIFT))
+        self.app.save(dict(self.app.cfg, ads_mode=mode, ads_start=start, ads_end=end))
+        if mode == 'off':
+            self.stop()
         return self.summary()
 
+    def stop(self):
+        with self.lock:
+            if self.proc:
+                self.proc[1].terminate()
+                self.proc = None
+
+    def cuts(self, uuid):
+        """Teile ohne Werbung für Avidemux – mit dem aktuellen Zeitversatz, Schnitte auf Schlüsselbildern."""
+        r = self.results.get(uuid)
+        if not r:
+            raise ValueError(_('srv.ads_none'))
+        fn = (self.app.tvh.call('idnode/load', uuid=uuid).get('entries') or [{}])[0]
+        fn = next((p.get('value') for p in fn.get('params', []) if p['id'] == 'filename'), '')
+        if not os.path.isfile(fn or ''):
+            raise ValueError(_('srv.file_not_found'))
+        duration, offset, base = probe(fn)
+        return {'cuts': cut_list(fn, self.blocks(r), duration, offset, base)}
+
     def request(self, uuid):
+        if self.settings()['mode'] == 'off':
+            raise ValueError(_('srv.ads_off'))
         with self.lock:
             self.results.pop(uuid, None)
             try:
@@ -150,7 +213,7 @@ class Ads:
     def step(self):
         """Läuft comskip, nur nachsehen; sonst die nächste Aufnahme beginnen. Wartet eine gewünschte Aufnahme,
         wird eine automatische Untersuchung abgebrochen – sie kommt später von vorn wieder dran."""
-        if not self.available():
+        if not self.available() or self.settings()['mode'] == 'off':
             return
         with self.lock:
             if self.proc:
@@ -191,6 +254,8 @@ class Ads:
                 if e and os.path.isfile(e.get('filename') or ''):
                     return u, e['filename'], True
             done = set(self.results)
+        if self.settings()['mode'] != 'auto':
+            return None, None, False
         since = time.time() - AUTO_DAYS * 86400
         for e in sorted(entries, key=lambda e: -(e.get('start') or 0)):
             if e['uuid'] in done or (e.get('start') or 0) < since:
@@ -201,10 +266,9 @@ class Ads:
 
     def finish(self, uuid, code, work, fn):
         edl = next((os.path.join(work, n) for n in os.listdir(work) if n.endswith('.edl')), None) if os.path.isdir(work) else None
-        duration, offset, base = probe(fn)
+        duration, offset = probe(fn)[:2]
         ads = read_edl(edl) if edl else []
-        res = {'at': int(time.time()), 'duration': duration, 'offset': offset, 'ads': ads,
-               'cuts': cut_list(fn, ads, duration, offset, base) if ads else []}
+        res = {'at': int(time.time()), 'duration': duration, 'offset': offset, 'ads': ads}
         if code not in (0, 1) and not edl:  # comskip endet mit 1, wenn es keine Werbung findet
             res['error'] = 'comskip %s' % code
         with open(os.path.join(DIR, uuid + '.json'), 'w') as f:

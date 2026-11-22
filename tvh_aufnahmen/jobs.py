@@ -244,7 +244,7 @@ class Jobs:
 
     def find_ads(self):
         ads = getattr(self.app, 'ads', None)
-        if ads and self.app.cfg.get('ads', True):
+        if ads:
             ads.step()
 
     def sample_reception(self):

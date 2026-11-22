@@ -12,8 +12,9 @@ const adTag=r=>{const a=adOf(r.uuid);if(ADS&&ADS.running==r.uuid)return `<br><sp
 async function adScan(u){try{ADS=await api('/api/ads-scan',{uuid:u});msg(L('ads.queued'),true);$('#dlg').close();fillRecordings()}catch(e){msg(e.message)}}
 // Avidemux-Projekt: behält alles außer den Werbeblöcken (Segmente, vom Server schon auf Schlüsselbilder gelegt),
 // Video und Ton nur kopiert. Der Pfad ist der der heruntergeladenen Datei.
-function avidemuxProject(u){const r=R(u),a=adOf(u);if(!a)return;
+async function avidemuxProject(u){const r=R(u),a=adOf(u);if(!a)return;
  const dir=prompt(L('ads.adm_dir'),store('admdir')||'');if(dir===null)return;store('admdir',dir.replace(/\/+$/,''));
+ try{a.cuts=(await api('/api/ads-cuts?uuid='+u)).cuts}catch(e){return msg(e.message)}
  const name=r.rel.split('/').pop(),path=(dir.replace(/\/+$/,'')+'/'+name).replace(/"/g,'\\"');
  const py=['#PY  <- Needed to identify #','#--automatically built-- tvh-aufnahmen: '+r.title+' – Werbung laut comskip:',
   ...a.ads.map(([x,y])=>'#   '+hms(x)+' – '+hms(y)),'','adm = Avidemux()','ed = Editor()',`if not adm.loadVideo("${path}"):`,`    raise("Cannot load ${path}")`,
@@ -155,7 +156,7 @@ function recCard(r,label,keep){return `<div class="rcard${keep?' keep':''}"><div
  <p style="white-space:pre-line">${esc(r.description||L('rec.no_desc'))}</p>
  <div class="bar" style="margin:0"><a class="b sec" style="text-decoration:none" href="/api/playlist?uuid=${r.uuid}" data-playrec="${r.uuid}">${L('common.play')}</a>
   <a class="b sec" style="text-decoration:none" href="/api/download?uuid=${r.uuid}">${L('rec.download')}</a>
-  ${ADS&&ADS.available?(adOf(r.uuid)&&adOf(r.uuid).cuts.length?`<button class="b sec" onclick="avidemuxProject('${r.uuid}')" title="${L('ads.adm_tip')}">✂ ${L('ads.adm')}</button>`:'')
+  ${ADS&&ADS.available?(adOf(r.uuid)&&adOf(r.uuid).ads.length?`<button class="b sec" onclick="avidemuxProject('${r.uuid}')" title="${L('ads.adm_tip')}">✂ ${L('ads.adm')}</button>`:'')
    +(ADS.running==r.uuid||ADS.wanted.includes(r.uuid)?'':`<button class="b sec" onclick="adScan('${r.uuid}')">${adOf(r.uuid)?L('ads.rescan'):L('ads.scan')}</button>`):''}
   <button class="b sec" onclick="toggleWatched('${r.uuid}')">${watched(r)?L('rec.mark_unwatched'):L('rec.mark_watched')}</button>
   <button class="b bad" onclick="removeRec(['${r.uuid}'])">${L('common.delete')}</button></div></div>`}
