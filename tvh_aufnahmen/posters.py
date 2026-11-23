@@ -20,7 +20,7 @@ import urllib.request
 
 MIN_DURATION = 80 * 60  # in der Programmübersicht nur für lange Sendungen
 DE, EN = 'de.wikipedia.org', 'en.wikipedia.org'
-CACHE_VERSION = 4  # 2: Plakat aus der englischen Wikipedia, 3: Wikidata, Jahr, breitere Prüfung, 4: TVmaze
+CACHE_VERSION = 5  # 2: Plakat aus der englischen Wikipedia, 3: Wikidata, Jahr, breitere Prüfung, 4: TVmaze, 5: Trakt deutsch
 USER_AGENT = 'tvh-aufnahmen/1.0 (https://github.com/PerFermat/tvh-aufnahmen)'  # Wikimedia verlangt Kontakt
 # Art der Sendung in der Kurzbeschreibung des Artikels („Filmdrama von …“, „deutsche Kochsendung“).
 # „Fernsehsender“ zählt nicht, Personen („Filmschauspieler“, „Regisseur“), Spiele, Bücher, Musik o. Ä. auch nicht.
@@ -144,34 +144,57 @@ class TraktKeyError(Exception):
     pass
 
 
+def trakt_get(client_id, path, params=None):
+    req = urllib.request.Request('https://api.trakt.tv/' + path + ('?' + urllib.parse.urlencode(params) if params else ''),
+                                 headers={'User-Agent': USER_AGENT, 'Content-Type': 'application/json',
+                                          'trakt-api-version': '2', 'trakt-api-key': client_id})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            raise TraktKeyError('Trakt-Client-ID ungültig') from None
+        raise
+
+
 def trakt_lookup(client_id, title, year=None):
-    """Plakat eines gleichnamigen Films oder einer Serie bei Trakt oder None. Bei Filmen mit
-    bekanntem Jahr muss es auf ±1 passen. TraktKeyError bei ungültiger Client-ID."""
+    """Plakat eines gleichnamigen Films oder einer Serie bei Trakt oder None. Trakt führt die Titel auf
+    Englisch; passt der nicht, zählt der deutsche aus den Übersetzungen (nur beim vollen Titel, für die ersten
+    Treffer). Bei Filmen mit bekanntem Jahr muss es auf ±1 passen. Vorsicht vor Fehltreffern: Der gekürzte
+    Titel („Relive“ aus „Relive: …“) muss noch zwei Wörter haben, ein einzelnes Wort ohne Jahr reicht für einen
+    Film nicht. TraktKeyError bei ungültiger Client-ID."""
     for i, q in enumerate(search_titles(title)):
+        if i and len(q.split()) < 2:
+            continue
         if i:
             time.sleep(1)
-        req = urllib.request.Request('https://api.trakt.tv/search/movie,show?' + urllib.parse.urlencode(
-            {'query': q, 'extended': 'images', 'limit': 10}), headers={
-            'User-Agent': USER_AGENT, 'Content-Type': 'application/json',
-            'trakt-api-version': '2', 'trakt-api-key': client_id})
-        try:
-            with urllib.request.urlopen(req, timeout=15) as r:
-                res = json.load(r)
-        except urllib.error.HTTPError as e:
-            if e.code in (401, 403):
-                raise TraktKeyError('Trakt-Client-ID ungültig') from None
-            raise
+        # Satzzeichen stören die Suche („Der Tag, an dem …“ findet nichts, ohne Komma schon)
+        res = trakt_get(client_id, 'search/movie,show', {'query': re.sub(r'\s+', ' ', re.sub(r'[,;:!?.]', ' ', q)).strip(),
+                                                         'extended': 'images', 'limit': 10})
         hits = []
-        for x in res:
+        for n, x in enumerate(res):
             kind = x.get('type')
             item = x.get(kind) or {}
             posters = (item.get('images') or {}).get('poster') or []
-            if kind not in ('movie', 'show') or not posters or not same_title(item.get('title'), q):
+            if kind not in ('movie', 'show') or not posters:
                 continue
             y = item.get('year')
             if year and kind == 'movie' and y and abs(int(year) - y) > 1:
                 continue
-            hits.append((kind, item, posters[0]))
+            if kind == 'movie' and not year and len(q.split()) < 2:
+                continue
+            match = same_title(item.get('title'), q)
+            if not match and i == 0 and n < 3 and (item.get('ids') or {}).get('slug'):
+                time.sleep(0.3)
+                try:
+                    tr = trakt_get(client_id, '%ss/%s/translations/de' % (kind, item['ids']['slug']))
+                except (OSError, ValueError):
+                    tr = []
+                de = next((t.get('title') for t in tr if t.get('title') and same_title(t['title'], q)), None)
+                if de:
+                    match, item = True, dict(item, title=de)
+            if match:
+                hits.append((kind, item, posters[0]))
         if year:  # passendes Jahr zuerst
             hits.sort(key=lambda h: abs(int(year) - (h[1].get('year') or 0)) > 1)
         if hits:
@@ -190,7 +213,9 @@ def still_valid(entry):
     p, old = entry.get('poster'), entry.get('v', 1) < CACHE_VERSION
     if not p:
         return not old  # „nichts gefunden“ aus einer älteren Suche: neu versuchen
-    if p.get('src') in ('tvmaze', 'trakt'):
+    if p.get('src') == 'trakt':
+        return not old  # ältere Suche ohne Schutz vor Fehltreffern („Relive“, „Infomercial“): neu prüfen
+    if p.get('src') == 'tvmaze':
         return True
     if 'Special:FilePath' in p.get('thumb', ''):
         return not old  # Wikidata-Bild (meist ein Logo) aus einer Suche ohne TVmaze
