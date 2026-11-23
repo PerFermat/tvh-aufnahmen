@@ -40,6 +40,7 @@
   "hdr.new_autorec": "New series recording",
   "hdr.new_autorec_tip": "Create a new series recording",
   "form.more": "More options ({n})",
+  "form.any": "– any –",
   "live.search": "Search: channel or programme …",
   "live.loading": "Loading channels …",
   "live.count": "{n} of {total} channels",

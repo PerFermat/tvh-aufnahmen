@@ -236,6 +236,14 @@ def class_form(tvh, name):
         if p.get('enum') is not None:
             prop['enum'] = resolve_enum(tvh, p['enum'])
             keys = [x['key'] for x in prop['enum']]
+            # Listen aus der API (Sender, Tags, Profile) haben keinen leeren Eintrag – leer heißt bei TVHeadend
+            # aber „beliebig“ (z. B. Serienaufnahme auf allen Sendern)
+            if (isinstance(p['enum'], dict) and not prop.get('list') and p['id'] != 'config_name'  # Profil: Standard ist da
+                    and not any(k in ('', 0, None) for k in keys)):
+                prop['enum'].insert(0, {'key': '', 'val': _('form.any')})
+            for x in prop['enum']:
+                if x['key'] in ('', 0) and x['val'] == '':  # z. B. Genre: leerer Eintrag = beliebig
+                    x['val'] = _('form.any')
             # z. B. Startzeit: Standard „Any“, die Liste beginnt aber übersetzt mit „Beliebig“
             if not prop.get('list') and prop.get('default') not in keys and keys and isinstance(keys[0], str):
                 prop['enum'][0] = {'key': prop.get('default'), 'val': prop['enum'][0]['val']}

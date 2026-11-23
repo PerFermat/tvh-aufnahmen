@@ -40,6 +40,7 @@
   "hdr.new_autorec": "Neue Serienaufnahme",
   "hdr.new_autorec_tip": "Neue Serienaufnahme anlegen",
   "form.more": "Weitere Optionen ({n})",
+  "form.any": "– beliebig –",
   "live.search": "Suchen: Sender oder Sendung …",
   "live.loading": "Lade Sender …",
   "live.count": "{n} von {total} Sendern",
