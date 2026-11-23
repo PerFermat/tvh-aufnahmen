@@ -63,7 +63,8 @@ function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLe
 // Zellen füllen: Erst ohne Beschreibung zeichnen und messen. Die vollste Zelle der Zeile (mindestens ROW_MIN px)
 // bestimmt die Höhe. Innerhalb der Zelle steht jede Sendung möglichst an der Stelle ihrer Uhrzeit (die Zeile ist
 // eine Zeitachse über 4 Stunden) – so stehen gleichzeitige Sendungen verschiedener Sender nebeneinander.
-// Den freien Platz bis zur nächsten Sendung bekommt die Beschreibung (lange Sendungen also mehr), bei viel Platz ein Bild.
+// Den freien Platz bis zur nächsten Sendung bekommt die Beschreibung (lange Sendungen also mehr), bei viel Platz ein Bild –
+// ohne Beschreibung das Bild allein, sobald es hineinpasst.
 const ROW_MIN=300,LINE_PX=16,IMG_PX=110,MIN_DESC=2,MAX_DESC=40,EV_GAP=7;
 const blockAt=h=>{const d=new Date(EPGS*1000);d.setHours(h,0,0,0);return d.getTime()/1000};
 function evHtml(e){
@@ -83,8 +84,10 @@ function layoutEpg(){
    // 1. Beschreibungen: Platz bis zur Uhrzeit der nächsten Sendung, zusammen höchstens der freie Platz der Zelle
    const free=evs.map((ev,j)=>Math.max(0,(j+1<evs.length?y(+evs[j+1].dataset.s):bottom)-y(+ev.dataset.s)-ev.offsetHeight-EV_GAP));
    const sum=free.reduce((a,b)=>a+b,0),k=sum>0?Math.min(1,(H-base[i])/sum):0;
-   evs.forEach((ev,j)=>{const d=ev.querySelector('.ds');if(!d)return;
-    let n=Math.min(MAX_DESC,Math.floor(free[j]*k/LINE_PX));const img=ev.querySelector('.poster');
+   evs.forEach((ev,j)=>{const d=ev.querySelector('.ds'),img=ev.querySelector('.poster');
+    // ohne Beschreibung: das Bild allein, wenn sein Platz bis zur nächsten Sendung reicht (die Zeile wächst nicht)
+    if(!d){if(img&&free[j]*k>=IMG_PX)img.hidden=false;return}
+    let n=Math.min(MAX_DESC,Math.floor(free[j]*k/LINE_PX));
     if(img&&n*LINE_PX>=IMG_PX+4*LINE_PX){img.hidden=false;n-=Math.ceil(IMG_PX/LINE_PX)}
     if(n>=MIN_DESC){d.hidden=false;d.style.webkitLineClamp=n}});
    // 2. Verschieben: jede Sendung nach unten bis zu ihrer Uhrzeit, aber nie über das Zellenende hinaus
