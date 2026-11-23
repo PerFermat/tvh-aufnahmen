@@ -520,6 +520,7 @@
   "epg.hits": "{n} Sendungen mit „{q}“",
   "epg.hits_full": "auch in Beschreibungen",
   "epg.nothing": "Nichts gefunden.",
+  "epg.cont": "Fortsetzung",
   "ev.searching": "Suche …",
   "ev.repeats": "{n} weitere Ausstrahlung(en)",
   "ev.repeats_ep": "{n} weitere Ausstrahlung(en) dieser Folge",

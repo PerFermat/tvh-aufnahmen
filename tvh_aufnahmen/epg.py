@@ -44,13 +44,18 @@ def epg_day(tvh, posters, archive, start=None):
         if key not in known and key not in seen:
             seen.add(key)
             events.append(dict({k: e.get(k) for k in EVENT_FIELDS}, archived=True))
+    # Läuft vom Vortag herein: im Block 0–4 als Fortsetzung (aus TVHeadend, für vergangene Tage aus dem Archiv)
+    carry = [{k: e.get(k) for k in EVENT_FIELDS} for e in raw if e.get('start', 0) < start < e.get('stop', 0)]
+    if not carry:
+        carry = [dict({k: e.get(k) for k in EVENT_FIELDS}, archived=True) for e in archive.day(start - 86400, start)
+                 if e.get('stop', 0) > start]
     for e in events:
         if len(e.get('description') or '') > GRID_TEXT:
             e['description'] = e['description'][:GRID_TEXT].rsplit(' ', 1)[0] + ' …'
     planned = upcoming_entries(tvh)
     by_event = {e.get('broadcast') for e in planned if e.get('broadcast')}
     by_time = {(e.get('channel'), e.get('start')) for e in planned}
-    for e in events:
+    for e in events + carry:
         e['planned'] = e['eventId'] in by_event or (e['channelUuid'], e['start']) in by_time
     with_epg = {e['channelUuid'] for e in events}
     tags = {t['uuid']: t['name'] for t in tvh.call('channeltag/grid', limit=1000).get('entries', [])}
@@ -64,7 +69,7 @@ def epg_day(tvh, posters, archive, start=None):
     channels.sort(key=lambda c: (c['number'] or 1 << 30, c['name'].lower()))
     events.sort(key=lambda e: e['start'])
     return {'start': start, 'end': end, 'prev': day_start(start - 1), 'next': end,
-            'channels': channels, 'events': events, 'posters_pending': attach(posters, events)}
+            'channels': channels, 'events': events, 'carry': carry, 'posters_pending': attach(posters, events)}
 
 
 def epg_search(tvh, query, fulltext=False):

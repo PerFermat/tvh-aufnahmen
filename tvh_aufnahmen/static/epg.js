@@ -67,7 +67,11 @@ function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLe
 // ohne Beschreibung das Bild allein, sobald es hineinpasst.
 const ROW_MIN=300,LINE_PX=16,IMG_PX=110,MIN_DESC=2,MAX_DESC=40,EV_GAP=7;
 const blockAt=h=>{const d=new Date(EPGS*1000);d.setHours(h,0,0,0);return d.getTime()/1000};
-function evHtml(e){
+// cont: Fortsetzung einer Sendung aus dem Block davor – kompakt, ohne Beschreibung und Bild
+function evHtml(e,cont){
+ if(cont)return `<div class="ev cont${e.planned?' pl':''}" data-s="${e.start}" data-e="${e.stop}" onclick="showEvent(${e.eventId})">
+  <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)} · ${L('epg.cont')}</div>
+  ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}</div>`;
  return `<div class="ev${e.planned?' pl':''}" data-s="${e.start}" data-e="${e.stop}" onclick="showEvent(${e.eventId})">
   ${e.poster?`<img class="poster" src="${esc(e.poster.thumb)}" alt="" loading="lazy" hidden onerror="this.remove()">`:''}
   <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)}${e.hd?' · HD':''}</div>
@@ -95,8 +99,9 @@ function layoutEpg(){
    const room=bottom-(evs[evs.length-1].getBoundingClientRect().bottom-ct);if(room<=1)return;
    const S=[];evs.forEach((ev,j)=>S[j]=Math.max(j?S[j-1]:0,y(+ev.dataset.s)-tops[j]));
    for(let j=evs.length-1;j>=0;j--)S[j]=Math.max(0,Math.min(S[j],room,j+1<evs.length?S[j+1]:room));
-   // Der Abstand gehört zur Sendung davor (deren Kasten wird länger, Hover und „Jetzt“ decken ihn mit ab);
-   // nur vor der ersten Sendung bleibt er frei – dort läuft noch die Sendung aus dem Block davor.
+   // Der Abstand gehört zur Sendung davor (deren Kasten wird länger, Hover und „Jetzt“ decken ihn mit ab).
+   // Läuft eine Sendung aus dem Block davor herein, steht sie als Fortsetzung oben und bekommt ihn ebenso;
+   // nur ohne Fortsetzung bleibt vor der ersten Sendung Platz frei (dann fängt dort nichts an).
    const grow=(el,px)=>el.style.paddingBottom=(parseFloat(getComputedStyle(el).paddingBottom)+px)+'px';
    evs.forEach((ev,j)=>{const dlt=S[j]-(j?S[j-1]:0);if(dlt<1)return;
     if(j)grow(evs[j-1],dlt);else ev.style.marginTop=(parseFloat(getComputedStyle(ev).marginTop)+dlt)+'px'});
@@ -110,10 +115,13 @@ function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=D
 function fillEpg(){if(EPGQ.trim().length>=2)return epgSearch(EPGFULL);  // Suchtext da: Ergebnisliste statt Zeitschrift
  const chans=chFilter(EPG.channels).filter(c=>c.epg);
  const evs=EPG.events,cell={};evs.forEach(e=>{(cell[blockOf(e.start)+'|'+e.channelUuid]??=[]).push(e)});EPGCELLS=cell;
+ // Fortsetzungen: was vor Blockbeginn anfängt und danach noch läuft, steht oben im nächsten Block (Block 0 aus dem Vortag)
+ const cont={},all=[...(EPG.carry||[]),...evs];
+ for(const h of BLOCKS){const B=blockAt(h);for(const e of all)if(e.start<B&&e.stop>B)cont[h+'|'+e.channelUuid]??=e}
  if(!chans.length||!evs.length){$('#epgwrap').innerHTML=`<p class="muted">${L('epg.empty')}</p>`;return}
  const rows=BLOCKS.map(h=>{
-  const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];const from=cellCut(all,k);return {k,all,from,list:EPGX.has(k)?all:all.slice(from,from+CELLMAX)}});
-  return `<tr class="blkbar" id="bb${h}"><th colspan="${chans.length+1}"><div>${L('epg.block',{a:h,b:h+4})}</div></th></tr><tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">${L('epg.oclock')}</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${L('epg.earlier',{n:x.from})}</button>`:''}${x.list.map(evHtml).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${L('epg.more',{n:after})}</button>`:''}</div></td>`}).join('')}</tr>`});
+  const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];const from=cellCut(all,k);return {k,all,from,cont:from?null:cont[h+'|'+c.uuid],list:EPGX.has(k)?all:all.slice(from,from+CELLMAX)}});
+  return `<tr class="blkbar" id="bb${h}"><th colspan="${chans.length+1}"><div>${L('epg.block',{a:h,b:h+4})}</div></th></tr><tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">${L('epg.oclock')}</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${L('epg.earlier',{n:x.from})}</button>`:''}${x.cont?evHtml(x.cont,true):''}${x.list.map(e=>evHtml(e)).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${L('epg.more',{n:after})}</button>`:''}</div></td>`}).join('')}</tr>`});
  $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th><div class="chh">${c.number?`<span class="chnr">${c.number}</span>`:''}${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}</div><div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
  epgHead();EPGCUT=cutSig();epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
 // Fingerabdruck aller Ausschnitte – ändert er sich (die laufende Sendung ist aus dem Ausschnitt gewandert), neu zeichnen

@@ -520,6 +520,7 @@
   "epg.hits": "{n} programmes with “{q}”",
   "epg.hits_full": "also in descriptions",
   "epg.nothing": "Nothing found.",
+  "epg.cont": "continued",
   "ev.searching": "Searching …",
   "ev.repeats": "{n} further broadcast(s)",
   "ev.repeats_ep": "{n} further broadcast(s) of this episode",

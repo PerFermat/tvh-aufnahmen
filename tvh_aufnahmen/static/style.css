@@ -332,3 +332,4 @@ dialog.ask{max-width:520px;height:auto;max-height:calc(100vh - 48px);margin:auto
 table.recep td{vertical-align:middle}table.recep details summary{cursor:pointer}
 .pseekw{position:relative;flex:1;display:flex}.pseekw input{flex:1}
 .admark{position:absolute;top:50%;height:6px;margin-top:-3px;background:var(--bad);opacity:.7;border-radius:2px;pointer-events:none;z-index:1}
+.ev.cont{border-top:1px dashed var(--line)}.ev.cont>b::before{content:"↳ ";color:var(--muted);font-weight:600}
