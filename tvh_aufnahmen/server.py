@@ -1,4 +1,5 @@
 """HTTP-Server: liefert die Oberfläche aus und bietet die JSON-API an."""
+import gzip
 import json
 import os
 import re
@@ -27,6 +28,8 @@ from .tvh import entry_info
 
 OPEN_PATHS = {'/api/login', '/api/logout', '/api/me'}  # ohne Anmeldung erreichbar
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+COMPRESSIBLE = re.compile(r'(application/json|text/|application/javascript|image/svg)')
+STATIC_CACHE = {}  # Pfad → (ETag, Inhalt, gepackt)
 STATIC_TYPES = {'.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
                 '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml',
                 '.webmanifest': 'application/manifest+json'}
@@ -37,10 +40,18 @@ def make_handler(app):
         def log_message(self, fmt, *args):
             pass
 
-        def send(self, code, body, ctype='application/json; charset=utf-8'):
+        def send(self, code, body, ctype='application/json; charset=utf-8', headers=None, packed=None):
+            """Antwort senden; Text (JSON, JS, CSS, HTML) gepackt, wenn der Browser gzip versteht – das Programm eines
+            Tages schrumpft so von gut 3 auf unter 1 MB, was vor allem von unterwegs und am Handy zählt."""
             data = body if isinstance(body, bytes) else json.dumps(body).encode()
             self.send_response(code)
             self.send_header('Content-Type', ctype)
+            if len(data) > 1400 and COMPRESSIBLE.match(ctype) and 'gzip' in (self.headers.get('Accept-Encoding') or ''):
+                data = packed or gzip.compress(data, 5)
+                self.send_header('Content-Encoding', 'gzip')
+                self.send_header('Vary', 'Accept-Encoding')
+            for k, v in (headers or {}).items():
+                self.send_header(k, v)
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
             self.wfile.write(data)
@@ -71,8 +82,20 @@ def make_handler(app):
             # nur Dateien direkt in static/ oder static/vendor/ (Bibliotheken), kein „..“
             if not re.fullmatch(r'(vendor/)?[\w.-]+', name) or '..' in name or not ctype or not os.path.isfile(path):
                 return self.send(404, {'error': _('srv.not_found')})
-            with open(path, 'rb') as f:
-                self.send(200, f.read(), ctype)
+            # Browser darf die Datei behalten, fragt aber jedes Mal nach (ETag) – unverändert kommt nur „304“ zurück
+            st = os.stat(path)
+            tag = '"%x-%x"' % (int(st.st_mtime), st.st_size)
+            if self.headers.get('If-None-Match') == tag:
+                self.send_response(304)
+                self.send_header('ETag', tag)
+                self.end_headers()
+                return
+            cached = STATIC_CACHE.get(path)
+            if not cached or cached[0] != tag:
+                with open(path, 'rb') as f:
+                    raw = f.read()
+                cached = STATIC_CACHE[path] = (tag, raw, gzip.compress(raw, 9))
+            self.send(200, cached[1], ctype, {'ETag': tag, 'Cache-Control': 'no-cache'}, packed=cached[2])
 
         def download(self, uuid):
             fn = entry_info(app.tvh, uuid).get('filename')
