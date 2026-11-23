@@ -112,14 +112,33 @@ function layoutEpg(){
    // die letzte Sendung bis zu ihrem Ende ziehen (höchstens bis zum Zellenende)
    const last=evs[evs.length-1],lb=last.getBoundingClientRect().bottom-c.getBoundingClientRect().top,want=Math.min(y(+last.dataset.e),bottom);
    if(want-lb>=1)grow(last,want-lb)})}
- epgSeams();setTimeout(epgSeams,400)}
+ epgSeams();epgFlow();setTimeout(epgSeams,400)}
 // Nahtstellen über die Blockgrenze: genau bis zur Unterkante der Tabellenzelle bzw. ab deren Oberkante (über die
 // Trennlinie) – per Innenabstand verlängert und per negativem Außenabstand ausgeglichen, die Zelle bleibt gleich hoch.
 // Wiederholbar (z. B. nachdem Bilder geladen sind und eine Zeile sich noch ändert).
 function epgSeams(){const px=(el,p)=>parseFloat(getComputedStyle(el)[p]);
- const fit=(ev,d,pad,mar)=>{d=Math.max(d,-px(ev,pad));if(Math.abs(d)>=.5){ev.style[pad]=px(ev,pad)+d+'px';ev.style[mar]=px(ev,mar)-d+'px'}};
+ // feste Höhe (siehe epgFlow): Höhe statt Innenabstand anpassen
+ const fit=(ev,d,pad,mar)=>{if(ev.dataset.fixed){if(Math.abs(d)>=.5){ev.style.height=ev.offsetHeight+d+'px';ev.style[mar]=px(ev,mar)-d+'px'}return}
+  d=Math.max(d,-px(ev,pad));if(Math.abs(d)>=.5){ev.style[pad]=px(ev,pad)+d+'px';ev.style[mar]=px(ev,mar)-d+'px'}};
  document.querySelectorAll('table.epg .ev.cont.blank').forEach(ev=>fit(ev,ev.getBoundingClientRect().top-ev.closest('td').getBoundingClientRect().top,'paddingTop','marginTop'));
- document.querySelectorAll('table.epg .ev.spill').forEach(ev=>fit(ev,ev.closest('td').getBoundingClientRect().bottom-ev.getBoundingClientRect().bottom,'paddingBottom','marginBottom'))}
+ document.querySelectorAll('table.epg .ev.spill').forEach(ev=>fit(ev,ev.closest('td').getBoundingClientRect().bottom-ev.getBoundingClientRect().bottom,'paddingBottom','marginBottom'));
+ if(document.querySelector('table.epg .ev[data-fixed]'))epgFlow()}
+// Text und Bild laufen über die Blockgrenze, als gäbe es sie nicht: Der erste Teil zeigt alles (Beschreibung bis
+// MAX_DESC Zeilen, Bild), abgeschnitten an der Zeilenkante; die Teile in den folgenden Zeilen zeigen denselben
+// Inhalt, um die schon sichtbare Höhe nach oben verschoben. Alle Teile behalten ihre Höhe aus dem Layout.
+function epgFlow(){const px=(el,p)=>parseFloat(getComputedStyle(el)[p]);
+ const fix=ev=>{if(!ev.dataset.fixed){ev.style.boxSizing='border-box';ev.style.height=ev.offsetHeight+'px';ev.dataset.fixed=1}};
+ document.querySelectorAll('table.epg .ev.spill:not(.cont)').forEach(sp=>{
+  const parts=[...document.querySelectorAll(`table.epg .ev.cont.blank[data-id="${sp.dataset.id}"]`)];if(!parts.length)return;
+  fix(sp);parts.forEach(fix);
+  if(!sp.dataset.open){const d=sp.querySelector('.ds'),img=sp.querySelector('.poster');
+   if(d){d.hidden=false;d.style.webkitLineClamp=MAX_DESC}if(img)img.hidden=false;sp.dataset.open=1}
+  // Kopie ohne onload – sonst stieße jedes geladene Bild der Kopie diese Funktion erneut an (Endlosschleife)
+  const inner=sp.innerHTML.replace(/ onload="[^"]*"/g,'');
+  let seen=sp.getBoundingClientRect().bottom-sp.getBoundingClientRect().top-px(sp,'paddingTop');
+  for(const b of parts){const off=Math.round(seen+px(b,'paddingTop'));
+   if(b.dataset.off!=off){b.innerHTML=`<div class="flow" style="margin-top:${-off}px">${inner}</div>`;b.dataset.off=off}
+   seen+=b.offsetHeight}})}
 // Volle Zelle: CELLMAX Sendungen zeigen, aber die laufende muss dabei sein – davor liegende
 // verschwinden dann oben unter „+ n frühere“, spätere wie bisher unten unter „+ n weitere“.
 function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);

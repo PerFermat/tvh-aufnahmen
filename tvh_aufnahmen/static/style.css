@@ -338,3 +338,4 @@ table.recep td{vertical-align:middle}table.recep details summary{cursor:pointer}
 .ev.spill{border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0}
 .ev.spill.now::after{display:none}
 .ev.cont.blank{padding:0 5px;min-height:10px;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.ev[data-fixed]{overflow:hidden}.ev.cont.blank.now::before{display:none}.ev.cont.blank .flow{pointer-events:none}
