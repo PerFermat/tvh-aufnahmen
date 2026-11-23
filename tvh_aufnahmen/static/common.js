@@ -55,7 +55,8 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#t-rec').textContent=L('nav.rec_n',{n:S.recordings.length});
  $('#t-unknown').textContent=L('nav.unknown_n',{n:S.unknown.length});
  $('#t-missing').textContent=L('nav.missing_n',{n:S.missing.length});
- $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;render()}
+ $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;
+ if(!SELF_TABS.includes(cur))render()}  // sonst lüde z. B. das Programm beim Start ein zweites Mal
 // Senderliste (Favoriten = Sender-Tags von TVHeadend): gilt für Live-TV, Programm und Heute Abend, je Gerät gemerkt
 let TAGS=[],CHL=store('chlist')||'';
 async function loadTags(){try{TAGS=(await api('/api/tags')).tags}catch(e){}
@@ -85,7 +86,9 @@ function toggleTools(){store('tools',store('tools')=='open'?'closed':'open');too
 function toggleMenu(open){const t=$('#top'),o=open??!t.classList.contains('open');t.classList.toggle('open',o);
  document.body.classList.toggle('menu-open',o);$('.menu').setAttribute('aria-expanded',o)}
 addEventListener('keydown',e=>{if(e.key=='Escape')toggleMenu(false)})
-function render(){if(['live','epg','tonight','autorec','upcoming','config','backup','scan','channels','status'].includes(cur))return TABS[cur]();if(!S){$('#main').innerHTML=`<p class="muted">${L('common.no_data')}</p>`;return}
+// Reiter, die ihre Daten selbst laden – sie brauchen S (/api/state) nicht und werden nach load() nicht neu gezeichnet
+const SELF_TABS=['live','epg','tonight','autorec','upcoming','config','backup','scan','channels','status'];
+function render(){if(SELF_TABS.includes(cur))return TABS[cur]();if(!S){$('#main').innerHTML=`<p class="muted">${L('common.no_data')}</p>`;return}
  TABS[cur]()}
 // Formulare aus der Klassenbeschreibung von TVHeadend (/api/form) – zeigt alle Optionen einer Klasse
 const FORMS={};
