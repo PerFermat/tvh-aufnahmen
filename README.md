@@ -2,7 +2,7 @@
 
 Web-Oberfläche für TVHeadend 4.3 (deutsch und englisch, weitere Sprachen als JSON-Datei), um
 
-- das **Programm** wie eine Fernsehzeitschrift zu zeigen – ein ganzer Tag, Sender als Spalten, sechs Zeilen zu je 4 Stunden mit allen Sendungen, die darin beginnen (was aus dem Block davor hereinläuft, steht oben als Fortsetzung); die Schnellauswahl springt zum Block – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
+- das **Programm** wie eine Fernsehzeitschrift zu zeigen – ein ganzer Tag, Sender als Spalten, sechs Zeilen zu je 4 Stunden mit allen Sendungen, die darin beginnen (läuft eine Sendung über die Blockgrenze, geht ihr Kasten in der nächsten Zeile weiter; am Tagesanfang steht sie mit Titel als Fortsetzung); die Schnellauswahl springt zum Block – und per Klick auf eine Sendung alle EPG-Angaben zu sehen, eine Aufnahme oder eine Serienaufnahme (mit allen Optionen von TVHeadend) zu planen,
 - im Programm **über alle Tage zu suchen** (Titel, auf Wunsch auch Beschreibungen); laufende Sendungen sind markiert, vorbeigelaufene grau,
 - **„Heute Abend“**: je Sender die Sendung um 20:15 und die danach, mit Plakat, für heute und die nächsten sechs Tage,
 - sich an eine Sendung **erinnern** zu lassen – 5 Minuten vor Beginn kommt eine ntfy-Nachricht; Antippen öffnet den Sender im Player,

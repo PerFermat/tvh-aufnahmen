@@ -333,3 +333,8 @@ table.recep td{vertical-align:middle}table.recep details summary{cursor:pointer}
 .pseekw{position:relative;flex:1;display:flex}.pseekw input{flex:1}
 .admark{position:absolute;top:50%;height:6px;margin-top:-3px;background:var(--bad);opacity:.7;border-radius:2px;pointer-events:none;z-index:1}
 .ev.cont{border-top:1px dashed var(--line)}.ev.cont>b::before{content:"↳ ";color:var(--muted);font-weight:600}
+/* Sendung über eine Blockgrenze: ohne Rundung und Strich an der Nahtstelle (bis an die Zeilenkanten zieht layoutEpg) */
+.ev.hov{background:var(--hover)}
+.ev.spill{border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.ev.spill.now::after{display:none}
+.ev.cont.blank{padding:0 5px;min-height:10px;border-top:0;border-top-left-radius:0;border-top-right-radius:0}

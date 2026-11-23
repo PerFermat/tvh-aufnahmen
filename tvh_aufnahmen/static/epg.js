@@ -65,15 +65,19 @@ function epgMore(k){EPGX.add(k);const w=$('#epgwrap'),y=w.scrollTop,x=w.scrollLe
 // eine Zeitachse über 4 Stunden) – so stehen gleichzeitige Sendungen verschiedener Sender nebeneinander.
 // Den freien Platz bis zur nächsten Sendung bekommt die Beschreibung (lange Sendungen also mehr), bei viel Platz ein Bild –
 // ohne Beschreibung das Bild allein, sobald es hineinpasst.
+let EPGSEAM=null;
 const ROW_MIN=300,LINE_PX=16,IMG_PX=110,MIN_DESC=2,MAX_DESC=40,EV_GAP=7;
 const blockAt=h=>{const d=new Date(EPGS*1000);d.setHours(h,0,0,0);return d.getTime()/1000};
-// cont: Fortsetzung einer Sendung aus dem Block davor – kompakt, ohne Beschreibung und Bild
-function evHtml(e,cont){
- if(cont)return `<div class="ev cont${e.planned?' pl':''}" data-s="${e.start}" data-e="${e.stop}" onclick="showEvent(${e.eventId})">
+// Über eine Blockgrenze: Der Kasten der Sendung reicht bis zur Unterkante ihrer Zeile (spill) und geht in der
+// nächsten Zeile ohne Text weiter (cont='blank') – beide Teile wirken wie ein Kasten. Nur am Tagesanfang, wo
+// der erste Teil auf einer anderen Seite steht, kommt der Titel als Fortsetzung (cont='title').
+function evHtml(e,cont,spill){const a=`data-s="${e.start}" data-e="${e.stop}" data-id="${e.eventId}" onclick="showEvent(${e.eventId})"`;
+ if(cont=='blank')return `<div class="ev cont blank${spill?' spill':''}" ${a} title="${esc(e.title)} · ${hm(e.start)}–${hm(e.stop)}"></div>`;
+ if(cont)return `<div class="ev cont${e.planned?' pl':''}${spill?' spill':''}" ${a}>
   <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)} · ${L('epg.cont')}</div>
   ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}</div>`;
- return `<div class="ev${e.planned?' pl':''}" data-s="${e.start}" data-e="${e.stop}" onclick="showEvent(${e.eventId})">
-  ${e.poster?`<img class="poster" src="${esc(e.poster.thumb)}" alt="" loading="lazy" hidden onerror="this.remove()">`:''}
+ return `<div class="ev${e.planned?' pl':''}${spill?' spill':''}" ${a}>
+  ${e.poster?`<img class="poster" src="${esc(e.poster.thumb)}" alt="" loading="lazy" hidden onerror="this.remove()" onload="clearTimeout(EPGSEAM);EPGSEAM=setTimeout(epgSeams,200)">`:''}
   <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)}${e.hd?' · HD':''}</div>
   ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}${e.description?`<div class="ds" hidden>${esc(e.description)}</div>`:''}</div>`}
 function layoutEpg(){
@@ -107,7 +111,15 @@ function layoutEpg(){
     if(j)grow(evs[j-1],dlt);else ev.style.marginTop=(parseFloat(getComputedStyle(ev).marginTop)+dlt)+'px'});
    // die letzte Sendung bis zu ihrem Ende ziehen (höchstens bis zum Zellenende)
    const last=evs[evs.length-1],lb=last.getBoundingClientRect().bottom-c.getBoundingClientRect().top,want=Math.min(y(+last.dataset.e),bottom);
-   if(want-lb>=1)grow(last,want-lb)})}}
+   if(want-lb>=1)grow(last,want-lb)})}
+ epgSeams();setTimeout(epgSeams,400)}
+// Nahtstellen über die Blockgrenze: genau bis zur Unterkante der Tabellenzelle bzw. ab deren Oberkante (über die
+// Trennlinie) – per Innenabstand verlängert und per negativem Außenabstand ausgeglichen, die Zelle bleibt gleich hoch.
+// Wiederholbar (z. B. nachdem Bilder geladen sind und eine Zeile sich noch ändert).
+function epgSeams(){const px=(el,p)=>parseFloat(getComputedStyle(el)[p]);
+ const fit=(ev,d,pad,mar)=>{d=Math.max(d,-px(ev,pad));if(Math.abs(d)>=.5){ev.style[pad]=px(ev,pad)+d+'px';ev.style[mar]=px(ev,mar)-d+'px'}};
+ document.querySelectorAll('table.epg .ev.cont.blank').forEach(ev=>fit(ev,ev.getBoundingClientRect().top-ev.closest('td').getBoundingClientRect().top,'paddingTop','marginTop'));
+ document.querySelectorAll('table.epg .ev.spill').forEach(ev=>fit(ev,ev.closest('td').getBoundingClientRect().bottom-ev.getBoundingClientRect().bottom,'paddingBottom','marginBottom'))}
 // Volle Zelle: CELLMAX Sendungen zeigen, aber die laufende muss dabei sein – davor liegende
 // verschwinden dann oben unter „+ n frühere“, spätere wie bisher unten unter „+ n weitere“.
 function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);
@@ -121,7 +133,7 @@ function fillEpg(){if(EPGQ.trim().length>=2)return epgSearch(EPGFULL);  // Sucht
  if(!chans.length||!evs.length){$('#epgwrap').innerHTML=`<p class="muted">${L('epg.empty')}</p>`;return}
  const rows=BLOCKS.map(h=>{
   const cells=chans.map(c=>{const k=EPGS+'|'+h+'|'+c.uuid,all=cell[h+'|'+c.uuid]||[];const from=cellCut(all,k);return {k,all,from,cont:from?null:cont[h+'|'+c.uuid],list:EPGX.has(k)?all:all.slice(from,from+CELLMAX)}});
-  return `<tr class="blkbar" id="bb${h}"><th colspan="${chans.length+1}"><div>${L('epg.block',{a:h,b:h+4})}</div></th></tr><tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">${L('epg.oclock')}</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${L('epg.earlier',{n:x.from})}</button>`:''}${x.cont?evHtml(x.cont,true):''}${x.list.map(e=>evHtml(e)).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${L('epg.more',{n:after})}</button>`:''}</div></td>`}).join('')}</tr>`});
+  return `<tr class="blkbar" id="bb${h}"><th colspan="${chans.length+1}"><div>${L('epg.block',{a:h,b:h+4})}</div></th></tr><tr id="blk${h}"><th class="tm"><div>${h}–${h+4}<br><span class="muted">${L('epg.oclock')}</span></div></th>${cells.map(x=>{const after=x.all.length-x.from-x.list.length;return `<td><div class="cell">${x.from?`<button class="b sec more first" onclick="epgMore('${x.k}')">+ ${L('epg.earlier',{n:x.from})}</button>`:''}${x.cont?evHtml(x.cont,h?'blank':'title',h<20&&!x.list.length&&x.cont.stop>blockAt(h+4)):''}${x.list.map((e,i)=>evHtml(e,false,h<20&&!after&&i==x.list.length-1&&e.stop>blockAt(h+4))).join('')}${after>0?`<button class="b sec more" onclick="epgMore('${x.k}')">+ ${L('epg.more',{n:after})}</button>`:''}</div></td>`}).join('')}</tr>`});
  $('#epgwrap').innerHTML=`<table class="epg"><thead><tr><th class="tm"></th>${chans.map(c=>`<th><div class="chh">${c.number?`<span class="chnr">${c.number}</span>`:''}${c.icon?`<img src="${c.icon}" alt="" loading="lazy">`:''}</div><div>${esc(c.name)}</div></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
  epgHead();EPGCUT=cutSig();epgNow();layoutEpg();$('#epgwrap').onscroll=epgMark}
 // Fingerabdruck aller Ausschnitte – ändert er sich (die laufende Sendung ist aus dem Ausschnitt gewandert), neu zeichnen
@@ -216,3 +228,6 @@ async function toggleRemind(id){const on=!REM.some(r=>r.eventId==id);
  try{REM=(await api('/api/remind',{event:id,on})).reminders;const b=$('#rembtn');if(b)b.textContent=remLabel(id);
   msg(on?L('ev.reminded'):L('ev.remind_removed'),true);if(cur=='upcoming')renderUpcoming()}catch(e){msg(e.message)}}
 loadReminders();
+// Teile derselben Sendung (über eine Blockgrenze) gemeinsam hervorheben
+['mouseover','mouseout'].forEach(t=>document.addEventListener(t,ev=>{const e=ev.target.closest?.('table.epg .ev[data-id]');if(!e)return;
+ document.querySelectorAll(`table.epg .ev[data-id="${e.dataset.id}"]`).forEach(x=>x.classList.toggle('hov',t=='mouseover'))}));
