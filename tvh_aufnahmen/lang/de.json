@@ -35,6 +35,8 @@
   "nav.tools": "Suche und Filter",
   "nav.tools_tip": "Suche und Filter ein-/ausblenden",
   "nav.tonight": "Heute Abend",
+  "nav.g_rec": "Aufnahmen",
+  "nav.g_sys": "Einstellungen",
   "hdr.new_rec": "Neue Aufnahme",
   "hdr.new_rec_tip": "Aufnahme mit festem Sender und festen Zeiten planen",
   "hdr.new_autorec": "Neue Serienaufnahme",

@@ -35,6 +35,8 @@
   "nav.tools": "Search and filter",
   "nav.tools_tip": "Show/hide search and filter",
   "nav.tonight": "Tonight",
+  "nav.g_rec": "Recordings",
+  "nav.g_sys": "Settings",
   "hdr.new_rec": "New recording",
   "hdr.new_rec_tip": "Schedule a recording with a fixed channel and fixed times",
   "hdr.new_autorec": "New series recording",

@@ -55,7 +55,7 @@ async function load(){try{S=await api('/api/state');}catch(e){S=null;$('#info').
  $('#t-rec').textContent=L('nav.rec_n',{n:S.recordings.length});
  $('#t-unknown').textContent=L('nav.unknown_n',{n:S.unknown.length});
  $('#t-missing').textContent=L('nav.missing_n',{n:S.missing.length});
- $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');$('#curtab').textContent=$('#t-'+cur).textContent;
+ $('#chans').innerHTML=S.channels.map(c=>`<option value="${esc(c.name)}">`).join('');curTab();
  if(!SELF_TABS.includes(cur))render()}  // sonst lüde z. B. das Programm beim Start ein zweites Mal
 // Senderliste (Favoriten = Sender-Tags von TVHeadend): gilt für Live-TV, Programm und Heute Abend, je Gerät gemerkt
 let TAGS=[],CHL=store('chlist')||'';
@@ -68,8 +68,17 @@ function listSel(after){const own=TAGS.filter(t=>t.own),other=TAGS.filter(t=>!t.
  ${own.length?`<optgroup label="${L('chn.own_lists')}">${own.map(o).join('')}</optgroup>`:''}${other.length?`<optgroup label="${L('chn.tvh_tags')}">${other.map(o).join('')}</optgroup>`:''}</select>`}
 loadTags();
 const TABS={live:()=>renderLive(),epg:()=>renderEpg(),tonight:()=>renderTonight(),autorec:()=>renderAutorecs(),upcoming:()=>renderUpcoming(),rec:()=>renderRecordings(),unknown:()=>renderUnknown(),missing:()=>renderMissing(),config:()=>renderConfig(),backup:()=>renderBackup(),scan:()=>renderScan(),channels:()=>renderChannels(),status:()=>renderStatus()};
-function tab(n){if(!TABS[n])n='live';if(cur=='channels'&&n!=cur&&chDirty()&&!confirm(L('chn.leave')))return;cur=n;store('tab',n);document.querySelectorAll('nav button').forEach(b=>b.className=b.id=='t-'+n?'on':'');
- $('#curtab').textContent=$('#t-'+n).textContent;toggleMenu(false);$('main').classList.toggle('tight',n=='epg');if(n!='epg')$('#hdrslot').innerHTML=HACTS[n]||'';render();toolsState()}
+// Menü: EPG-Seiten oben, darunter die Gruppen „Aufnahmen“ und „Einstellungen“ zum Aufklappen. Die Gruppe der
+// aktuellen Seite ist offen; was man selbst auf- oder zuklappt, merkt sich das Gerät.
+const navGroupOf=n=>document.getElementById('t-'+n)?.closest('.ngrp')?.id.slice(2);
+function navState(){const g=navGroupOf(cur);let open={};try{open=JSON.parse(store('navopen'))||{}}catch(e){}
+ document.querySelectorAll('nav .ngrp').forEach(el=>{const k=el.id.slice(2);el.classList.toggle('open',open[k]??k==g);el.classList.toggle('has',k==g)})}
+function navGroup(k){let open={};try{open=JSON.parse(store('navopen'))||{}}catch(e){}
+ const el=$('#g-'+k);open[k]=!el.classList.contains('open');store('navopen',JSON.stringify(open));navState()}
+// Kopfzeile: „Gruppe › Seite“
+function curTab(){const g=navGroupOf(cur),t=$('#t-'+cur).textContent;$('#curtab').textContent=g?$('#g-'+g+' .nghead span').textContent+' › '+t:t}
+function tab(n){if(!TABS[n])n='live';if(cur=='channels'&&n!=cur&&chDirty()&&!confirm(L('chn.leave')))return;cur=n;store('tab',n);document.querySelectorAll('nav button[id^="t-"]').forEach(b=>b.className=b.id=='t-'+n?'on':'');navState();
+ curTab();toggleMenu(false);$('main').classList.toggle('tight',n=='epg');if(n!='epg')$('#hdrslot').innerHTML=HACTS[n]||'';render();toolsState()}
 // Knöpfe im Kopf je Reiter (auf dem Handy nur „＋“)
 const newRecBtn=`<button class="b hact" onclick="manualRecording()" title="${L('hdr.new_rec_tip')}">＋<span class="lbl">&nbsp;${L('hdr.new_rec')}</span></button>`;
 const HACTS={autorec:`<button class="b hact" onclick="editAutorec()" title="${L('hdr.new_autorec_tip')}">＋<span class="lbl">&nbsp;${L('hdr.new_autorec')}</span></button>`,

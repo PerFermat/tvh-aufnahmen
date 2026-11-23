@@ -25,16 +25,18 @@
 <nav id="nav"><button id="t-live" onclick="tab('live')" data-i18n="nav.live">Live-TV</button>
 <button id="t-epg" onclick="tab('epg')" data-i18n="nav.epg">Programm</button>
 <button id="t-tonight" onclick="tab('tonight')" data-i18n="nav.tonight">Heute Abend</button>
+<div class="ngrp" id="g-rec"><button class="nghead" onclick="navGroup('rec')"><span data-i18n="nav.g_rec">Aufnahmen</span><span class="chev">›</span></button><div class="ngitems">
 <button id="t-autorec" onclick="tab('autorec')" data-i18n="nav.autorec">Serienaufnahmen</button>
 <button id="t-upcoming" onclick="tab('upcoming')" data-i18n="nav.upcoming">Geplante Aufnahmen</button>
 <button id="t-rec" onclick="tab('rec')" data-i18n="nav.rec">Aufnahmen</button>
 <button id="t-unknown" onclick="tab('unknown')" data-i18n="nav.unknown">Nicht eingetragene Dateien</button>
-<button id="t-missing" onclick="tab('missing')" data-i18n="nav.missing">Einträge ohne Datei</button>
+<button id="t-missing" onclick="tab('missing')" data-i18n="nav.missing">Einträge ohne Datei</button></div></div>
+<div class="ngrp" id="g-sys"><button class="nghead" onclick="navGroup('sys')"><span data-i18n="nav.g_sys">Einstellungen</span><span class="chev">›</span></button><div class="ngitems">
 <button id="t-status" onclick="tab('status')" data-i18n="nav.status">Status</button>
 <button id="t-config" onclick="tab('config')" data-i18n="nav.config">Einstellungen</button>
 <button id="t-backup" onclick="tab('backup')" data-i18n="nav.backup">Sicherung</button>
 <button id="t-scan" onclick="tab('scan')" data-i18n="nav.scan">Suchlauf</button>
-<button id="t-channels" onclick="tab('channels')" data-i18n="nav.channels">Sender ordnen</button>
+<button id="t-channels" onclick="tab('channels')" data-i18n="nav.channels">Sender ordnen</button></div></div>
 <div class="sub nav-info" id="info" data-i18n="common.loading">Lade …</div></nav></div>
 <div class="scrim" onclick="toggleMenu(false)"></div>
 <div id="msg" onclick="this.className=''" data-i18n-title="common.close_tip"></div>
