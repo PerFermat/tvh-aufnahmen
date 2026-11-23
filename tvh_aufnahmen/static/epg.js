@@ -81,6 +81,10 @@ function evHtml(e,cont,spill){const a=`data-s="${e.start}" data-e="${e.stop}" da
   <b>${esc(e.title)}</b><div class="muted tt">${hm(e.start)}–${hm(e.stop)}${e.hd?' · HD':''}</div>
   ${e.subtitle&&e.subtitle!=e.title?`<div class="st">${esc(e.subtitle)}</div>`:''}${e.description?`<div class="ds" hidden>${esc(e.description)}</div>`:''}</div>`}
 function layoutEpg(){
+ // In Phasen über alle Zellen: erst messen, dann ändern, dann wieder messen … – abwechselnd je Zelle müsste der
+ // Browser bei jeder Messung die ganze (große) Tabelle neu berechnen (bei 100 Sendern über 20 Sekunden).
+ const work=[];
+ // A. messen: Grundhöhen, Zeitachse je Zelle, Höhen der Sendungen (noch ohne Beschreibung)
  for(const tr of document.querySelectorAll('table.epg tbody tr[id^="blk"]')){
   const h=+tr.id.slice(3),B=blockAt(h),E=blockAt(h+4);
   const cells=[...tr.querySelectorAll('td > .cell')],base=cells.map(c=>c.offsetHeight);
@@ -89,56 +93,66 @@ function layoutEpg(){
    const first=c.querySelector(':scope > .more.first'),more=c.querySelector(':scope > .more:not(.first)');
    const top0=first?first.offsetHeight+EV_GAP:0,bottom=H-(more?more.offsetHeight+EV_GAP:0);
    const y=t=>top0+(Math.min(Math.max(t,B),E)-B)/(E-B)*(bottom-top0);  // Uhrzeit → Höhe in der Zelle
-   // 1. Beschreibungen: Platz bis zur Uhrzeit der nächsten Sendung, zusammen höchstens der freie Platz der Zelle
-   const free=evs.map((ev,j)=>Math.max(0,(j+1<evs.length?y(+evs[j+1].dataset.s):bottom)-y(+ev.dataset.s)-ev.offsetHeight-EV_GAP));
-   const sum=free.reduce((a,b)=>a+b,0),k=sum>0?Math.min(1,(H-base[i])/sum):0;
-   evs.forEach((ev,j)=>{const d=ev.querySelector('.ds'),img=ev.querySelector('.poster');
-    // ohne Beschreibung: das Bild allein, wenn sein Platz bis zur nächsten Sendung reicht (die Zeile wächst nicht)
-    if(!d){if(img&&free[j]*k>=IMG_PX)img.hidden=false;return}
-    let n=Math.min(MAX_DESC,Math.floor(free[j]*k/LINE_PX));
-    if(img&&n*LINE_PX>=IMG_PX+4*LINE_PX){img.hidden=false;n-=Math.ceil(IMG_PX/LINE_PX)}
-    if(n>=MIN_DESC){d.hidden=false;d.style.webkitLineClamp=n}});
-   // 2. Verschieben: jede Sendung nach unten bis zu ihrer Uhrzeit, aber nie über das Zellenende hinaus
-   const ct=c.getBoundingClientRect().top,tops=evs.map(ev=>ev.getBoundingClientRect().top-ct);
-   const room=bottom-(evs[evs.length-1].getBoundingClientRect().bottom-ct);if(room<=1)return;
-   const S=[];evs.forEach((ev,j)=>S[j]=Math.max(j?S[j-1]:0,y(+ev.dataset.s)-tops[j]));
-   for(let j=evs.length-1;j>=0;j--)S[j]=Math.max(0,Math.min(S[j],room,j+1<evs.length?S[j+1]:room));
-   // Der Abstand gehört zur Sendung davor (deren Kasten wird länger, Hover und „Jetzt“ decken ihn mit ab).
-   // Läuft eine Sendung aus dem Block davor herein, steht sie als Fortsetzung oben und bekommt ihn ebenso;
-   // nur ohne Fortsetzung bleibt vor der ersten Sendung Platz frei (dann fängt dort nichts an).
-   const grow=(el,px)=>el.style.paddingBottom=(parseFloat(getComputedStyle(el).paddingBottom)+px)+'px';
-   evs.forEach((ev,j)=>{const dlt=S[j]-(j?S[j-1]:0);if(dlt<1)return;
-    if(j)grow(evs[j-1],dlt);else ev.style.marginTop=(parseFloat(getComputedStyle(ev).marginTop)+dlt)+'px'});
-   // die letzte Sendung bis zu ihrem Ende ziehen (höchstens bis zum Zellenende)
-   const last=evs[evs.length-1],lb=last.getBoundingClientRect().bottom-c.getBoundingClientRect().top,want=Math.min(y(+last.dataset.e),bottom);
-   if(want-lb>=1)grow(last,want-lb)})}
+   work.push({c,evs,y,bottom,H,base:base[i],hs:evs.map(ev=>ev.offsetHeight)})})}
+ // B. ändern – Beschreibungen: Platz bis zur Uhrzeit der nächsten Sendung, zusammen höchstens der freie Platz der Zelle
+ for(const w of work){const {evs,y,bottom}=w;
+  const free=evs.map((ev,j)=>Math.max(0,(j+1<evs.length?y(+evs[j+1].dataset.s):bottom)-y(+ev.dataset.s)-w.hs[j]-EV_GAP));
+  const sum=free.reduce((a,b)=>a+b,0),k=sum>0?Math.min(1,(w.H-w.base)/sum):0;
+  evs.forEach((ev,j)=>{const d=ev.querySelector('.ds'),img=ev.querySelector('.poster');
+   // ohne Beschreibung: das Bild allein, wenn sein Platz bis zur nächsten Sendung reicht (die Zeile wächst nicht)
+   if(!d){if(img&&free[j]*k>=IMG_PX)img.hidden=false;return}
+   let n=Math.min(MAX_DESC,Math.floor(free[j]*k/LINE_PX));
+   if(img&&n*LINE_PX>=IMG_PX+4*LINE_PX){img.hidden=false;n-=Math.ceil(IMG_PX/LINE_PX)}
+   if(n>=MIN_DESC){d.hidden=false;d.style.webkitLineClamp=n}})}
+ // C. messen: Lage der Sendungen in der Zelle, Innen- und Außenabstände
+ for(const w of work){const ct=w.c.getBoundingClientRect().top;
+  w.tops=w.evs.map(ev=>ev.getBoundingClientRect().top-ct);w.lastBottom=w.evs[w.evs.length-1].getBoundingClientRect().bottom-ct;
+  w.pb=w.evs.map(ev=>parseFloat(getComputedStyle(ev).paddingBottom));w.mt=parseFloat(getComputedStyle(w.evs[0]).marginTop)}
+ // D. ändern – verschieben: jede Sendung nach unten bis zu ihrer Uhrzeit, aber nie über das Zellenende hinaus.
+ // Der Abstand gehört zur Sendung davor (deren Kasten wird länger, Hover und „Jetzt“ decken ihn mit ab). Läuft eine
+ // Sendung aus dem Block davor herein, steht sie oben und bekommt ihn ebenso; sonst bleibt vor der ersten Platz frei.
+ for(const w of work){const {evs,y,bottom,tops}=w,n=evs.length,room=bottom-w.lastBottom;if(room<=1)continue;
+  const S=[];evs.forEach((ev,j)=>S[j]=Math.max(j?S[j-1]:0,y(+ev.dataset.s)-tops[j]));
+  for(let j=n-1;j>=0;j--)S[j]=Math.max(0,Math.min(S[j],room,j+1<n?S[j+1]:room));
+  const pb=[...w.pb];let moved=0;
+  evs.forEach((ev,j)=>{const dlt=S[j]-(j?S[j-1]:0);if(dlt<1)return;moved+=dlt;
+   if(j){pb[j-1]+=dlt;evs[j-1].style.paddingBottom=pb[j-1]+'px'}else ev.style.marginTop=w.mt+dlt+'px'});
+  // die letzte Sendung bis zu ihrem Ende ziehen (höchstens bis zum Zellenende)
+  const want=Math.min(y(+evs[n-1].dataset.e),bottom),lb=w.lastBottom+moved;
+  if(want-lb>=1)evs[n-1].style.paddingBottom=pb[n-1]+want-lb+'px'}
  epgSeams();epgFlow();setTimeout(epgSeams,400)}
 // Nahtstellen über die Blockgrenze: genau bis zur Unterkante der Tabellenzelle bzw. ab deren Oberkante (über die
 // Trennlinie) – per Innenabstand verlängert und per negativem Außenabstand ausgeglichen, die Zelle bleibt gleich hoch.
 // Wiederholbar (z. B. nachdem Bilder geladen sind und eine Zeile sich noch ändert).
-function epgSeams(){const px=(el,p)=>parseFloat(getComputedStyle(el)[p]);
- // feste Höhe (siehe epgFlow): Höhe statt Innenabstand anpassen
- const fit=(ev,d,pad,mar)=>{if(ev.dataset.fixed){if(Math.abs(d)>=.5){ev.style.height=ev.offsetHeight+d+'px';ev.style[mar]=px(ev,mar)-d+'px'}return}
-  d=Math.max(d,-px(ev,pad));if(Math.abs(d)>=.5){ev.style[pad]=px(ev,pad)+d+'px';ev.style[mar]=px(ev,mar)-d+'px'}};
- document.querySelectorAll('table.epg .ev.cont.blank').forEach(ev=>fit(ev,ev.getBoundingClientRect().top-ev.closest('td').getBoundingClientRect().top,'paddingTop','marginTop'));
- document.querySelectorAll('table.epg .ev.spill').forEach(ev=>fit(ev,ev.closest('td').getBoundingClientRect().bottom-ev.getBoundingClientRect().bottom,'paddingBottom','marginBottom'));
- if(document.querySelector('table.epg .ev[data-fixed]'))epgFlow()}
+function epgSeams(){
+ // erst alles messen, dann alles ändern – abwechselnd würde jede Messung die ganze Tabelle neu berechnen lassen
+ const spills=[...document.querySelectorAll('table.epg .ev.spill')],blanks=[...document.querySelectorAll('table.epg .ev.cont.blank')];
+ const m=[...blanks.map(ev=>[ev,ev.getBoundingClientRect().top-ev.closest('td').getBoundingClientRect().top,'paddingTop','marginTop']),
+  ...spills.map(ev=>[ev,ev.closest('td').getBoundingClientRect().bottom-ev.getBoundingClientRect().bottom,'paddingBottom','marginBottom'])]
+  .filter(x=>Math.abs(x[1])>=.5).map(([ev,d,pad,mar])=>{const cs=getComputedStyle(ev);return [ev,d,pad,mar,parseFloat(cs[pad]),parseFloat(cs[mar]),ev.offsetHeight]});
+ for(const [ev,d0,pad,mar,p,mg,h] of m){
+  if(ev.dataset.fixed){ev.style.height=h+d0+'px';ev.style[mar]=mg-d0+'px'}  // feste Höhe (siehe epgFlow): Höhe statt Innenabstand
+  else{const d=Math.max(d0,-p);ev.style[pad]=p+d+'px';ev.style[mar]=mg-d+'px'}}
+ if(m.length&&document.querySelector('table.epg .ev[data-fixed]'))epgFlow()}
 // Text und Bild laufen über die Blockgrenze, als gäbe es sie nicht: Der erste Teil zeigt alles (Beschreibung bis
 // MAX_DESC Zeilen, Bild), abgeschnitten an der Zeilenkante; die Teile in den folgenden Zeilen zeigen denselben
 // Inhalt, um die schon sichtbare Höhe nach oben verschoben. Alle Teile behalten ihre Höhe aus dem Layout.
-function epgFlow(){const px=(el,p)=>parseFloat(getComputedStyle(el)[p]);
- const fix=ev=>{if(!ev.dataset.fixed){ev.style.boxSizing='border-box';ev.style.height=ev.offsetHeight+'px';ev.dataset.fixed=1}};
- document.querySelectorAll('table.epg .ev.spill:not(.cont)').forEach(sp=>{
-  const parts=[...document.querySelectorAll(`table.epg .ev.cont.blank[data-id="${sp.dataset.id}"]`)];if(!parts.length)return;
-  fix(sp);parts.forEach(fix);
+function epgFlow(){
+ const groups=[...document.querySelectorAll('table.epg .ev.spill:not(.cont)')].map(sp=>[sp,[...document.querySelectorAll(`table.epg .ev.cont.blank[data-id="${sp.dataset.id}"]`)]]).filter(g=>g[1].length);
+ // 1. messen: Höhen und obere Innenabstände
+ const all=groups.flatMap(([sp,parts])=>[sp,...parts]);
+ const H=new Map(all.map(ev=>[ev,ev.offsetHeight])),PT=new Map(all.map(ev=>[ev,parseFloat(getComputedStyle(ev).paddingTop)]));
+ // 2. ändern: Höhen festschreiben, ersten Teil aufklappen, Folgeteile mit verschobener Kopie füllen
+ for(const ev of all)if(!ev.dataset.fixed){ev.style.boxSizing='border-box';ev.style.height=H.get(ev)+'px';ev.dataset.fixed=1}
+ for(const [sp,parts] of groups){
   if(!sp.dataset.open){const d=sp.querySelector('.ds'),img=sp.querySelector('.poster');
    if(d){d.hidden=false;d.style.webkitLineClamp=MAX_DESC}if(img)img.hidden=false;sp.dataset.open=1}
   // Kopie ohne onload – sonst stieße jedes geladene Bild der Kopie diese Funktion erneut an (Endlosschleife)
   const inner=sp.innerHTML.replace(/ onload="[^"]*"/g,'');
-  let seen=sp.getBoundingClientRect().bottom-sp.getBoundingClientRect().top-px(sp,'paddingTop');
-  for(const b of parts){const off=Math.round(seen+px(b,'paddingTop'));
+  let seen=H.get(sp)-PT.get(sp);
+  for(const b of parts){const off=Math.round(seen+PT.get(b));
    if(b.dataset.off!=off){b.innerHTML=`<div class="flow" style="margin-top:${-off}px">${inner}</div>`;b.dataset.off=off}
-   seen+=b.offsetHeight}})}
+   seen+=H.get(b)}}}
 // Volle Zelle: CELLMAX Sendungen zeigen, aber die laufende muss dabei sein – davor liegende
 // verschwinden dann oben unter „+ n frühere“, spätere wie bisher unten unter „+ n weitere“.
 function cellCut(all,k){if(EPGX.has(k)||all.length<=CELLMAX)return 0;const now=Date.now()/1000,i=all.findIndex(e=>e.start<=now&&now<e.stop);

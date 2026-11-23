@@ -198,7 +198,8 @@ table.epg tr.blkbar{display:none}
 table.epg tr.blkbar th{position:sticky;top:var(--eh,86px);z-index:2;padding:6px 10px;border-right:0;text-align:left;
  background:color-mix(in srgb,var(--acc) 14%,var(--solid));font-size:14px;color:var(--fg);width:auto;max-width:none}
 table.epg tr.blkbar th div{position:sticky;left:10px;display:inline-block;font-weight:700}
-table.epg tbody tr+tr td,table.epg tbody tr+tr th{border-top:3px solid color-mix(in srgb,var(--acc) 25%,var(--line))}
+/* Blockgrenze nur angedeutet – die Blöcke synchronisieren nur die Zeitachse, Sendungen laufen darüber hinweg */
+table.epg tbody td,table.epg tbody th{border-bottom-color:color-mix(in srgb,var(--line) 35%,transparent)}
 .ev{cursor:pointer;border-radius:8px;padding:5px;margin:-3px;font-size:13px;line-height:1.35;border-bottom:1px dashed var(--line);padding-bottom:7px;transition:background .12s}
 .ev:last-child{border-bottom:0}.ev:hover{background:var(--hover)}
 .ev+.ev{margin-top:7px}.ev .tt{font-size:12px}.ev .st{font-size:12px;font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
