@@ -187,11 +187,21 @@ def scan_add(tvh, uuids):
 
 
 def scan_delete(tvh, uuids):
-    """Löscht Sender einzeln (gemischte Listen löscht TVHeadend nur teilweise)."""
-    known = {c['uuid']: c.get('name') for c in grid(tvh, 'channel/grid')}
+    """Löscht Sender einzeln (gemischte Listen löscht TVHeadend nur teilweise). Liegt danach auf einem Transponder
+    kein Sender mehr, wird dort die EPG-Abfrage abgeschaltet: Fremde Transponder (z. B. Movistar+) senden auch
+    Programmdaten für andere Sender – so hatte ein spanischer 24-Stunden-Platzhalter das Programm von arte ersetzt."""
+    chans = grid(tvh, 'channel/grid')
+    known = {c['uuid']: c.get('name') for c in chans}
+    svc_mux = {s['uuid']: s.get('multiplex_uuid') for s in grid(tvh, 'mpegts/service/grid')}
+    touched = {svc_mux.get(s) for c in chans if c['uuid'] in uuids for s in c.get('services', [])} - {None}
     deleted = []
     for u in uuids:
         if u in known:
             tvh.call('idnode/delete', uuid=u)
             deleted.append(known[u])
-    return {'deleted': deleted}
+    epg_off = []
+    for m in grid(tvh, 'mpegts/mux/grid'):
+        if m['uuid'] in touched and not m.get('num_chn') and m.get('epg'):
+            tvh.call('idnode/save', node=json.dumps({'uuid': m['uuid'], 'epg': 0}))
+            epg_off.append(m.get('name'))
+    return {'deleted': deleted, 'epg_off': epg_off}
