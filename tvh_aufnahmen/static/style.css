@@ -232,6 +232,14 @@ figure.wp figcaption{font-size:11px;margin-top:4px}
 /* ---------- Handy und schmale Fenster ---------- */
 @media (max-width:760px){
  table.epg tr.blkbar{display:table-row}
+ /* Die Leiste belegt keinen Platz mehr: Sie liegt zu 70 % durchsichtig über den Sendungen, deren Text und Bild darunter
+    einfach weiterlaufen (die Zeile selbst ist 0 px hoch, die Leiste hängt als Überlagerung daran) */
+ table.epg tr.blkbar th{height:0;padding:0;border:0;background:none;line-height:0}
+ table.epg tr.blkbar th>div{position:absolute;left:0;right:0;top:0;height:26px;line-height:26px;padding:0 10px;display:block;
+  background:color-mix(in srgb,color-mix(in srgb,var(--acc) 14%,var(--solid)) 30%,transparent);
+  border-top:1px solid color-mix(in srgb,var(--acc) 30%,transparent);pointer-events:none}
+ table.epg tr.blkbar.gone th>div{display:none}
+ table.epg tr.blkbar th>div>span{position:sticky;left:10px;font-weight:700;text-shadow:0 0 4px var(--solid),0 0 2px var(--solid)}
  table.epg .tm{display:none}
  header{padding:6px 10px;gap:8px}
  .logo-mark{display:none}
