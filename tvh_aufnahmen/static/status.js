@@ -21,6 +21,7 @@ async function renderStatus(){let s;try{s=await api('/api/status')}catch(e){$('#
   <div class="kv"><span>${L('st.memory')}</span><b>${L('st.of',{a:gb(sy.mem_total-sy.mem_avail),b:gb(sy.mem_total)})}</b></div>${meter(memPct,memPct>90?'bad':memPct>80?'warn':'')}
   <div class="kv"><span>${L('st.uptime')}</span><b>${dur(sy.uptime)}</b></div>
   <div class="kv"><span>TVHeadend</span><b>${esc(s.version||'')}</b></div>
+  <div class="kv"><span>tvh-aufnahmen</span><b>${esc(s.app_version||'')}</b></div>
   <div class="kv"><span>${L('st.clients')}</span><b>${s.clients}</b></div></div>
  <div class="card"><div class="card-h"><b>${L('st.storage')}</b></div>
   <div class="kv"><span>${L('st.used')}</span><b>${L('st.of',{a:gb(d.used),b:gb(d.total)})}</b></div>${meter(dp,dp>=95?'bad':dp>=88?'warn':'')}

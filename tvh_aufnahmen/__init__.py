@@ -1,7 +1,6 @@
-"""tvh-aufnahmen: Web-Oberfläche, um TVHeadend-Aufnahmen zu verwalten – anzeigen,
-suchen, herunterladen, Datei ersetzen und löschen –, Videodateien wieder als
-Aufnahmen einzutragen und Einträge zu bereinigen, deren Datei nicht mehr existiert.
+"""tvh-aufnahmen: Web-Oberfläche für TVHeadend 4.3 – Programm, Live-TV und Aufnahmen im Browser, Serienaufnahmen,
+Konflikte, Werbeerkennung, Sender verwalten, Sicherung.
 
-Läuft direkt auf dem OSMC-Gerät (Python 3, nur Standardbibliothek).
-Getestet gegen die API von TVHeadend 4.3.
+Läuft auf dem TVHeadend-Rechner (Python 3, nur Standardbibliothek; ffmpeg für den Player).
 """
+__version__ = '1.0'

@@ -4,6 +4,7 @@ import re
 import socket
 import time
 
+from . import __version__
 from .state import disk_info
 
 STARTED = time.time()
@@ -70,6 +71,6 @@ def status(tvh, recdir):
                   'stop': e.get('stop'), 'size': e.get('filesize') or 0}
                  for e in tvh.call('dvr/entry/grid_upcoming', limit=1000).get('entries', [])
                  if e.get('sched_status') == 'recording']
-    return {'version': tvh.call('serverinfo').get('sw_version'), 'tuners': tuners(tvh), 'subscriptions': subs,
+    return {'version': tvh.call('serverinfo').get('sw_version'), 'app_version': __version__, 'tuners': tuners(tvh), 'subscriptions': subs,
             'recording': recording, 'system': system(), 'disk': disk_info(recdir),
             'clients': len(tvh.call('status/connections').get('entries', []))}

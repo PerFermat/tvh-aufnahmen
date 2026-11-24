@@ -4,7 +4,7 @@ import os
 import socket
 from http.server import ThreadingHTTPServer
 
-from . import i18n
+from . import __version__, i18n
 from .ads import Ads
 from .auth import Auth
 from .config import App, find_tvhconf, load_config
@@ -50,6 +50,7 @@ def main():
     p.add_argument('--tvhconf', help=_('cli.tvhconf'))
     p.add_argument('--tvh-service', default='tvheadend', help=_('cli.service'))
     p.add_argument('--port', type=int, default=8099, help=_('cli.port'))
+    p.add_argument('--version', action='version', version='tvh-aufnahmen ' + __version__)
     p.add_argument('--bind', default='::', help=_('cli.bind'))
     a = p.parse_args()
 
