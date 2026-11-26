@@ -60,7 +60,15 @@ Läuft auf einem Linux-Rechner mit TVHeadend (x86 oder ARM). Python 3.7+, keine 
 
 ## Installation
 
-Das Tool läuft auf jedem Linux-Rechner, auf dem auch TVHeadend läuft. Kopiert werden der Starter `tvh-aufnahmen.py` und der Ordner `tvh_aufnahmen` daneben – am besten ins Home-Verzeichnis des Benutzers, unter dem TVHeadend läuft (`<benutzer>`), damit das Tool Aufnahmen und Konfiguration lesen und schreiben darf:
+**Mit dem Installationsskript** (Debian, Ubuntu, Raspberry Pi OS) – auf dem TVHeadend-Rechner:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/PerFermat/tvh-aufnahmen/main/install.sh | sudo bash
+```
+
+Das Skript ermittelt den Benutzer, unter dem TVHeadend läuft, installiert python3, ffmpeg und auf Wunsch comskip, lädt das neueste Release nach `~<benutzer>/tvh-aufnahmen`, richtet den systemd-Dienst ein und startet ihn. Auf Wunsch erlaubt es dem Benutzer, TVHeadend zum Einspielen einer Komplettsicherung zu stoppen und zu starten (sudo-Regel nur für diese zwei Befehle). Zum Schluss nennt es die Adresse der Oberfläche; dort unter „Einstellungen“ den TVHeadend-Benutzer mit Passwort eintragen. Erneut ausgeführt aktualisiert es auf das neueste Release, Einstellungen bleiben. Optionen (Benutzer, Ordner, Port, Version, Deinstallieren): `bash install.sh --help`.
+
+**Von Hand:** Das Tool läuft auf jedem Linux-Rechner, auf dem auch TVHeadend läuft. Kopiert werden der Starter `tvh-aufnahmen.py` und der Ordner `tvh_aufnahmen` daneben – am besten ins Home-Verzeichnis des Benutzers, unter dem TVHeadend läuft (`<benutzer>`), damit das Tool Aufnahmen und Konfiguration lesen und schreiben darf:
 
 ```bash
 rsync -a --exclude __pycache__ tvh-aufnahmen.py tvh_aufnahmen <benutzer>@<tvheadend-rechner>:~/tvh-aufnahmen/

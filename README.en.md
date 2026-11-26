@@ -62,7 +62,15 @@ Runs on a Linux computer with Tvheadend (x86 or ARM). Python 3.7+, no additional
 
 ## Installation
 
-The tool runs on any Linux computer that also runs Tvheadend. Copy the launcher `tvh-aufnahmen.py` and the folder `tvh_aufnahmen` next to it – preferably into the home directory of the user Tvheadend runs as (`<user>`), so the tool may read and write recordings and configuration:
+**With the install script** (Debian, Ubuntu, Raspberry Pi OS) – on the Tvheadend machine:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/PerFermat/tvh-aufnahmen/main/install.sh | sudo bash
+```
+
+The script finds the user Tvheadend runs as, installs python3, ffmpeg and optionally comskip, downloads the latest release to `~<user>/tvh-aufnahmen`, sets up the systemd service and starts it. Optionally it allows the user to stop and start Tvheadend for restoring a full backup (sudo rule for exactly these two commands). At the end it shows the address of the interface; there, enter the Tvheadend user and password under “Settings”. Running it again updates to the latest release, settings are kept. Options (user, folder, port, version, uninstall): `bash install.sh --help`.
+
+**Manually:** the tool runs on any Linux computer that also runs Tvheadend. Copy the launcher `tvh-aufnahmen.py` and the folder `tvh_aufnahmen` next to it – preferably into the home directory of the user Tvheadend runs as (`<user>`), so the tool may read and write recordings and configuration:
 
 ```bash
 rsync -a --exclude __pycache__ tvh-aufnahmen.py tvh_aufnahmen <user>@<tvheadend-host>:~/tvh-aufnahmen/
